@@ -35,3 +35,13 @@ npm run build
 ```
 
 The GUI is served from `http://127.0.0.1:8765` after `web\dist` exists.
+
+Local diagnostics include Codex doctor, MoonBridge models, Lark auth status, logs, and backup cleanup.
+
+Desktop-friendly scripts:
+
+```powershell
+F:\1AI\feishu_agent\scripts\start-control-center.ps1
+F:\1AI\feishu_agent\scripts\status-control-center.ps1
+F:\1AI\feishu_agent\scripts\install-control-center-shortcut.ps1
+```

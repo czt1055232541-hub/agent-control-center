@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import codex_agent, codex_desktop, codex_provider, moonbridge, openclaw, stack_actions
+from . import backups, codex_agent, codex_desktop, codex_provider, diagnostics as diagnostics_module, moonbridge, openclaw, stack_actions
 from .config import StackConfig, load_config
 from .logs import tail
 from .models import OperationResult, to_dict
@@ -49,11 +49,32 @@ def logs(component: str, lines: int = 120) -> dict:
         "openclaw": [cfg.openclaw_stdout_log, cfg.openclaw_stderr_log],
         "moonbridge": [cfg.moonbridge_stdout_log, cfg.moonbridge_stderr_log],
         "codex-agent": [cfg.codex_agent_stdout_log, cfg.codex_agent_stderr_log],
+        "control-center-api": [cfg.log_dir / "control-center-api-out.log", cfg.log_dir / "control-center-api-err.log"],
         "operations": [cfg.log_dir / "operations.jsonl"],
     }
     if component not in table:
         raise HTTPException(status_code=404, detail=f"Unknown log component: {component}")
     return {"component": component, "logs": [to_dict(tail(path, lines)) for path in table[component]]}
+
+
+@app.get("/api/doctor/codex")
+def codex_doctor() -> dict:
+    return diagnostics_module.codex_doctor()
+
+
+@app.get("/api/moonbridge/models")
+def moonbridge_models() -> dict:
+    return diagnostics_module.moonbridge_models()
+
+
+@app.get("/api/lark/auth-status")
+def lark_auth_status() -> dict:
+    return diagnostics_module.lark_auth_status()
+
+
+@app.get("/api/diagnostics")
+def diagnostics() -> dict:
+    return to_dict(diagnostics_module.diagnostics())
 
 
 @app.post("/api/openclaw/start", dependencies=[Depends(require_control_token)])
@@ -129,6 +150,11 @@ def stack_stop() -> dict:
 @app.post("/api/codex-desktop/stop", dependencies=[Depends(require_control_token)])
 def stop_codex_desktop() -> dict:
     return _run("codex-desktop", "stop", codex_desktop.stop)
+
+
+@app.post("/api/backups/clean", dependencies=[Depends(require_control_token)])
+def clean_backups() -> dict:
+    return _run("backups", "clean", backups.clean)
 
 
 web_dist = Path(__file__).resolve().parents[2] / "web" / "dist"

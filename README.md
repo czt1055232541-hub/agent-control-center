@@ -34,6 +34,14 @@ cd F:\1AI\feishu_agent\control-center
 E:\Python\python.exe -m uvicorn feishu_stack.app:app --host 127.0.0.1 --port 8765
 ```
 
+Or use the desktop-friendly wrapper:
+
+```powershell
+.\scripts\start-control-center.ps1
+.\scripts\status-control-center.ps1
+.\scripts\install-control-center-shortcut.ps1
+```
+
 Open:
 
 ```text

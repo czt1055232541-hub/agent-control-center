@@ -712,3 +712,48 @@ Remaining work:
 - Phase 4 diagnostics panels are not implemented yet.
 - Phase 5 desktop convenience script/tray/Electron work is not implemented yet.
 - Production GUI requires `web\dist`; this build output is intentionally ignored by git.
+
+## Phase 4/5 Progress
+
+Last updated: 2026-06-18
+
+Phase 4 and the script-based part of Phase 5 are implemented.
+
+Implemented diagnostics:
+
+- `GET /api/doctor/codex`
+- `GET /api/moonbridge/models`
+- `GET /api/lark/auth-status`
+- `GET /api/diagnostics`
+- `POST /api/backups/clean`
+- GUI Diagnostics panel for Codex doctor, MoonBridge models, Lark auth status, and backup cleanup.
+- Log viewer supports OpenClaw, MoonBridge, Codex Agent, Control Center API, and Operations logs.
+
+Implemented desktop convenience:
+
+- `scripts\start-control-center.ps1`
+- `scripts\stop-control-center.ps1`
+- `scripts\status-control-center.ps1`
+- `scripts\install-control-center-shortcut.ps1`
+- Desktop shortcut: `Feishu Codex Control Center.lnk`
+
+Run:
+
+```powershell
+cd F:\1AI\feishu_agent
+.\scripts\start-control-center.ps1
+.\scripts\status-control-center.ps1
+.\scripts\install-control-center-shortcut.ps1
+```
+
+Open:
+
+```text
+http://127.0.0.1:8765
+```
+
+Notes:
+
+- Backup cleanup keeps the latest `config.toml.bak-switch-*` and latest `config.toml.bak-restore-native-*`; `config.toml.bak-goal-*` is preserved.
+- `scripts\stop-control-center.ps1` stops only the Control Center API.
+- Electron/tray wrapper remains unimplemented by design.

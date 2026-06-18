@@ -76,3 +76,59 @@ def test_stack_stop_does_not_stop_codex_desktop(monkeypatch) -> None:
     response = client.post("/api/stack/stop", headers={"X-Control-Token": token})
     assert response.status_code == 200
     assert response.json()["component"] == "stack"
+
+
+def test_diagnostics_endpoint_uses_mock(monkeypatch) -> None:
+    monkeypatch.setattr(app_module.diagnostics_module, "diagnostics", lambda: {"codex_doctor": {"ok": True}})
+    response = client.get("/api/diagnostics")
+    assert response.status_code == 200
+    assert response.json()["codex_doctor"]["ok"] is True
+
+
+def test_codex_doctor_endpoint_uses_mock(monkeypatch) -> None:
+    monkeypatch.setattr(app_module.diagnostics_module, "codex_doctor", lambda: {"ok": True, "stdout": "doctor"})
+    response = client.get("/api/doctor/codex")
+    assert response.status_code == 200
+    assert response.json()["stdout"] == "doctor"
+
+
+def test_moonbridge_models_endpoint_uses_mock(monkeypatch) -> None:
+    monkeypatch.setattr(app_module.diagnostics_module, "moonbridge_models", lambda: {"ok": True, "models": ["moonbridge"]})
+    response = client.get("/api/moonbridge/models")
+    assert response.status_code == 200
+    assert response.json()["models"] == ["moonbridge"]
+
+
+def test_lark_auth_status_endpoint_uses_mock(monkeypatch) -> None:
+    monkeypatch.setattr(app_module.diagnostics_module, "lark_auth_status", lambda: {"ok": True, "stdout": "logged in"})
+    response = client.get("/api/lark/auth-status")
+    assert response.status_code == 200
+    assert response.json()["stdout"] == "logged in"
+
+
+def test_backup_cleanup_requires_token() -> None:
+    response = client.post("/api/backups/clean")
+    assert response.status_code == 401
+    response = client.post("/api/backups/clean", headers={"X-Control-Token": "bad"})
+    assert response.status_code == 403
+
+
+def test_backup_cleanup_route_uses_mock(monkeypatch) -> None:
+    token = _token()
+    called = {"clean": False}
+
+    def fake_clean(_config):
+        called["clean"] = True
+        return OperationResult(True, "backups", "clean", "mock clean")
+
+    monkeypatch.setattr(app_module.backups, "clean", fake_clean)
+    response = client.post("/api/backups/clean", headers={"X-Control-Token": token})
+    assert response.status_code == 200
+    assert response.json()["component"] == "backups"
+    assert called["clean"] is True
+
+
+def test_control_center_log_route() -> None:
+    response = client.get("/api/logs/control-center-api")
+    assert response.status_code == 200
+    assert response.json()["component"] == "control-center-api"
