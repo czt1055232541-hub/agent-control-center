@@ -14,6 +14,13 @@ def find_stack_root(start: Path | None = None) -> Path:
     raise FileNotFoundError("Could not find config/stack.settings.json")
 
 
+def infer_lark_cli_home(lark_cli_bin: Path, stack_root: Path) -> Path:
+    for parent in [lark_cli_bin, *lark_cli_bin.parents]:
+        if parent.name == ".npm-global":
+            return parent.parent / ".home"
+    return stack_root / ".home"
+
+
 @dataclass(frozen=True)
 class StackConfig:
     raw: dict[str, Any]
@@ -37,6 +44,7 @@ class StackConfig:
     runtime_dir: Path
     log_dir: Path
     pid_dir: Path
+    lark_cli_home: Path | None = None
 
     @property
     def pid_openclaw(self) -> Path:
@@ -107,10 +115,10 @@ def load_config(path: Path | None = None) -> StackConfig:
         agent_dir=Path(agent["dir"]),
         agent_entry=Path(agent["dir"]) / agent["entry"],
         lark_cli_bin=Path(agent["larkCliBin"]),
+        lark_cli_home=Path(agent["larkCliHome"]) if agent.get("larkCliHome") else infer_lark_cli_home(Path(agent["larkCliBin"]), stack_root),
         runtime_dir=Path(runtime["dir"]),
         log_dir=Path(runtime["logs"]),
         pid_dir=Path(runtime["pids"]),
     )
     config.ensure_runtime_dirs()
     return config
-

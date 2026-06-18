@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import subprocess
 import time
 
@@ -31,23 +32,46 @@ def start(config: StackConfig | None = None) -> OperationResult:
     built, build_message = _build_if_needed(cfg)
     if not built:
         return OperationResult(False, "codex-agent", "start", build_message)
+    lark_cli_home = cfg.lark_cli_home or (cfg.stack_root / ".home")
+    agent_settings = cfg.raw.get("agent", {})
     env = os.environ.copy()
     env.update(
         {
             "CODEX_HOME": str(cfg.codex_home),
             "CODEX_CLI_BIN": str(cfg.codex_bin),
-            "AGENT_PROVIDER": "codex",
+            "AGENT_PROVIDER": str(agent_settings.get("provider") or "local"),
             "AGENT_NAME": "codex",
             "AGENT_MENTION": "Codex",
+            "DRY_RUN": "false",
             "LARK_IDENTITY": "bot",
-            "LARK_CLI_OUTPUT_ENCODING": "utf8",
+            "LARK_CLI_OUTPUT_ENCODING": "auto",
             "LARK_EVENT_TIMEOUT": "8760h",
             "LARK_CLI_BIN": str(cfg.lark_cli_bin),
             "LARK_CLI_CWD": str(cfg.stack_root),
+            "HOME": str(lark_cli_home),
+            "USERPROFILE": str(lark_cli_home),
+            "APPDATA": str(lark_cli_home / "AppData" / "Roaming"),
+            "LOCALAPPDATA": str(lark_cli_home / "AppData" / "Local"),
             "OPENCLAW_HOME": "",
             "CLAW_HOME": "",
         }
     )
+    if agent_settings.get("larkBotOpenId"):
+        env["LARK_BOT_OPEN_ID"] = str(agent_settings["larkBotOpenId"])
+    if agent_settings.get("a2aBots"):
+        env["A2A_BOTS"] = json.dumps(agent_settings["a2aBots"], ensure_ascii=False)
+    a2a_relay = agent_settings.get("a2aRelay") or {}
+    if a2a_relay:
+        env["A2A_RELAY_ENABLED"] = "true" if a2a_relay.get("enabled") else "false"
+        relay_env_map = {
+            "groupChatId": "A2A_RELAY_GROUP_CHAT_ID",
+            "peerName": "A2A_RELAY_PEER_NAME",
+            "peerOpenId": "A2A_RELAY_PEER_OPEN_ID",
+            "peerCliHome": "A2A_RELAY_PEER_CLI_HOME",
+        }
+        for key, env_key in relay_env_map.items():
+            if a2a_relay.get(key):
+                env[env_key] = str(a2a_relay[key])
     proc = start_process(
         ["node.exe", "dist\\src\\index.js"],
         cwd=cfg.agent_dir,

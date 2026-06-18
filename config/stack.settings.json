@@ -17,12 +17,40 @@
   "openclaw": {
     "home": "E:\\openclaw\\clawclaw",
     "gatewayCmd": "E:\\openclaw\\clawclaw\\.openclaw\\gateway.cmd",
-    "port": 18789
+    "port": 18789,
+    "a2aBots": [
+      {
+        "name": "Codex",
+        "openId": "ou_3fde5fb022f4ecdc31dc04a5b94499d8",
+        "aliases": [
+          "Codex",
+          "codeX agent",
+          "Codex Agent"
+        ]
+      }
+    ]
   },
   "agent": {
     "dir": "F:\\1AI\\feishu_agent\\agents\\feishu-codex-agent",
     "entry": "dist\\src\\index.js",
-    "larkCliBin": "F:\\1AI\\feishu_agent\\.npm-global\\node_modules\\@larksuite\\cli\\bin\\lark-cli.exe"
+    "provider": "codex",
+    "larkCliBin": "F:\\1AI\\feishu_agent\\.npm-global\\node_modules\\@larksuite\\cli\\bin\\lark-cli.exe",
+    "larkCliHome": "F:\\1AI\\feishu_agent\\.home",
+    "larkBotOpenId": "ou_3fde5fb022f4ecdc31dc04a5b94499d8",
+    "a2aBots": [
+      {
+        "name": "龙虾酱",
+        "openId": "ou_eb0ee5955e64d44a38f55ba6c5201beb",
+        "description": "OpenClaw assistant"
+      }
+    ],
+    "a2aRelay": {
+      "enabled": true,
+      "groupChatId": "oc_48eddce2c13083893aeb36d26827b856",
+      "peerName": "龙虾酱",
+      "peerOpenId": "ou_eb0ee5955e64d44a38f55ba6c5201beb",
+      "peerCliHome": "C:\\Users\\admin"
+    }
   },
   "runtime": {
     "dir": "F:\\1AI\\Agent control center\\runtime",
