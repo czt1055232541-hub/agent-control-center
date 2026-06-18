@@ -45,4 +45,4 @@ git push
 
 ## Planning Docs
 
-- [GUI Control Center Plan](docs/gui-control-center-plan.md)
+- [Python-first GUI Control Center Plan](docs/gui-control-center-plan.md)
