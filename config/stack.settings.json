@@ -1,0 +1,9 @@
+{
+  "repository": "czt1055232541-hub/feishu-codex-stack",
+  "codexHome": "E:\\codeX",
+  "codexNativeModel": "gpt-5.5",
+  "codexMoonBridgeModel": "moonbridge",
+  "moonBridgeBaseUrl": "http://127.0.0.1:38440/v1",
+  "openClawPort": 18789,
+  "moonBridgePort": 38440
+}
