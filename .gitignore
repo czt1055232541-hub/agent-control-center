@@ -35,6 +35,11 @@ dist/
 coverage/
 .cache/
 tmp/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Databases and logs
 *.sqlite
