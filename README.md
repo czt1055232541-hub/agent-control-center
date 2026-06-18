@@ -18,6 +18,23 @@ This private stack keeps the local Feishu agents, Codex provider switching tools
 
 Root `start-all.ps1` and `stop-all.ps1` are compatibility wrappers.
 
+## GitHub
+
+Private repository:
+
+```text
+git@github.com:czt1055232541-hub/feishu-codex-stack.git
+```
+
+Normal update flow:
+
+```powershell
+git status
+git add -A
+git commit -m "Describe the change"
+git push
+```
+
 ## Layout
 
 - `config/`: shared paths and stack settings
