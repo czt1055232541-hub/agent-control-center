@@ -42,3 +42,7 @@ git push
 - `codex/`: provider switching, backup cleanup, and thread migration tools
 - `agents/`: Feishu Codex agent and OpenClaw Feishu bot plugin source
 - `docs/`: provider switching and recovery notes
+
+## Planning Docs
+
+- [GUI Control Center Plan](docs/gui-control-center-plan.md)
