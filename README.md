@@ -18,7 +18,7 @@ Python is the source of truth for stack control. PowerShell files are compatibil
 .\codex\Restore-CodexNative.ps1
 ```
 
-Root `start-all.ps1` and `stop-all.ps1` are compatibility wrappers.
+Use the scripts under `scripts/` as the compatibility wrappers. The old root-level wrappers were removed during cleanup.
 
 Preferred Python flow:
 
@@ -87,11 +87,15 @@ git push
 
 ## Layout
 
-- `config/`: shared paths and stack settings
-- `scripts/`: start, stop, and status scripts
-- `codex/`: provider switching, backup cleanup, and thread migration tools
-- `agents/`: Feishu Codex agent and OpenClaw Feishu bot plugin source
-- `docs/`: provider switching and recovery notes
+- `control-center/`: Python control package, FastAPI API, tests, and React/Tailwind GUI source
+- `agents/`: Feishu Codex Agent and OpenClaw Feishu bot plugin source
+- `scripts/`: compatibility wrappers and desktop entry scripts
+- `codex/`: compatibility wrappers plus thread migration/test tools
+- `config/`: stack settings and legacy PowerShell path definitions
+- `docs/`: architecture, provider switching, and recovery notes
+- `runtime/`: ignored local logs, PID files, and local control token
+- `.npm-global/`: ignored local Lark CLI install used by the agent
+- `.home/`: ignored local Lark/OpenClaw auth state
 
 ## Planning Docs
 
