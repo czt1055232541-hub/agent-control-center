@@ -12,8 +12,10 @@ auth*.json
 runtime/*
 !runtime/.gitkeep
 !runtime/logs/
+runtime/logs/*
 !runtime/logs/.gitkeep
 !runtime/pids/
+runtime/pids/*
 !runtime/pids/.gitkeep
 codex-home/
 .appdata/

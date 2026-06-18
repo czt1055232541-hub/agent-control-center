@@ -35,7 +35,14 @@ Last local verification: 2026-06-18.
 - `moonbridge`: `codex doctor --summary` loaded config, did not require OpenAI auth for the active provider, reached the active provider over HTTP, and reported no failures.
 - Remaining doctor warnings are unrelated to the switch scripts: Codex WebSocket fallback in native mode and two historical thread rows pointing at missing rollout files.
 
-Because Codex Desktop was running during the setup, live `resume` / `fork` cross-provider validation is intentionally left for manual confirmation.
+Cross-provider validation was run on 2026-06-18 with native session `019ed8ed-2bb4-7d01-91d1-a3cce908c7d7` and target model/provider `moonbridge`.
+
+- `codex exec resume <session_id> -m moonbridge` accepted the native session and started with `model: moonbridge`, `provider: moonbridge`, and the original session id. Codex logged: `resuming session with different model: previous=gpt-5.5, current=moonbridge`.
+- `codex exec resume <session_id> -c model="moonbridge" -c model_provider="moonbridge"` also started with `model: moonbridge`, `provider: moonbridge`, and the original session id.
+- Both non-interactive resume runs were stopped after the configured timeout before a final assistant response was produced.
+- `codex fork ...` cannot be validated from a hidden non-interactive process because the CLI requires a terminal and exits with `stdin is not a terminal`.
+
+Conclusion: CLI resume can attach the previous native session to the MoonBridge provider without manually editing Codex DB or rollout files. Full response completion and interactive `fork` should still be manually confirmed in a real terminal/Codex UI.
 
 ## Conversation Continuity
 
@@ -47,7 +54,7 @@ When Codex Desktop is not actively using the target session, use:
 .\codex\Test-CodexProviderThread.ps1 -SessionId <session-id> -TargetModel moonbridge
 ```
 
-The test records whether `resume` or `fork` can cross providers. Treat this as a manual validation step until you confirm it on a quiet Codex Desktop session.
+The test records whether `resume` or `fork` can cross providers. Headless `fork` is expected to fail unless it has a real terminal.
 
 If direct continuation fails, use:
 
@@ -55,4 +62,4 @@ If direct continuation fails, use:
 .\codex\Continue-CodexThreadWithProvider.ps1 -SessionId <session-id> -TargetModel moonbridge
 ```
 
-That tool first attempts direct fork. If it fails, it creates a new provider run using a summary migration prompt from the prior rollout tail.
+That tool first attempts bounded `codex exec resume`. If it fails or times out, it creates a new provider run using a summary migration prompt from the prior rollout tail. The tool writes stdout/stderr logs under `runtime\logs`, which is intentionally ignored by git.
