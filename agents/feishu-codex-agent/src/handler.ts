@@ -4,11 +4,13 @@ import { routeCommand } from "./router.js";
 import { draftAgentResponse } from "./agent.js";
 import { ConfirmationStore } from "./confirmationStore.js";
 import type { FeishuMessageEvent, RouteResult } from "./types.js";
-import { LarkCli } from "./larkCli.js";
+import { LarkCli, type LarkPostContent, type LarkPostElement } from "./larkCli.js";
+import { A2ARelay } from "./a2aRelay.js";
 
  export class MessageHandler {
    private readonly confirmations: ConfirmationStore;
    private readonly a2aBotOpenIds: Set<string>;
+   private readonly a2aRelay: A2ARelay;
 
    constructor(
      private readonly config: AppConfig,
@@ -16,6 +18,7 @@ import { LarkCli } from "./larkCli.js";
    ) {
      this.confirmations = new ConfirmationStore(config.confirmTimeoutMs);
      this.a2aBotOpenIds = new Set(config.a2aBots.map((b) => b.openId));
+     this.a2aRelay = new A2ARelay(config, larkCli);
    }
 
    async handleRaw(raw: unknown): Promise<void> {
@@ -37,6 +40,9 @@ import { LarkCli } from "./larkCli.js";
 
   async handleEvent(event: FeishuMessageEvent): Promise<string> {
     const cleanText = cleanTriggerText(event.plainText, this.config.botName);
+    if (this.a2aRelay.shouldHandle(event, cleanText)) {
+      return this.a2aRelay.run(event, cleanText);
+    }
     const senderKey = senderKeyFor(event);
     const confirmed = this.confirmations.consumeIfConfirmed(event.chatId, senderKey, cleanText);
     if (confirmed) {
@@ -70,10 +76,10 @@ import { LarkCli } from "./larkCli.js";
      ]
        .filter(Boolean)
        .join("\n\n");
-     if (this.config.a2aBots.length > 0) {
-       response = this.convertAtTags(response);
-     }
-     const sendResult = await this.larkCli.sendText(chatId, response);
+     const richResponse = this.toRichTextWithA2AMentions(response);
+     const sendResult = richResponse
+       ? await this.larkCli.sendPost(chatId, richResponse)
+       : await this.larkCli.sendText(chatId, response);
     if (!sendResult.ok) {
       console.error(`[agent] failed to reply chat_id=${chatId} code=${sendResult.code} stderr=${preview(sendResult.stderr || sendResult.stdout, 1000)}`);
     } else {
@@ -82,14 +88,39 @@ import { LarkCli } from "./larkCli.js";
      return response;
    }
 
-   private convertAtTags(text: string): string {
-     let result = text;
-     for (const bot of this.config.a2aBots) {
-       const escapedName = bot.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-       const pattern = new RegExp(`@${escapedName}`, "g");
-       result = result.replace(pattern, `<at user_id="${bot.openId}">${bot.name}</at>`);
+   private toRichTextWithA2AMentions(value: string): LarkPostContent | null {
+     if (this.config.a2aBots.length === 0) {
+       return null;
      }
-     return result;
+     const mentionPattern = new RegExp(
+       this.config.a2aBots.map((bot) => `@${bot.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).join("|"),
+       "g"
+     );
+     const elements: LarkPostElement[] = [];
+     let cursor = 0;
+     let hasMention = false;
+     for (const match of value.matchAll(mentionPattern)) {
+       const matchText = match[0];
+       const index = match.index ?? 0;
+       if (index > cursor) {
+         elements.push({ tag: "text", text: value.slice(cursor, index) });
+       }
+       const bot = this.config.a2aBots.find((item) => matchText === `@${item.name}`);
+       if (bot) {
+         elements.push({ tag: "at", user_id: bot.openId, user_name: bot.name });
+         hasMention = true;
+       } else {
+         elements.push({ tag: "text", text: matchText });
+       }
+       cursor = index + matchText.length;
+     }
+     if (!hasMention) {
+       return null;
+     }
+     if (cursor < value.length) {
+       elements.push({ tag: "text", text: value.slice(cursor) });
+     }
+     return { zh_cn: { content: [elements] } };
    }
  }
 
@@ -143,6 +174,9 @@ function senderKeyFor(event: FeishuMessageEvent): string {
    }
    const senderBot = config.a2aBots.find((b) => b.openId === event.sender.openId);
    if (!senderBot) {
+     return;
+   }
+   if (/^\s*\[(?:\u7ed3\u679c\u56de\u4f20|\u4ec5\u901a\u77e5)\]/.test(event.plainText)) {
      return;
    }
    const senderLabel = `[\u6765\u81ea\u673a\u5668\u4eba\u300c${senderBot.name}\u300d\u2014 \u5982\u9700 @ \u56de\u5bf9\u65b9\u8bf7\u5199\uff1a@${senderBot.name}]\n\n`;

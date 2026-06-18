@@ -8,6 +8,8 @@ const larkCli = new LarkCli(config);
 const handler = new MessageHandler(config, larkCli);
 const consumer = new EventConsumer(config);
 
+console.error(`[agent] starting provider=${config.agentProvider} dry_run=${config.dryRun} codex_cli=${config.codexCliBin}`);
+
 consumer.on("ready", (marker) => {
   console.error(`[agent] lark-cli event consumer ready: ${marker.split(/\r?\n/).at(-1) ?? "ready"}`);
 });

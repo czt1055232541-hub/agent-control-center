@@ -21,6 +21,13 @@ import path from "node:path";
    confirmTimeoutMs: number;
    maxContextMessages: number;
    a2aBots: Array<{ name: string; openId: string; description?: string }>;
+   a2aRelay: {
+     enabled: boolean;
+     groupChatId?: string;
+     peerName?: string;
+     peerOpenId?: string;
+     peerCliHome?: string;
+   };
  };
 
 export function loadDotEnv(filePath = path.resolve(process.cwd(), ".env")): void {
@@ -65,7 +72,14 @@ export function getConfig(): AppConfig {
      codexAgentArgs: splitArgs(process.env.CODEX_AGENT_ARGS || "exec --skip-git-repo-check"),
      confirmTimeoutMs: numberEnv("CONFIRM_TIMEOUT_MS", 600_000),
      maxContextMessages: numberEnv("MAX_CONTEXT_MESSAGES", 30),
-     a2aBots: parseA2ABots(process.env.A2A_BOTS || "")
+     a2aBots: parseA2ABots(process.env.A2A_BOTS || ""),
+     a2aRelay: {
+       enabled: boolEnv("A2A_RELAY_ENABLED", false),
+       groupChatId: emptyToUndefined(process.env.A2A_RELAY_GROUP_CHAT_ID),
+       peerName: emptyToUndefined(process.env.A2A_RELAY_PEER_NAME),
+       peerOpenId: emptyToUndefined(process.env.A2A_RELAY_PEER_OPEN_ID),
+       peerCliHome: emptyToUndefined(process.env.A2A_RELAY_PEER_CLI_HOME)
+     }
    };
  }
 

@@ -6,7 +6,7 @@ import { decodeCliChunk } from "./cliText.js";
 export class LarkCli {
   constructor(private readonly config: AppConfig) {}
 
-  run(args: string[], options: { input?: string; dryRun?: boolean } = {}): Promise<CliResult> {
+  run(args: string[], options: { input?: string; dryRun?: boolean; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}): Promise<CliResult> {
     const dryRun = options.dryRun ?? this.config.dryRun;
     if (dryRun) {
       return Promise.resolve({
@@ -16,7 +16,7 @@ export class LarkCli {
         stderr: ""
       });
     }
-    return spawnCollect(this.config.larkCliBin, args, options.input, this.config.larkCliOutputEncoding);
+    return spawnCollect(this.config.larkCliBin, args, options.input, this.config.larkCliOutputEncoding, options.env, options.timeoutMs);
   }
 
   sendText(chatId: string, text: string): Promise<CliResult> {
@@ -32,19 +32,68 @@ export class LarkCli {
     ]);
   }
 
+  sendPost(chatId: string, content: LarkPostContent, options: { env?: NodeJS.ProcessEnv; identity?: "bot" | "user" } = {}): Promise<CliResult> {
+    return this.run(
+      [
+        "im",
+        "+messages-send",
+        "--chat-id",
+        chatId,
+        "--content",
+        JSON.stringify(content),
+        "--msg-type",
+        "post",
+        "--as",
+        options.identity ?? this.config.larkIdentity
+      ],
+      { env: options.env }
+    );
+  }
+
   commandPreview(args: string[]): string {
     return [this.config.larkCliBin, ...args].map(quoteArg).join(" ");
   }
 }
 
-export function spawnCollect(command: string, args: string[], input?: string, outputEncoding = "auto"): Promise<CliResult> {
+export type LarkPostContent = {
+  zh_cn: {
+    title?: string;
+    content: Array<Array<LarkPostElement>>;
+  };
+};
+
+export type LarkPostElement =
+  | { tag: "text"; text: string }
+  | { tag: "at"; user_id: string; user_name?: string };
+
+export function spawnCollect(
+  command: string,
+  args: string[],
+  input?: string,
+  outputEncoding = "auto",
+  env: NodeJS.ProcessEnv = process.env,
+  timeoutMs = 60_000
+): Promise<CliResult> {
   return new Promise((resolve) => {
     const child = spawn(command, args, {
       windowsHide: true,
-      env: process.env
+      env
     });
     let stdout = "";
     let stderr = "";
+    let settled = false;
+    const finish = (result: CliResult) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    const timer = setTimeout(() => {
+      child.kill();
+      finish({ ok: false, code: null, stdout, stderr: `${stderr}Command timed out after ${timeoutMs}ms` });
+    }, timeoutMs);
     child.stdout.on("data", (chunk: Buffer | string) => {
       stdout += decodeCliChunk(chunk, outputEncoding);
     });
@@ -52,10 +101,10 @@ export function spawnCollect(command: string, args: string[], input?: string, ou
       stderr += decodeCliChunk(chunk, outputEncoding);
     });
     child.on("error", (error) => {
-      resolve({ ok: false, code: null, stdout, stderr: `${stderr}${error.message}` });
+      finish({ ok: false, code: null, stdout, stderr: `${stderr}${error.message}` });
     });
     child.on("close", (code) => {
-      resolve({ ok: code === 0, code, stdout, stderr });
+      finish({ ok: code === 0, code, stdout, stderr });
     });
     if (input) {
       child.stdin.write(input);

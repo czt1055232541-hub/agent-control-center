@@ -4,15 +4,21 @@ import type { RouteResult } from "./types.js";
 
 export async function draftAgentResponse(config: AppConfig, route: RouteResult): Promise<string> {
   if (config.agentProvider === "openai" && config.openaiApiKey) {
+    infoLog("draft provider=openai");
     return draftWithOpenAI(config, route);
   }
   if (config.agentProvider === "codex") {
+    infoLog("draft provider=codex");
     return draftWithCodex(config, route);
   }
+  infoLog("draft provider=local");
   return localDraft(route);
 }
 
 function localDraft(route: RouteResult): string {
+  if (route.intent === "greeting") {
+    return route.plan.responsePreview;
+  }
   const lines = [
     route.plan.responsePreview,
     "",
@@ -61,10 +67,12 @@ async function draftWithOpenAI(config: AppConfig, route: RouteResult): Promise<s
      ...(a2aSection ? [a2aSection] : []),
      JSON.stringify(route, null, 2)
    ].join("\n\n");
-  const result = await spawnCollect(config.codexCliBin, [...config.codexAgentArgs, prompt]);
+  const result = await spawnCollect(config.codexCliBin, [...config.codexAgentArgs, prompt], undefined, "auto", process.env, 180_000);
   if (!result.ok) {
+    infoLog(`draft provider=codex failed code=${result.code}`);
     return `${localDraft(route)}\n\nCodex CLI \u8c03\u7528\u5931\u8d25\uff1a${result.stderr || result.code}`;
   }
+  infoLog("draft provider=codex completed");
    return result.stdout.trim() || localDraft(route);
  }
 
@@ -96,3 +104,9 @@ async function draftWithOpenAI(config: AppConfig, route: RouteResult): Promise<s
      "- \u4ec5\u901a\u77e5\u65f6\u52a0\u4e0a [\u4ec5\u901a\u77e5] \u6807\u8bb0\uff08\u4f8b\u5982\uff1a[\u4ec5\u901a\u77e5] @\u9f99\u867e\u9171 \u6392\u671f\u5df2\u786e\u8ba4\uff09"
    ].join("\n");
  }
+
+function infoLog(message: string): void {
+  if ((process.env.LOG_LEVEL || "info").toLowerCase() !== "silent") {
+    console.error(`[agent] ${message}`);
+  }
+}
