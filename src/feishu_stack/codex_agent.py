@@ -1,0 +1,84 @@
+from __future__ import annotations
+
+import os
+import subprocess
+import time
+
+from .config import StackConfig, load_config
+from .models import OperationResult
+from .process import CREATE_NO_WINDOW, process_info, read_pid, start_process, stop_component, write_pid
+
+
+def _build_if_needed(cfg: StackConfig) -> tuple[bool, str]:
+    if cfg.agent_entry.exists():
+        return True, "Codex Agent is already built."
+    install = subprocess.run(["npm", "install"], cwd=cfg.agent_dir, text=True, capture_output=True, creationflags=CREATE_NO_WINDOW)
+    if install.returncode != 0:
+        return False, install.stderr or install.stdout
+    build = subprocess.run(["npm", "run", "build"], cwd=cfg.agent_dir, text=True, capture_output=True, creationflags=CREATE_NO_WINDOW)
+    if build.returncode != 0:
+        return False, build.stderr or build.stdout
+    return cfg.agent_entry.exists(), "Codex Agent build complete."
+
+
+def start(config: StackConfig | None = None) -> OperationResult:
+    cfg = config or load_config()
+    started = time.monotonic()
+    pid = read_pid(cfg.pid_codex_agent)
+    running, _ = process_info(pid)
+    if running:
+        return OperationResult(True, "codex-agent", "start", "Codex Agent is already running.", pid=pid)
+    built, build_message = _build_if_needed(cfg)
+    if not built:
+        return OperationResult(False, "codex-agent", "start", build_message)
+    env = os.environ.copy()
+    env.update(
+        {
+            "CODEX_HOME": str(cfg.codex_home),
+            "CODEX_CLI_BIN": str(cfg.codex_bin),
+            "AGENT_PROVIDER": "codex",
+            "AGENT_NAME": "codex",
+            "AGENT_MENTION": "Codex",
+            "LARK_IDENTITY": "bot",
+            "LARK_CLI_OUTPUT_ENCODING": "utf8",
+            "LARK_EVENT_TIMEOUT": "8760h",
+            "LARK_CLI_BIN": str(cfg.lark_cli_bin),
+            "LARK_CLI_CWD": str(cfg.stack_root),
+            "OPENCLAW_HOME": "",
+            "CLAW_HOME": "",
+        }
+    )
+    proc = start_process(
+        ["node.exe", "dist\\src\\index.js"],
+        cwd=cfg.agent_dir,
+        stdout_log=cfg.codex_agent_stdout_log,
+        stderr_log=cfg.codex_agent_stderr_log,
+        env=env,
+    )
+    write_pid(cfg.pid_codex_agent, proc.pid)
+    time.sleep(3)
+    running, _ = process_info(proc.pid)
+    duration = int((time.monotonic() - started) * 1000)
+    return OperationResult(
+        ok=running,
+        component="codex-agent",
+        action="start",
+        message="Codex Agent started." if running else "Codex Agent exited during startup.",
+        pid=proc.pid,
+        stdout_log=str(cfg.codex_agent_stdout_log),
+        stderr_log=str(cfg.codex_agent_stderr_log),
+        duration_ms=duration,
+    )
+
+
+def stop(config: StackConfig | None = None) -> OperationResult:
+    cfg = config or load_config()
+    return stop_component("codex-agent", cfg.pid_codex_agent, None)
+
+
+def restart(config: StackConfig | None = None) -> OperationResult:
+    cfg = config or load_config()
+    stop(cfg)
+    result = start(cfg)
+    result.action = "restart"
+    return result
