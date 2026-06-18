@@ -631,7 +631,84 @@ Phase 5 is not started:
 ### Known Limitations
 
 - Provider switching still delegates to `codex\Switch-CodexProvider.ps1`; Python does not directly rewrite TOML yet.
-- The first phase is CLI-only. There is no FastAPI server and no GUI yet.
-- Operation locking is deferred to the API phase.
+- Phase 2/3 now provide FastAPI and a React GUI; Phase 4 diagnostics and Phase 5 desktop convenience are still pending.
 - Active Codex Desktop conversations may not immediately adopt a changed provider until Codex refreshes or a new session is opened.
 - Cross-provider conversation inheritance remains a Codex behavior limitation; the earlier verification path still favors resume/fork testing or summary migration rather than database edits.
+
+## Phase 2/3 Progress
+
+Last updated: 2026-06-18
+
+Phase 2 and Phase 3 are implemented as a local FastAPI server plus a React/Vite/Tailwind GUI.
+
+Implemented capabilities:
+
+- `GET /api/status` exposes stack status without a token.
+- `GET /api/session` returns the local control token for the same-origin GUI.
+- Write APIs require `X-Control-Token`.
+- Operation locking rejects concurrent write operations with a busy response.
+- Operation results are recorded in memory and appended to `runtime\logs\operations.jsonl`.
+- The API can start, stop, and restart OpenClaw, MoonBridge, and Feishu Codex Agent.
+- The API can switch Codex provider to `native` or `moonbridge`.
+- The API includes `POST /api/codex-desktop/stop` as an explicit dangerous action.
+- `POST /api/stack/stop` does not stop Codex Desktop.
+- The GUI shows status panels, component controls, provider controls, stack actions, logs, and operation history.
+- The GUI includes a dangerous `Stop Codex Desktop` button with a second confirmation step.
+
+Run the local API and production GUI:
+
+```powershell
+cd F:\1AI\feishu_agent\control-center
+E:\Python\python.exe -m uvicorn feishu_stack.app:app --host 127.0.0.1 --port 8765
+```
+
+Open:
+
+```text
+http://127.0.0.1:8765
+```
+
+Build or rebuild the GUI:
+
+```powershell
+cd F:\1AI\feishu_agent\control-center\web
+npm install
+npm run build
+```
+
+Development server:
+
+```powershell
+cd F:\1AI\feishu_agent\control-center\web
+npm run dev
+```
+
+Validation completed:
+
+- `E:\Python\python.exe -m pytest -q` passed with 12 tests.
+- `npm run build` passed.
+- FastAPI started on `127.0.0.1:8765`.
+- Real API integration verified:
+  - restart OpenClaw
+  - restart MoonBridge
+  - restart Feishu Codex Agent
+  - switch provider to `native`
+  - switch provider back to `moonbridge`
+- Final status after validation:
+  - Codex provider: `moonbridge`
+  - OpenClaw listening on port `18789`
+  - MoonBridge listening on port `38440`
+  - Feishu Codex Agent running
+  - Codex Desktop still running
+
+Codex Desktop stop validation:
+
+- The route and GUI button were implemented.
+- Unit tests validate token/route behavior through a mock.
+- The real `POST /api/codex-desktop/stop` action was not executed.
+
+Remaining work:
+
+- Phase 4 diagnostics panels are not implemented yet.
+- Phase 5 desktop convenience script/tray/Electron work is not implemented yet.
+- Production GUI requires `web\dist`; this build output is intentionally ignored by git.

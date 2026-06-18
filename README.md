@@ -18,6 +18,36 @@ This private stack keeps the local Feishu agents, Codex provider switching tools
 
 Root `start-all.ps1` and `stop-all.ps1` are compatibility wrappers.
 
+## Control Center
+
+Install/update the Python control package:
+
+```powershell
+cd F:\1AI\feishu_agent\control-center
+E:\Python\python.exe -m pip install -e .[dev]
+```
+
+Run the local API and production GUI:
+
+```powershell
+cd F:\1AI\feishu_agent\control-center
+E:\Python\python.exe -m uvicorn feishu_stack.app:app --host 127.0.0.1 --port 8765
+```
+
+Open:
+
+```text
+http://127.0.0.1:8765
+```
+
+For frontend development:
+
+```powershell
+cd F:\1AI\feishu_agent\control-center\web
+npm install
+npm run dev
+```
+
 ## GitHub
 
 Private repository:
