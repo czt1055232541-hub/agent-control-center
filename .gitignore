@@ -1,0 +1,54 @@
+# Secrets and local auth
+.env
+*.env
+*.key
+*.pem
+*token*
+*secret*
+auth*.json
+
+# Runtime state
+.runtime/
+runtime/*
+!runtime/.gitkeep
+!runtime/logs/
+!runtime/logs/.gitkeep
+!runtime/pids/
+!runtime/pids/.gitkeep
+codex-home/
+.appdata/
+.home/
+.localappdata/
+.npm-cache/
+.npm-global/
+.tmp/
+.tools/
+
+# Legacy root copy kept only because an old process may hold it open
+/feishu-codex-agent/
+
+# Dependencies and build/cache output
+node_modules/
+dist/
+coverage/
+.cache/
+tmp/
+
+# Databases and logs
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.log
+*.pid
+
+# QR codes and generated images
+*qr*.png
+*.bak-goal-*
+*.bak-switch-*
+*.bak-restore-native-*
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
