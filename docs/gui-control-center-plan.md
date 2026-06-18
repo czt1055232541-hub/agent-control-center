@@ -412,3 +412,226 @@ Validation:
 Start with Phase 0 and Phase 1.
 
 The first build should not include Electron. A local Python API plus CLI gives a stable foundation, and the GUI can sit on top once process control is proven.
+
+## Current Progress
+
+Last updated: 2026-06-18
+
+### Implemented
+
+Phase 1 is implemented as a Python control package plus CLI under `control-center`.
+
+Implemented files:
+
+- `control-center\pyproject.toml`
+- `control-center\README.md`
+- `control-center\src\feishu_stack\config.py`
+- `control-center\src\feishu_stack\models.py`
+- `control-center\src\feishu_stack\process.py`
+- `control-center\src\feishu_stack\status.py`
+- `control-center\src\feishu_stack\openclaw.py`
+- `control-center\src\feishu_stack\moonbridge.py`
+- `control-center\src\feishu_stack\codex_agent.py`
+- `control-center\src\feishu_stack\codex_provider.py`
+- `control-center\src\feishu_stack\logs.py`
+- `control-center\src\feishu_stack\cli.py`
+- `control-center\tests\`
+
+Implemented capabilities:
+
+- Load machine-readable stack config from `config\stack.settings.json`.
+- Report unified stack status as human-readable text or stable JSON.
+- Detect current Codex provider and model from `E:\codeX\config.toml`.
+- Detect Codex Desktop in read-only mode; the control package never stops it.
+- Start, stop, and restart OpenClaw Gateway.
+- Start, stop, and restart MoonBridge.
+- Start, stop, and restart Feishu Codex Agent.
+- Build Feishu Codex Agent automatically when `dist\src\index.js` is missing.
+- Switch Codex provider to `native` or `moonbridge` by calling the existing PowerShell switching script.
+- Start child processes hidden and redirect stdout/stderr to `runtime\logs`.
+- Store process IDs in `runtime\pids`.
+- Determine status by combining PID files and port checks.
+- Stop by PID first, then use port-based fallback where applicable.
+- Tail runtime logs through the Python logs module.
+- Run unit tests with `pytest`.
+
+Validated commands:
+
+```powershell
+cd F:\1AI\feishu_agent\control-center
+E:\Python\python.exe -m pip install -e .[dev]
+E:\Python\python.exe -m compileall src tests
+E:\Python\python.exe -m pytest -q
+E:\Python\python.exe -m feishu_stack.cli status --json
+E:\Python\python.exe -m feishu_stack.cli stop codex-agent --json
+E:\Python\python.exe -m feishu_stack.cli start codex-agent --json
+E:\Python\python.exe -m feishu_stack.cli restart codex-agent --json
+E:\Python\python.exe -m feishu_stack.cli stop moonbridge --json
+E:\Python\python.exe -m feishu_stack.cli start moonbridge --json
+E:\Python\python.exe -m feishu_stack.cli restart moonbridge --json
+E:\Python\python.exe -m feishu_stack.cli stop openclaw --json
+E:\Python\python.exe -m feishu_stack.cli start openclaw --json
+E:\Python\python.exe -m feishu_stack.cli restart openclaw --json
+E:\Python\python.exe -m feishu_stack.cli switch-provider native --json
+E:\Python\python.exe -m feishu_stack.cli switch-provider moonbridge --json
+```
+
+Current validation result:
+
+- Python syntax check passed.
+- `pytest` passed.
+- OpenClaw, MoonBridge, and Feishu Codex Agent independent start/stop/restart were validated.
+- Provider switching via the existing PowerShell script was validated for `native` and `moonbridge`.
+- Codex Desktop remained running during validation.
+- Final tested provider state after integration validation was `moonbridge`.
+
+### Manual Usage
+
+Install or refresh the editable Python package:
+
+```powershell
+cd F:\1AI\feishu_agent\control-center
+E:\Python\python.exe -m pip install -e .[dev]
+```
+
+Check full stack status:
+
+```powershell
+E:\Python\python.exe -m feishu_stack.cli status
+E:\Python\python.exe -m feishu_stack.cli status --json
+```
+
+Operate OpenClaw Gateway:
+
+```powershell
+E:\Python\python.exe -m feishu_stack.cli start openclaw
+E:\Python\python.exe -m feishu_stack.cli stop openclaw
+E:\Python\python.exe -m feishu_stack.cli restart openclaw
+```
+
+Operate MoonBridge:
+
+```powershell
+E:\Python\python.exe -m feishu_stack.cli start moonbridge
+E:\Python\python.exe -m feishu_stack.cli stop moonbridge
+E:\Python\python.exe -m feishu_stack.cli restart moonbridge
+```
+
+Operate Feishu Codex Agent:
+
+```powershell
+E:\Python\python.exe -m feishu_stack.cli start codex-agent
+E:\Python\python.exe -m feishu_stack.cli stop codex-agent
+E:\Python\python.exe -m feishu_stack.cli restart codex-agent
+```
+
+Switch Codex provider:
+
+```powershell
+E:\Python\python.exe -m feishu_stack.cli switch-provider native
+E:\Python\python.exe -m feishu_stack.cli switch-provider moonbridge
+```
+
+Use `--json` after any command when another tool or GUI needs a stable machine-readable response:
+
+```powershell
+E:\Python\python.exe -m feishu_stack.cli restart moonbridge --json
+```
+
+Runtime files:
+
+- Logs: `F:\1AI\feishu_agent\runtime\logs`
+- PID files: `F:\1AI\feishu_agent\runtime\pids`
+- Runtime files are ignored by git.
+
+### Manual Verification Checklist
+
+1. Run tests:
+
+```powershell
+cd F:\1AI\feishu_agent\control-center
+E:\Python\python.exe -m pytest -q
+```
+
+Expected result: all tests pass.
+
+2. Check status:
+
+```powershell
+E:\Python\python.exe -m feishu_stack.cli status --json
+```
+
+Expected result:
+
+- `codex.provider` reflects the current provider.
+- `openclaw`, `moonbridge`, and `codex_agent` show PID and/or port information when running.
+- `codex_desktop_running` is reported, but no command stops Codex Desktop.
+
+3. Restart one component at a time:
+
+```powershell
+E:\Python\python.exe -m feishu_stack.cli restart openclaw --json
+E:\Python\python.exe -m feishu_stack.cli restart moonbridge --json
+E:\Python\python.exe -m feishu_stack.cli restart codex-agent --json
+```
+
+Expected result: each command returns `ok: true`, writes logs, and updates the related PID file.
+
+4. Switch provider:
+
+```powershell
+E:\Python\python.exe -m feishu_stack.cli switch-provider native --json
+E:\Python\python.exe -m feishu_stack.cli status --json
+E:\Python\python.exe -m feishu_stack.cli switch-provider moonbridge --json
+E:\Python\python.exe -m feishu_stack.cli status --json
+```
+
+Expected result: provider status changes between `native` and `moonbridge`. Active Codex Desktop sessions may need a manual refresh or new session to reflect provider changes.
+
+5. Confirm git hygiene:
+
+```powershell
+cd F:\1AI\feishu_agent
+git status --short
+```
+
+Expected result: no runtime logs, PID files, sqlite files, `node_modules`, Python caches, or editable-install metadata should appear as tracked changes.
+
+### Remaining Work
+
+Phase 2 is not started:
+
+- FastAPI local server.
+- Local write-operation token.
+- Single operation lock for concurrent start/stop/switch requests.
+- API-level structured error responses.
+
+Phase 3 is not started:
+
+- React/Vite GUI.
+- Dashboard status panels.
+- Component action buttons.
+- Provider segmented control.
+- Operation log panel.
+
+Phase 4 is not started:
+
+- Browser log viewer.
+- Codex doctor panel.
+- MoonBridge models check panel.
+- Lark CLI auth status panel.
+- Backup cleanup action in GUI.
+
+Phase 5 is not started:
+
+- `scripts\start-control-center.ps1`.
+- Auto-open browser.
+- Optional desktop wrapper or tray app.
+
+### Known Limitations
+
+- Provider switching still delegates to `codex\Switch-CodexProvider.ps1`; Python does not directly rewrite TOML yet.
+- The first phase is CLI-only. There is no FastAPI server and no GUI yet.
+- Operation locking is deferred to the API phase.
+- Active Codex Desktop conversations may not immediately adopt a changed provider until Codex refreshes or a new session is opened.
+- Cross-provider conversation inheritance remains a Codex behavior limitation; the earlier verification path still favors resume/fork testing or summary migration rather than database edits.
