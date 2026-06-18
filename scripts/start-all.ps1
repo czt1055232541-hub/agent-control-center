@@ -4,9 +4,8 @@ param(
     [switch]$NoPause
 )
 
-$StackRoot = Split-Path -Parent $PSScriptRoot
 $PythonExe = "E:\Python\python.exe"
-$ControlCenterDir = Join-Path $StackRoot "control-center"
+$ControlCenterDir = "F:\1AI\Agent control center"
 
 Push-Location -LiteralPath $ControlCenterDir
 try {

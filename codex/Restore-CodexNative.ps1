@@ -1,7 +1,7 @@
-$StackRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $PythonExe = "E:\Python\python.exe"
-Push-Location -LiteralPath (Join-Path $StackRoot "control-center")
+Push-Location -LiteralPath "F:\1AI\Agent control center"
 try {
+    $env:PYTHONPATH = "F:\1AI\Agent control center\src"
     & $PythonExe -m feishu_stack.cli switch-provider native
     exit $LASTEXITCODE
 }

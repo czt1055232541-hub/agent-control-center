@@ -1,6 +1,5 @@
-$StackRoot = Split-Path -Parent $PSScriptRoot
 $PythonExe = "E:\Python\python.exe"
-Push-Location -LiteralPath (Join-Path $StackRoot "control-center")
+Push-Location -LiteralPath "F:\1AI\Agent control center"
 try {
     & $PythonExe -m feishu_stack.cli status
     exit $LASTEXITCODE
