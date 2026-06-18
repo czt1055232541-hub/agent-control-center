@@ -4,6 +4,8 @@ This private stack keeps the local Feishu agents, Codex provider switching tools
 
 `E:\codeX` remains the real `CODEX_HOME`. This repository only manages scripts and agent source code.
 
+Python is the source of truth for stack control. PowerShell files are compatibility wrappers for double-click and legacy paths.
+
 ## Common Commands
 
 ```powershell
@@ -17,6 +19,16 @@ This private stack keeps the local Feishu agents, Codex provider switching tools
 ```
 
 Root `start-all.ps1` and `stop-all.ps1` are compatibility wrappers.
+
+Preferred Python flow:
+
+```powershell
+cd F:\1AI\feishu_agent\control-center
+E:\Python\python.exe -m feishu_stack.cli status --json
+E:\Python\python.exe -m feishu_stack.cli stack start-moonbridge
+E:\Python\python.exe -m feishu_stack.cli switch-provider moonbridge
+E:\Python\python.exe -m feishu_stack.cli backups clean
+```
 
 ## Control Center
 

@@ -24,12 +24,21 @@ class ProviderStatus:
 
 
 @dataclass
+class CodexDesktopStatus:
+    running: bool
+    pid: int | None
+    process_count: int
+    executable: str | None
+
+
+@dataclass
 class StackStatus:
     codex: ProviderStatus
     openclaw: ComponentStatus
     moonbridge: ComponentStatus
     codex_agent: ComponentStatus
     codex_desktop_running: bool
+    codex_desktop: CodexDesktopStatus
     stack_root: str
 
 
@@ -60,4 +69,3 @@ def to_dict(value: Any) -> Any:
     if isinstance(value, dict):
         return {key: to_dict(item) for key, item in value.items()}
     return value
-

@@ -40,6 +40,12 @@ type StackStatus = {
   moonbridge: ComponentStatus;
   codex_agent: ComponentStatus;
   codex_desktop_running: boolean;
+  codex_desktop: {
+    running: boolean;
+    pid: number | null;
+    process_count: number;
+    executable: string | null;
+  };
   stack_root: string;
 };
 
@@ -100,6 +106,7 @@ const logOptions = [
   { value: "openclaw", label: "OpenClaw" },
   { value: "moonbridge", label: "MoonBridge" },
   { value: "codex-agent", label: "Codex Agent" },
+  { value: "codex-desktop", label: "Codex Desktop" },
   { value: "control-center-api", label: "Control API" },
   { value: "operations", label: "Operations" },
 ];
@@ -194,6 +201,80 @@ function DiagnosticCard({ title, ok, body, footer }: { title: string; ok: boolea
   );
 }
 
+function CodexRuntimePanel({
+  status,
+  providerMode,
+  busy,
+  confirmStop,
+  confirmRestart,
+  setConfirmStop,
+  setConfirmRestart,
+  run,
+  loadLogs,
+  loadDiagnostics,
+}: {
+  status: StackStatus | null;
+  providerMode: string;
+  busy: boolean;
+  confirmStop: boolean;
+  confirmRestart: boolean;
+  setConfirmStop: (value: boolean) => void;
+  setConfirmRestart: (value: boolean) => void;
+  run: (path: string, after?: () => Promise<void>) => Promise<void>;
+  loadLogs: (component?: string, lines?: number) => Promise<void>;
+  loadDiagnostics: () => Promise<void>;
+}) {
+  const running = Boolean(status?.codex_desktop.running ?? status?.codex_desktop_running);
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-slate-950">Codex Runtime</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Provider {providerMode} | Model {status?.codex.model ?? "unknown"} | PID {status?.codex_desktop.pid ?? "none"}
+          </p>
+          <p className="mt-1 truncate text-xs text-slate-500">{status?.codex_desktop.executable ?? "Codex Desktop executable not detected"}</p>
+        </div>
+        <StatusPill active={running} label={running ? "Desktop Running" : "Desktop Stopped"} />
+      </div>
+
+      <div className="grid gap-3 xl:grid-cols-2">
+        <div>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Desktop</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <ActionButton disabled={busy || running} icon={<Play size={16} />} label="Start" onClick={() => run("/api/codex-desktop/start")} />
+            {!confirmStop ? (
+              <ActionButton disabled={busy || !running} danger icon={<Power size={16} />} label="Stop" onClick={() => setConfirmStop(true)} />
+            ) : (
+              <ActionButton disabled={busy} danger icon={<Power size={16} />} label="Confirm Stop" onClick={() => run("/api/codex-desktop/stop").then(() => setConfirmStop(false))} />
+            )}
+            {!confirmRestart ? (
+              <ActionButton disabled={busy || !running} danger icon={<RefreshCcw size={16} />} label="Restart" onClick={() => setConfirmRestart(true)} />
+            ) : (
+              <ActionButton disabled={busy} danger icon={<RefreshCcw size={16} />} label="Confirm Restart" onClick={() => run("/api/codex-desktop/restart").then(() => setConfirmRestart(false))} />
+            )}
+            <ActionButton disabled={busy} icon={<Terminal size={16} />} label="Logs" onClick={() => loadLogs("codex-desktop")} />
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Provider</p>
+          <div className="grid grid-cols-2 gap-2">
+            <ActionButton disabled={busy || providerMode === "native"} icon={<Server size={16} />} label="Native" onClick={() => run("/api/codex-provider/native", loadDiagnostics)} />
+            <ActionButton disabled={busy || providerMode === "moonbridge"} icon={<Server size={16} />} label="MoonBridge" onClick={() => run("/api/codex-provider/moonbridge", loadDiagnostics)} />
+          </div>
+          {(confirmStop || confirmRestart) ? (
+            <ActionButton disabled={busy} icon={<XCircle size={16} />} label="Cancel Desktop Action" onClick={() => {
+              setConfirmStop(false);
+              setConfirmRestart(false);
+            }} />
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const [token, setToken] = React.useState("");
   const [status, setStatus] = React.useState<StackStatus | null>(null);
@@ -206,6 +287,7 @@ function App() {
   const [selectedLog, setSelectedLog] = React.useState("operations");
   const [logLines, setLogLines] = React.useState(120);
   const [confirmDesktopStop, setConfirmDesktopStop] = React.useState(false);
+  const [confirmDesktopRestart, setConfirmDesktopRestart] = React.useState(false);
 
   const refresh = React.useCallback(async () => {
     const [nextStatus, nextOperations] = await Promise.all([
@@ -311,14 +393,18 @@ function App() {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
-          <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-950">Codex Provider</h2>
-            <p className="mt-1 text-sm text-slate-600">Model {status?.codex.model ?? "unknown"}</p>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <ActionButton disabled={busy || providerMode === "native"} icon={<Server size={16} />} label="Native" onClick={() => run("/api/codex-provider/native")} />
-              <ActionButton disabled={busy || providerMode === "moonbridge"} icon={<Server size={16} />} label="MoonBridge" onClick={() => run("/api/codex-provider/moonbridge", loadDiagnostics)} />
-            </div>
-          </section>
+          <CodexRuntimePanel
+            status={status}
+            providerMode={providerMode}
+            busy={busy}
+            confirmStop={confirmDesktopStop}
+            confirmRestart={confirmDesktopRestart}
+            setConfirmStop={setConfirmDesktopStop}
+            setConfirmRestart={setConfirmDesktopRestart}
+            run={run}
+            loadLogs={loadLogs}
+            loadDiagnostics={loadDiagnostics}
+          />
 
           <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="text-base font-semibold text-slate-950">Stack Actions</h2>
@@ -329,20 +415,6 @@ function App() {
             </div>
           </section>
 
-          <section className="rounded-lg border border-red-200 bg-white p-4 shadow-sm">
-            <h2 className="text-base font-semibold text-red-950">Codex Desktop</h2>
-            <p className="mt-1 text-sm text-slate-600">Independent desktop process control.</p>
-            <div className="mt-4 grid gap-2">
-              {!confirmDesktopStop ? (
-                <ActionButton disabled={busy} danger icon={<Power size={16} />} label="Stop Codex Desktop" onClick={() => setConfirmDesktopStop(true)} />
-              ) : (
-                <>
-                  <ActionButton disabled={busy} danger icon={<Power size={16} />} label="Confirm Stop" onClick={() => run("/api/codex-desktop/stop")} />
-                  <ActionButton disabled={busy} icon={<XCircle size={16} />} label="Cancel" onClick={() => setConfirmDesktopStop(false)} />
-                </>
-              )}
-            </div>
-          </section>
         </div>
 
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">

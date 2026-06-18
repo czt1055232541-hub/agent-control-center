@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from .config import StackConfig, load_config
-from .models import ProviderStatus, StackStatus
+from .models import CodexDesktopStatus, ProviderStatus, StackStatus
 from .process import component_status, process_info, read_pid
 
 
@@ -18,28 +18,55 @@ def read_provider_status(config: StackConfig) -> ProviderStatus:
 
 
 def is_codex_desktop_running() -> bool:
-    # Codex Desktop has several Codex.exe children; any alive Codex.exe is enough for read-only presence.
+    return codex_desktop_status().running
+
+
+def codex_desktop_status() -> CodexDesktopStatus:
     import subprocess
     from .process import CREATE_NO_WINDOW
 
     completed = subprocess.run(
-        ["tasklist", "/FI", "IMAGENAME eq Codex.exe", "/FO", "CSV", "/NH"],
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-Command",
+            "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'Codex.exe' } | Select-Object ProcessId,ExecutablePath | ConvertTo-Json -Compress",
+        ],
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         creationflags=CREATE_NO_WINDOW,
     )
     output = completed.stdout.strip()
-    return bool(output and "No tasks are running" not in output)
+    if not output:
+        return CodexDesktopStatus(False, None, 0, None)
+    try:
+        import json
+
+        data = json.loads(output)
+        rows = data if isinstance(data, list) else [data]
+        rows = [row for row in rows if isinstance(row, dict)]
+        main = next((row for row in rows if row.get("ExecutablePath")), rows[0] if rows else {})
+        return CodexDesktopStatus(
+            running=bool(rows),
+            pid=int(main["ProcessId"]) if main.get("ProcessId") is not None else None,
+            process_count=len(rows),
+            executable=main.get("ExecutablePath"),
+        )
+    except Exception:
+        return CodexDesktopStatus(True, None, 1, None)
 
 
 def get_status(config: StackConfig | None = None) -> StackStatus:
     cfg = config or load_config()
+    desktop = codex_desktop_status()
     return StackStatus(
         codex=read_provider_status(cfg),
         openclaw=component_status("openclaw", cfg.openclaw_port, cfg.pid_openclaw),
         moonbridge=component_status("moonbridge", cfg.moonbridge_port, cfg.pid_moonbridge),
         codex_agent=component_status("codex-agent", None, cfg.pid_codex_agent),
-        codex_desktop_running=is_codex_desktop_running(),
+        codex_desktop_running=desktop.running,
+        codex_desktop=desktop,
         stack_root=str(cfg.stack_root),
     )
-

@@ -45,10 +45,13 @@ def operations() -> dict:
 @app.get("/api/logs/{component}")
 def logs(component: str, lines: int = 120) -> dict:
     cfg = load_config()
+    if component == "codex-desktop":
+        codex_desktop.log(cfg)
     table = {
         "openclaw": [cfg.openclaw_stdout_log, cfg.openclaw_stderr_log],
         "moonbridge": [cfg.moonbridge_stdout_log, cfg.moonbridge_stderr_log],
         "codex-agent": [cfg.codex_agent_stdout_log, cfg.codex_agent_stderr_log],
+        "codex-desktop": [cfg.log_dir / "codex-desktop-status.log"],
         "control-center-api": [cfg.log_dir / "control-center-api-out.log", cfg.log_dir / "control-center-api-err.log"],
         "operations": [cfg.log_dir / "operations.jsonl"],
     }
@@ -122,6 +125,11 @@ def restart_codex_agent() -> dict:
     return _run("codex-agent", "restart", codex_agent.restart)
 
 
+@app.post("/api/codex-desktop/start", dependencies=[Depends(require_control_token)])
+def start_codex_desktop() -> dict:
+    return _run("codex-desktop", "start", codex_desktop.start)
+
+
 @app.post("/api/codex-provider/native", dependencies=[Depends(require_control_token)])
 def switch_native() -> dict:
     return _run("codex-provider", "switch-native", lambda cfg: codex_provider.switch_provider("native", cfg))
@@ -150,6 +158,11 @@ def stack_stop() -> dict:
 @app.post("/api/codex-desktop/stop", dependencies=[Depends(require_control_token)])
 def stop_codex_desktop() -> dict:
     return _run("codex-desktop", "stop", codex_desktop.stop)
+
+
+@app.post("/api/codex-desktop/restart", dependencies=[Depends(require_control_token)])
+def restart_codex_desktop() -> dict:
+    return _run("codex-desktop", "restart", codex_desktop.restart)
 
 
 @app.post("/api/backups/clean", dependencies=[Depends(require_control_token)])
