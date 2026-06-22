@@ -4,10 +4,11 @@ from pathlib import Path
 from typing import Callable
 
 from fastapi import Depends, FastAPI, HTTPException
+from pydantic import BaseModel
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import backups, codex_agent, codex_desktop, codex_provider, diagnostics as diagnostics_module, moonbridge, openclaw, stack_actions
+from . import backups, codex_agent, codex_desktop, codex_provider, diagnostics as diagnostics_module, moonbridge, openclaw, stack_actions, thread_migration
 from .config import StackConfig, load_config
 from .logs import tail
 from .models import OperationResult, to_dict
@@ -16,6 +17,16 @@ from .security import get_or_create_token, require_control_token
 from .status import get_status
 
 app = FastAPI(title="Feishu Codex Stack Control Center")
+
+
+class ThreadMigrationRequest(BaseModel):
+    session_id: str
+    target_provider: str
+    prompt: str = thread_migration.DEFAULT_CONTINUATION_PROMPT
+
+
+class ThreadMigrationFolderRequest(BaseModel):
+    summary_path: str
 
 
 def _run(component: str, action: str, fn: Callable[[StackConfig], OperationResult]) -> dict:
@@ -80,6 +91,11 @@ def diagnostics() -> dict:
     return to_dict(diagnostics_module.diagnostics())
 
 
+@app.get("/api/thread-migration/threads")
+def thread_migration_threads(limit: int = 20) -> dict:
+    return {"threads": to_dict(thread_migration.list_recent_threads(limit=limit))}
+
+
 @app.post("/api/openclaw/start", dependencies=[Depends(require_control_token)])
 def start_openclaw() -> dict:
     return _run("openclaw", "start", openclaw.start)
@@ -95,6 +111,11 @@ def restart_openclaw() -> dict:
     return _run("openclaw", "restart", openclaw.restart)
 
 
+@app.post("/api/openclaw/open-ui", dependencies=[Depends(require_control_token)])
+def open_openclaw_ui() -> dict:
+    return _run("openclaw", "open-ui", openclaw.open_ui)
+
+
 @app.post("/api/moonbridge/start", dependencies=[Depends(require_control_token)])
 def start_moonbridge() -> dict:
     return _run("moonbridge", "start", moonbridge.start)
@@ -108,6 +129,22 @@ def stop_moonbridge() -> dict:
 @app.post("/api/moonbridge/restart", dependencies=[Depends(require_control_token)])
 def restart_moonbridge() -> dict:
     return _run("moonbridge", "restart", moonbridge.restart)
+
+
+@app.get("/api/moonbridge/available-models")
+def available_moonbridge_models() -> dict:
+    """Return the list of available moonbridge models from config YAML."""
+    models = moonbridge.get_available_models()
+    return {"models": models}
+
+
+class MoonBridgeModelSwitchRequest(BaseModel):
+    model: str
+
+
+@app.post("/api/moonbridge/model/switch", dependencies=[Depends(require_control_token)])
+def switch_moonbridge_model(request: MoonBridgeModelSwitchRequest) -> dict:
+    return _run("moonbridge", "switch-model", lambda cfg: moonbridge.switch_model(request.model, cfg))
 
 
 @app.post("/api/codex-agent/start", dependencies=[Depends(require_control_token)])
@@ -168,6 +205,29 @@ def restart_codex_desktop() -> dict:
 @app.post("/api/backups/clean", dependencies=[Depends(require_control_token)])
 def clean_backups() -> dict:
     return _run("backups", "clean", backups.clean)
+
+
+@app.post("/api/thread-migration/migrate", dependencies=[Depends(require_control_token)])
+def migrate_thread(request: ThreadMigrationRequest) -> dict:
+    return _run(
+        "thread-migration",
+        "migrate",
+        lambda cfg: thread_migration.migrate_thread(
+            request.session_id,
+            request.target_provider,
+            request.prompt,
+            cfg,
+        ),
+    )
+
+
+@app.post("/api/thread-migration/open-summary-folder", dependencies=[Depends(require_control_token)])
+def open_thread_migration_summary_folder(request: ThreadMigrationFolderRequest) -> dict:
+    return _run(
+        "thread-migration",
+        "open-summary-folder",
+        lambda _cfg: thread_migration.open_summary_folder(request.summary_path),
+    )
 
 
 web_dist = Path(__file__).resolve().parents[2] / "web" / "dist"

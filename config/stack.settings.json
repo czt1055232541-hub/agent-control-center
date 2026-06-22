@@ -5,7 +5,7 @@
   "codexBin": "E:\\codeX\\bin\\codex.exe",
   "codexConfig": "E:\\codeX\\config.toml",
   "codexNativeModel": "gpt-5.5",
-  "codexMoonBridgeModel": "moonbridge",
+  "codexMoonBridgeModel": "deepseek-v4-flash",
   "codexSwitchScript": "F:\\1AI\\feishu_agent\\codex\\Switch-CodexProvider.ps1",
   "moonBridgeBaseUrl": "http://127.0.0.1:38440/v1",
   "moonbridge": {
@@ -20,13 +20,19 @@
     "port": 18789,
     "a2aBots": [
       {
+        "name": "\u722a\u5b50\u79d8\u4e66",
+        "openId": "ou_c83752acfdd42d21d574cbf306834eb5",
+        "aliases": ["\u722a\u5b50\u79d8\u4e66", "\u8c03\u5ea6\u5b98"]
+      },
+      {
+        "name": "Orchestrator",
+        "openId": "ou_c54051590a748d9952e6e69d4261e13f",
+        "aliases": ["Orchestrator", "\u8fd0\u7ef4\u9a8c\u8bc1"]
+      },
+      {
         "name": "Codex",
         "openId": "ou_3fde5fb022f4ecdc31dc04a5b94499d8",
-        "aliases": [
-          "Codex",
-          "codeX agent",
-          "Codex Agent"
-        ]
+        "aliases": ["Codex", "codeX agent", "Codex Agent"]
       }
     ]
   },
@@ -38,23 +44,24 @@
     "larkCliHome": "F:\\1AI\\feishu_agent\\.home",
     "larkBotOpenId": "ou_3fde5fb022f4ecdc31dc04a5b94499d8",
     "a2aBots": [
-      {
-        "name": "龙虾酱",
-        "openId": "ou_eb0ee5955e64d44a38f55ba6c5201beb",
-        "description": "OpenClaw assistant"
-      }
+      { "name": "\u722a\u5b50\u79d8\u4e66", "openId": "ou_c83752acfdd42d21d574cbf306834eb5", "description": "orchestrator" },
+      { "name": "codeX agent", "openId": "ou_3fde5fb022f4ecdc31dc04a5b94499d8", "description": "executor-dev" },
+      { "name": "Orchestrator", "openId": "ou_c54051590a748d9952e6e69d4261e13f", "description": "executor-ops-validation" },
+      { "name": "\u9f99\u867e\u9171", "openId": "ou_53814067a4bf58f06cfe7f1f8587a975", "description": "auditor" },
+      { "name": "Office \u6587\u6863\u5168\u80fd\u624b", "openId": "ou_3e58d9c9aedbd7d30248cd2ec1ef8a97", "description": "knowledge" }
     ],
     "a2aRelay": {
-      "enabled": true,
+      "enabled": false,
       "groupChatId": "oc_48eddce2c13083893aeb36d26827b856",
-      "peerName": "龙虾酱",
-      "peerOpenId": "ou_eb0ee5955e64d44a38f55ba6c5201beb",
+      "peerName": "\u9f99\u867e\u9171",
+      "peerOpenId": "ou_53814067a4bf58f06cfe7f1f8587a975",
       "peerCliHome": "C:\\Users\\admin"
     }
   },
   "runtime": {
     "dir": "F:\\1AI\\Agent control center\\runtime",
     "logs": "F:\\1AI\\Agent control center\\runtime\\logs",
-    "pids": "F:\\1AI\\Agent control center\\runtime\\pids"
+    "pids": "F:\\1AI\\Agent control center\\runtime\\pids",
+    "summaries": "F:\\1AI\\Agent control center\\runtime\\summaries"
   }
 }

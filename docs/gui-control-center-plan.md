@@ -34,6 +34,7 @@ That repository should focus on Feishu Codex Agent source, OpenClaw/Feishu conne
 - Python remains the source of truth for control behavior.
 - PowerShell remains only for double-click usage and legacy wrappers.
 - Runtime files live under `F:\1AI\Agent control center\runtime`.
+- Thread migration summaries live under `F:\1AI\Agent control center\runtime\summaries`.
 - Feishu agent source remains under `F:\1AI\feishu_agent\agents`.
 - Codex home remains `E:\codeX`.
 - OpenClaw home remains `E:\openclaw\clawclaw`.
@@ -51,6 +52,7 @@ That repository should focus on Feishu Codex Agent source, OpenClaw/Feishu conne
 - Update `config\stack.settings.json` so `stackRoot` and runtime paths point to `F:\1AI\Agent control center`.
 - Keep managed component paths pointing at their real locations.
 - Update control center start/status/shortcut logic to use the new project root.
+- Keep generated migration summaries, import prompts, and rollout excerpts in `runtime\summaries`, not `runtime\logs`.
 
 ### Phase C: Compatibility Wrappers
 
@@ -81,6 +83,17 @@ E:\Python\python.exe -m feishu_stack.cli ...
 - Split GUI `main.tsx` into smaller modules.
 - Keep dangerous Codex Desktop stop/restart actions explicit and manually confirmed.
 
+### Phase E: Project Closeout Hygiene
+
+After a feature round is functionally complete:
+
+- run the Python tests and frontend build before deleting anything;
+- inspect generated artifacts under `runtime\logs`, `runtime\pids`, `runtime\summaries`, `.pytest_cache`, `web\dist`, and `web\node_modules`;
+- keep source tests under `tests\` when they cover active behavior;
+- delete only redundant generated test outputs, caches, stale logs, temporary migration summaries, and obsolete manual smoke files;
+- do not delete regression tests merely because the feature is complete;
+- run `git status --short` after cleanup and verify no runtime or secret files are staged.
+
 ## Compatibility Rules
 
 - Existing Feishu wrapper paths remain callable.
@@ -88,6 +101,7 @@ E:\Python\python.exe -m feishu_stack.cli ...
 - `stack stop` does not stop Codex Desktop.
 - Codex Desktop stop/restart is isolated and not executed in automated validation.
 - Git repositories must not commit runtime logs, PID files, local tokens, SQLite files, secrets, QR codes, or dependency folders.
+- Runtime summaries are user-facing generated artifacts. They are kept locally under `runtime\summaries` and are excluded from Git except for `.gitkeep`.
 
 ## Test Plan
 
@@ -111,6 +125,19 @@ CLI smoke:
 cd "F:\1AI\Agent control center"
 E:\Python\python.exe -m feishu_stack.cli status --json
 E:\Python\python.exe -m feishu_stack.cli status-control-center
+```
+
+Thread migration smoke:
+
+```powershell
+cd "F:\1AI\Agent control center"
+E:\Python\python.exe -m feishu_stack.cli migrate-thread --session-id <session-id> --target-provider moonbridge --json
+```
+
+Expected summary output directory:
+
+```text
+F:\1AI\Agent control center\runtime\summaries
 ```
 
 Wrapper syntax:

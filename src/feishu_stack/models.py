@@ -56,6 +56,27 @@ class OperationResult:
 
 
 @dataclass
+class ThreadMigrationResult(OperationResult):
+    source_session_id: str | None = None
+    source_title: str | None = None
+    target_provider: str | None = None
+    target_model: str | None = None
+    summary_path: str | None = None
+    summary_dir: str | None = None
+    launched_command: str | None = None
+    launch_mode: str | None = None
+
+
+@dataclass
+class ThreadListItem:
+    session_id: str
+    title: str
+    provider: str
+    model: str
+    updated_at: str
+
+
+@dataclass
 class LogTail:
     path: str
     lines: list[str]

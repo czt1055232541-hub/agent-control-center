@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import time
 
 from .config import StackConfig, load_config
 from .models import OperationResult
-from .process import is_port_listening, start_process, stop_component, wait_for_port, write_pid
+from .process import CREATE_NO_WINDOW, is_port_listening, start_process, stop_component, wait_for_port, write_pid
 
 
 def _ensure_feishu_a2a_runtime(cfg: StackConfig) -> None:
@@ -198,3 +199,41 @@ def restart(config: StackConfig | None = None) -> OperationResult:
     result = start(cfg)
     result.action = "restart"
     return result
+
+
+def _read_gateway_token(cfg: StackConfig) -> str | None:
+    config_path = cfg.openclaw_home / ".openclaw" / "openclaw.json"
+    if not config_path.exists():
+        return None
+    try:
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    token = data.get("gateway", {}).get("auth", {}).get("token")
+    return str(token).strip() if token else None
+
+
+def ui_url(config: StackConfig | None = None) -> str:
+    cfg = config or load_config()
+    token = _read_gateway_token(cfg)
+    base = f"http://127.0.0.1:{cfg.openclaw_port}/"
+    return f"{base}#token={token}" if token else base
+
+
+def open_ui(config: StackConfig | None = None) -> OperationResult:
+    cfg = config or load_config()
+    started = time.monotonic()
+    url = ui_url(cfg)
+    subprocess.Popen(
+        ["cmd.exe", "/d", "/c", "start", "", url],
+        cwd=str(cfg.openclaw_home),
+        creationflags=CREATE_NO_WINDOW,
+    )
+    return OperationResult(
+        ok=True,
+        component="openclaw",
+        action="open-ui",
+        message="OpenClaw Control UI opened in the default browser.",
+        port=cfg.openclaw_port,
+        duration_ms=int((time.monotonic() - started) * 1000),
+    )

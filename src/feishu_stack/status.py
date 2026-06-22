@@ -30,7 +30,7 @@ def codex_desktop_status() -> CodexDesktopStatus:
             "powershell.exe",
             "-NoProfile",
             "-Command",
-            "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'Codex.exe' } | Select-Object ProcessId,ExecutablePath | ConvertTo-Json -Compress",
+            "Get-Process -Name Codex -ErrorAction SilentlyContinue | Select-Object Id,Path | ConvertTo-Json -Compress",
         ],
         text=True,
         encoding="utf-8",
@@ -47,12 +47,12 @@ def codex_desktop_status() -> CodexDesktopStatus:
         data = json.loads(output)
         rows = data if isinstance(data, list) else [data]
         rows = [row for row in rows if isinstance(row, dict)]
-        main = next((row for row in rows if row.get("ExecutablePath")), rows[0] if rows else {})
+        main = next((row for row in rows if row.get("Path")), rows[0] if rows else {})
         return CodexDesktopStatus(
             running=bool(rows),
-            pid=int(main["ProcessId"]) if main.get("ProcessId") is not None else None,
+            pid=int(main["Id"]) if main.get("Id") is not None else None,
             process_count=len(rows),
-            executable=main.get("ExecutablePath"),
+            executable=main.get("Path"),
         )
     except Exception:
         return CodexDesktopStatus(True, None, 1, None)
