@@ -40,6 +40,8 @@ type StackStatus = {
   openclaw: ComponentStatus;
   moonbridge: ComponentStatus;
   codex_agent: ComponentStatus;
+  codex_agent_args: string;
+  codex_agent_follows_global_config: boolean;
   codex_desktop_running: boolean;
   codex_desktop: {
     running: boolean;
@@ -273,6 +275,9 @@ function CodexRuntimePanel({
           <h2 className="text-base font-semibold text-slate-950">Codex Runtime</h2>
           <p className="mt-1 text-sm text-slate-600">
             Provider {providerMode} | Model {status?.codex.model ?? "unknown"} | PID {status?.codex_desktop.pid ?? "none"}
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            Agent {status?.codex_agent_follows_global_config ? "follows global config" : "uses a profile override"} | Args {status?.codex_agent_args ?? "unknown"}
           </p>
           <p className="mt-1 truncate text-xs text-slate-500">{status?.codex_desktop.executable ?? "Codex Desktop executable not detected"}</p>
         </div>

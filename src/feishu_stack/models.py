@@ -37,6 +37,8 @@ class StackStatus:
     openclaw: ComponentStatus
     moonbridge: ComponentStatus
     codex_agent: ComponentStatus
+    codex_agent_args: str
+    codex_agent_follows_global_config: bool
     codex_desktop_running: bool
     codex_desktop: CodexDesktopStatus
     stack_root: str

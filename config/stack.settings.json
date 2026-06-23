@@ -20,19 +20,24 @@
     "port": 18789,
     "a2aBots": [
       {
-        "name": "\u722a\u5b50\u79d8\u4e66",
-        "openId": "ou_c83752acfdd42d21d574cbf306834eb5",
-        "aliases": ["\u722a\u5b50\u79d8\u4e66", "\u8c03\u5ea6\u5b98"]
+        "name": "项目调度官",
+        "openId": "ou_c83752acfdd42d21d574cbf306834eb5"
       },
       {
-        "name": "Orchestrator",
-        "openId": "ou_c54051590a748d9952e6e69d4261e13f",
-        "aliases": ["Orchestrator", "\u8fd0\u7ef4\u9a8c\u8bc1"]
+        "name": "运维验证官",
+        "openId": "ou_c54051590a748d9952e6e69d4261e13f"
       },
       {
-        "name": "Codex",
-        "openId": "ou_3fde5fb022f4ecdc31dc04a5b94499d8",
-        "aliases": ["Codex", "codeX agent", "Codex Agent"]
+        "name": "代码执行官",
+        "openId": "ou_3fde5fb022f4ecdc31dc04a5b94499d8"
+      },
+      {
+        "name": "质量审计官",
+        "openId": "ou_53814067a4bf58f06cfe7f1f8587a975"
+      },
+      {
+        "name": "项目档案官",
+        "openId": "ou_3e58d9c9aedbd7d30248cd2ec1ef8a97"
       }
     ]
   },
@@ -40,20 +45,41 @@
     "dir": "F:\\1AI\\feishu_agent\\agents\\feishu-codex-agent",
     "entry": "dist\\src\\index.js",
     "provider": "codex",
+    "codexAgentArgs": "exec --skip-git-repo-check",
     "larkCliBin": "F:\\1AI\\feishu_agent\\.npm-global\\node_modules\\@larksuite\\cli\\bin\\lark-cli.exe",
     "larkCliHome": "F:\\1AI\\feishu_agent\\.home",
     "larkBotOpenId": "ou_3fde5fb022f4ecdc31dc04a5b94499d8",
     "a2aBots": [
-      { "name": "\u722a\u5b50\u79d8\u4e66", "openId": "ou_c83752acfdd42d21d574cbf306834eb5", "description": "orchestrator" },
-      { "name": "codeX agent", "openId": "ou_3fde5fb022f4ecdc31dc04a5b94499d8", "description": "executor-dev" },
-      { "name": "Orchestrator", "openId": "ou_c54051590a748d9952e6e69d4261e13f", "description": "executor-ops-validation" },
-      { "name": "\u9f99\u867e\u9171", "openId": "ou_53814067a4bf58f06cfe7f1f8587a975", "description": "auditor" },
-      { "name": "Office \u6587\u6863\u5168\u80fd\u624b", "openId": "ou_3e58d9c9aedbd7d30248cd2ec1ef8a97", "description": "knowledge" }
+      {
+        "name": "项目调度官",
+        "openId": "ou_c83752acfdd42d21d574cbf306834eb5",
+        "description": "coordinator"
+      },
+      {
+        "name": "代码执行官",
+        "openId": "ou_3fde5fb022f4ecdc31dc04a5b94499d8",
+        "description": "developer"
+      },
+      {
+        "name": "运维验证官",
+        "openId": "ou_c54051590a748d9952e6e69d4261e13f",
+        "description": "ops-validation"
+      },
+      {
+        "name": "质量审计官",
+        "openId": "ou_53814067a4bf58f06cfe7f1f8587a975",
+        "description": "quality-auditor"
+      },
+      {
+        "name": "项目档案官",
+        "openId": "ou_3e58d9c9aedbd7d30248cd2ec1ef8a97",
+        "description": "archivist"
+      }
     ],
     "a2aRelay": {
       "enabled": false,
       "groupChatId": "oc_48eddce2c13083893aeb36d26827b856",
-      "peerName": "\u9f99\u867e\u9171",
+      "peerName": "质量审计官",
       "peerOpenId": "ou_53814067a4bf58f06cfe7f1f8587a975",
       "peerCliHome": "C:\\Users\\admin"
     }

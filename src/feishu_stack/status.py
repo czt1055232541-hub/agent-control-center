@@ -61,11 +61,15 @@ def codex_desktop_status() -> CodexDesktopStatus:
 def get_status(config: StackConfig | None = None) -> StackStatus:
     cfg = config or load_config()
     desktop = codex_desktop_status()
+    agent_settings = cfg.raw.get("agent", {})
+    codex_agent_args = str(agent_settings.get("codexAgentArgs") or "exec --skip-git-repo-check")
     return StackStatus(
         codex=read_provider_status(cfg),
         openclaw=component_status("openclaw", cfg.openclaw_port, cfg.pid_openclaw),
         moonbridge=component_status("moonbridge", cfg.moonbridge_port, cfg.pid_moonbridge),
         codex_agent=component_status("codex-agent", None, cfg.pid_codex_agent),
+        codex_agent_args=codex_agent_args,
+        codex_agent_follows_global_config="--profile" not in codex_agent_args,
         codex_desktop_running=desktop.running,
         codex_desktop=desktop,
         stack_root=str(cfg.stack_root),
