@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import time
+import json
 import urllib.request
 from pathlib import Path
 
@@ -130,6 +131,26 @@ def _moonbridge_ready(cfg: StackConfig, timeout: int = 3) -> bool:
         return False
 
 
+def _moonbridge_has_model(cfg: StackConfig, model: str, timeout: int = 3) -> bool:
+    url = str(cfg.raw.get("moonBridgeBaseUrl") or f"http://127.0.0.1:{cfg.moonbridge_port}/v1").rstrip("/") + "/models"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            if not (200 <= response.status < 300):
+                return False
+            payload = json.loads(response.read().decode("utf-8", errors="replace"))
+    except Exception:
+        return False
+    models = []
+    if isinstance(payload, dict):
+        models = payload.get("data") or payload.get("models") or []
+    for item in models:
+        if not isinstance(item, dict):
+            continue
+        if item.get("id") == model or item.get("slug") == model or item.get("model") == model or item.get("name") == model:
+            return True
+    return False
+
+
 def _apply_native(lines: list[str], cfg: StackConfig) -> list[str]:
     result = _set_top_level_key(lines, "model", f'"{cfg.native_model}"')
     result = _remove_top_level_keys(result, {"model_provider", "model_context_window", "model_max_output_tokens", "model_catalog_json"})
@@ -139,6 +160,8 @@ def _apply_native(lines: list[str], cfg: StackConfig) -> list[str]:
 def _apply_moonbridge(lines: list[str], cfg: StackConfig, allow_unavailable: bool = False) -> list[str]:
     if not allow_unavailable and not _moonbridge_ready(cfg):
         raise RuntimeError(f"MoonBridge is not reachable at 127.0.0.1:{cfg.moonbridge_port}.")
+    if not allow_unavailable and not _moonbridge_has_model(cfg, cfg.moonbridge_model):
+        raise RuntimeError(f"MoonBridge model is not available: {cfg.moonbridge_model}.")
     catalog = cfg.codex_home / "models_catalog.json"
     catalog_source = cfg.codex_home / "models_catalog.json.bak-switch"
     if not catalog.exists() and catalog_source.exists():

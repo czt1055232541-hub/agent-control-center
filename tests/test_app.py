@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from feishu_stack import app as app_module
-from feishu_stack.models import OperationResult
+from feishu_stack.models import OperationResult, ThreadMigrationResult
 from feishu_stack.operations import _lock
 
 
@@ -78,6 +78,22 @@ def test_stack_stop_does_not_stop_codex_desktop(monkeypatch) -> None:
     assert response.json()["component"] == "stack"
 
 
+def test_openclaw_open_ui_route_uses_mock(monkeypatch) -> None:
+    token = _token()
+    called = {"open": False}
+
+    def fake_open_ui(_config):
+        called["open"] = True
+        return OperationResult(True, "openclaw", "open-ui", "mock open ui", port=18789)
+
+    monkeypatch.setattr(app_module.openclaw, "open_ui", fake_open_ui)
+    response = client.post("/api/openclaw/open-ui", headers={"X-Control-Token": token})
+    assert response.status_code == 200
+    assert response.json()["component"] == "openclaw"
+    assert response.json()["action"] == "open-ui"
+    assert called["open"] is True
+
+
 def test_diagnostics_endpoint_uses_mock(monkeypatch) -> None:
     monkeypatch.setattr(app_module.diagnostics_module, "diagnostics", lambda: {"codex_doctor": {"ok": True}})
     response = client.get("/api/diagnostics")
@@ -132,3 +148,91 @@ def test_control_center_log_route() -> None:
     response = client.get("/api/logs/control-center-api")
     assert response.status_code == 200
     assert response.json()["component"] == "control-center-api"
+
+
+def test_thread_migration_requires_token() -> None:
+    response = client.post("/api/thread-migration/migrate", json={"session_id": "abc", "target_provider": "moonbridge", "prompt": "continue"})
+    assert response.status_code == 401
+    response = client.post(
+        "/api/thread-migration/migrate",
+        headers={"X-Control-Token": "bad"},
+        json={"session_id": "abc", "target_provider": "moonbridge", "prompt": "continue"},
+    )
+    assert response.status_code == 403
+
+
+def test_thread_migration_route_uses_mock(monkeypatch) -> None:
+    token = _token()
+    called = {"migrate": False}
+
+    def fake_migrate(session_id, target_provider, prompt, _config):
+        called["migrate"] = True
+        return ThreadMigrationResult(
+            True,
+            "thread-migration",
+            "migrate",
+            "mock migrate",
+            source_session_id=session_id,
+            source_title="Example Thread",
+            target_provider=target_provider,
+            target_model="moonbridge",
+            summary_path="F:/summary.txt",
+            summary_dir="F:/",
+            launch_mode="cli-session-fallback",
+        )
+
+    monkeypatch.setattr(app_module.thread_migration, "migrate_thread", fake_migrate)
+    response = client.post(
+        "/api/thread-migration/migrate",
+        headers={"X-Control-Token": token},
+        json={"session_id": "abc", "target_provider": "moonbridge", "prompt": "continue"},
+    )
+    assert response.status_code == 200
+    assert response.json()["component"] == "thread-migration"
+    assert response.json()["source_session_id"] == "abc"
+    assert called["migrate"] is True
+
+
+def test_thread_migration_open_summary_folder_route_uses_mock(monkeypatch) -> None:
+    token = _token()
+    called = {"open": False}
+
+    def fake_open(summary_path):
+        called["open"] = True
+        return ThreadMigrationResult(
+            True,
+            "thread-migration",
+            "open-summary-folder",
+            "opened",
+            summary_path=summary_path,
+            summary_dir="F:/summaries",
+        )
+
+    monkeypatch.setattr(app_module.thread_migration, "open_summary_folder", fake_open)
+    response = client.post(
+        "/api/thread-migration/open-summary-folder",
+        headers={"X-Control-Token": token},
+        json={"summary_path": "F:/summary.txt"},
+    )
+    assert response.status_code == 200
+    assert response.json()["action"] == "open-summary-folder"
+    assert called["open"] is True
+
+
+def test_thread_migration_threads_route_uses_mock(monkeypatch) -> None:
+    monkeypatch.setattr(
+        app_module.thread_migration,
+        "list_recent_threads",
+        lambda limit=20: [
+            {
+                "session_id": "abc",
+                "title": "Example Thread",
+                "provider": "openai",
+                "model": "gpt-5.5",
+                "updated_at": "2026-06-21 10:00:00",
+            }
+        ],
+    )
+    response = client.get("/api/thread-migration/threads?limit=10")
+    assert response.status_code == 200
+    assert response.json()["threads"][0]["title"] == "Example Thread"

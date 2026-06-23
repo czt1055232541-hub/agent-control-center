@@ -12,4 +12,4 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.openclaw_port, 18789)
         self.assertEqual(config.moonbridge_port, 38440)
         self.assertEqual(config.pid_dir.name, "pids")
-
+        self.assertEqual(config.migration_summary_dir.name, "summaries")

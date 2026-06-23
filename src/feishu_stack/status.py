@@ -30,7 +30,7 @@ def codex_desktop_status() -> CodexDesktopStatus:
             "powershell.exe",
             "-NoProfile",
             "-Command",
-            "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'Codex.exe' } | Select-Object ProcessId,ExecutablePath | ConvertTo-Json -Compress",
+            "Get-Process -Name Codex -ErrorAction SilentlyContinue | Select-Object Id,Path | ConvertTo-Json -Compress",
         ],
         text=True,
         encoding="utf-8",
@@ -47,12 +47,12 @@ def codex_desktop_status() -> CodexDesktopStatus:
         data = json.loads(output)
         rows = data if isinstance(data, list) else [data]
         rows = [row for row in rows if isinstance(row, dict)]
-        main = next((row for row in rows if row.get("ExecutablePath")), rows[0] if rows else {})
+        main = next((row for row in rows if row.get("Path")), rows[0] if rows else {})
         return CodexDesktopStatus(
             running=bool(rows),
-            pid=int(main["ProcessId"]) if main.get("ProcessId") is not None else None,
+            pid=int(main["Id"]) if main.get("Id") is not None else None,
             process_count=len(rows),
-            executable=main.get("ExecutablePath"),
+            executable=main.get("Path"),
         )
     except Exception:
         return CodexDesktopStatus(True, None, 1, None)
@@ -61,11 +61,15 @@ def codex_desktop_status() -> CodexDesktopStatus:
 def get_status(config: StackConfig | None = None) -> StackStatus:
     cfg = config or load_config()
     desktop = codex_desktop_status()
+    agent_settings = cfg.raw.get("agent", {})
+    codex_agent_args = str(agent_settings.get("codexAgentArgs") or "exec --skip-git-repo-check")
     return StackStatus(
         codex=read_provider_status(cfg),
         openclaw=component_status("openclaw", cfg.openclaw_port, cfg.pid_openclaw),
         moonbridge=component_status("moonbridge", cfg.moonbridge_port, cfg.pid_moonbridge),
         codex_agent=component_status("codex-agent", None, cfg.pid_codex_agent),
+        codex_agent_args=codex_agent_args,
+        codex_agent_follows_global_config="--profile" not in codex_agent_args,
         codex_desktop_running=desktop.running,
         codex_desktop=desktop,
         stack_root=str(cfg.stack_root),

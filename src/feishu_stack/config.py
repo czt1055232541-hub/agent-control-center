@@ -45,6 +45,7 @@ class StackConfig:
     log_dir: Path
     pid_dir: Path
     lark_cli_home: Path | None = None
+    summary_dir: Path | None = None
 
     @property
     def pid_openclaw(self) -> Path:
@@ -82,10 +83,15 @@ class StackConfig:
     def codex_agent_stderr_log(self) -> Path:
         return self.log_dir / "codex-agent-err.log"
 
+    @property
+    def migration_summary_dir(self) -> Path:
+        return self.summary_dir or (self.runtime_dir / "summaries")
+
     def ensure_runtime_dirs(self) -> None:
         self.runtime_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.pid_dir.mkdir(parents=True, exist_ok=True)
+        self.migration_summary_dir.mkdir(parents=True, exist_ok=True)
 
 
 def load_config(path: Path | None = None) -> StackConfig:
@@ -119,6 +125,7 @@ def load_config(path: Path | None = None) -> StackConfig:
         runtime_dir=Path(runtime["dir"]),
         log_dir=Path(runtime["logs"]),
         pid_dir=Path(runtime["pids"]),
+        summary_dir=Path(runtime.get("summaries") or Path(runtime["dir"]) / "summaries"),
     )
     config.ensure_runtime_dirs()
     return config

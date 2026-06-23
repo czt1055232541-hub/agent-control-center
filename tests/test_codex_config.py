@@ -35,7 +35,7 @@ def make_config(tmp_path: Path) -> StackConfig:
         codex_config=config_path,
         codex_switch_script=stack_root / "codex" / "Switch-CodexProvider.ps1",
         native_model="gpt-5.5",
-        moonbridge_model="moonbridge",
+        moonbridge_model="moonbridge-flash",
         moonbridge_dir=tmp_path,
         moonbridge_exe=tmp_path / "moonbridge.exe",
         moonbridge_config=tmp_path / "config.yml",
@@ -55,10 +55,11 @@ def make_config(tmp_path: Path) -> StackConfig:
 def test_switch_provider_to_moonbridge_preserves_sections(tmp_path: Path, monkeypatch) -> None:
     cfg = make_config(tmp_path)
     monkeypatch.setattr("feishu_stack.codex_config._moonbridge_ready", lambda _cfg: True)
+    monkeypatch.setattr("feishu_stack.codex_config._moonbridge_has_model", lambda _cfg, _model: True)
     result = switch_provider("moonbridge", cfg)
     text = cfg.codex_config.read_text(encoding="utf-8")
     assert result.ok is True
-    assert 'model = "moonbridge"' in text
+    assert 'model = "moonbridge-flash"' in text
     assert 'model_provider = "moonbridge"' in text
     assert "[features]" in text
     assert "[model_providers.moonbridge]" in text
@@ -68,6 +69,7 @@ def test_switch_provider_to_moonbridge_preserves_sections(tmp_path: Path, monkey
 def test_switch_provider_to_native_removes_moonbridge_keys(tmp_path: Path, monkeypatch) -> None:
     cfg = make_config(tmp_path)
     monkeypatch.setattr("feishu_stack.codex_config._moonbridge_ready", lambda _cfg: True)
+    monkeypatch.setattr("feishu_stack.codex_config._moonbridge_has_model", lambda _cfg, _model: True)
     assert switch_provider("moonbridge", cfg).ok is True
     assert switch_provider("native", cfg).ok is True
     text = cfg.codex_config.read_text(encoding="utf-8")

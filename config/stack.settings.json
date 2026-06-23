@@ -5,7 +5,7 @@
   "codexBin": "E:\\codeX\\bin\\codex.exe",
   "codexConfig": "E:\\codeX\\config.toml",
   "codexNativeModel": "gpt-5.5",
-  "codexMoonBridgeModel": "moonbridge",
+  "codexMoonBridgeModel": "deepseek-v4-flash",
   "codexSwitchScript": "F:\\1AI\\feishu_agent\\codex\\Switch-CodexProvider.ps1",
   "moonBridgeBaseUrl": "http://127.0.0.1:38440/v1",
   "moonbridge": {
@@ -20,13 +20,24 @@
     "port": 18789,
     "a2aBots": [
       {
-        "name": "Codex",
-        "openId": "ou_3fde5fb022f4ecdc31dc04a5b94499d8",
-        "aliases": [
-          "Codex",
-          "codeX agent",
-          "Codex Agent"
-        ]
+        "name": "项目调度官",
+        "openId": "ou_c83752acfdd42d21d574cbf306834eb5"
+      },
+      {
+        "name": "运维验证官",
+        "openId": "ou_c54051590a748d9952e6e69d4261e13f"
+      },
+      {
+        "name": "代码执行官",
+        "openId": "ou_3fde5fb022f4ecdc31dc04a5b94499d8"
+      },
+      {
+        "name": "质量审计官",
+        "openId": "ou_53814067a4bf58f06cfe7f1f8587a975"
+      },
+      {
+        "name": "项目档案官",
+        "openId": "ou_3e58d9c9aedbd7d30248cd2ec1ef8a97"
       }
     ]
   },
@@ -34,27 +45,49 @@
     "dir": "F:\\1AI\\feishu_agent\\agents\\feishu-codex-agent",
     "entry": "dist\\src\\index.js",
     "provider": "codex",
+    "codexAgentArgs": "exec --skip-git-repo-check",
     "larkCliBin": "F:\\1AI\\feishu_agent\\.npm-global\\node_modules\\@larksuite\\cli\\bin\\lark-cli.exe",
     "larkCliHome": "F:\\1AI\\feishu_agent\\.home",
     "larkBotOpenId": "ou_3fde5fb022f4ecdc31dc04a5b94499d8",
     "a2aBots": [
       {
-        "name": "龙虾酱",
-        "openId": "ou_eb0ee5955e64d44a38f55ba6c5201beb",
-        "description": "OpenClaw assistant"
+        "name": "项目调度官",
+        "openId": "ou_c83752acfdd42d21d574cbf306834eb5",
+        "description": "coordinator"
+      },
+      {
+        "name": "代码执行官",
+        "openId": "ou_3fde5fb022f4ecdc31dc04a5b94499d8",
+        "description": "developer"
+      },
+      {
+        "name": "运维验证官",
+        "openId": "ou_c54051590a748d9952e6e69d4261e13f",
+        "description": "ops-validation"
+      },
+      {
+        "name": "质量审计官",
+        "openId": "ou_53814067a4bf58f06cfe7f1f8587a975",
+        "description": "quality-auditor"
+      },
+      {
+        "name": "项目档案官",
+        "openId": "ou_3e58d9c9aedbd7d30248cd2ec1ef8a97",
+        "description": "archivist"
       }
     ],
     "a2aRelay": {
-      "enabled": true,
+      "enabled": false,
       "groupChatId": "oc_48eddce2c13083893aeb36d26827b856",
-      "peerName": "龙虾酱",
-      "peerOpenId": "ou_eb0ee5955e64d44a38f55ba6c5201beb",
+      "peerName": "质量审计官",
+      "peerOpenId": "ou_53814067a4bf58f06cfe7f1f8587a975",
       "peerCliHome": "C:\\Users\\admin"
     }
   },
   "runtime": {
     "dir": "F:\\1AI\\Agent control center\\runtime",
     "logs": "F:\\1AI\\Agent control center\\runtime\\logs",
-    "pids": "F:\\1AI\\Agent control center\\runtime\\pids"
+    "pids": "F:\\1AI\\Agent control center\\runtime\\pids",
+    "summaries": "F:\\1AI\\Agent control center\\runtime\\summaries"
   }
 }

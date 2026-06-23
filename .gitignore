@@ -16,6 +16,9 @@ runtime/logs/*
 !runtime/pids/
 runtime/pids/*
 !runtime/pids/.gitkeep
+!runtime/summaries/
+runtime/summaries/*
+!runtime/summaries/.gitkeep
 .runtime/
 .appdata/
 .home/

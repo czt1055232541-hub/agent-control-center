@@ -5,7 +5,7 @@ import json
 import sys
 from typing import Callable
 
-from . import backups, codex_agent, codex_desktop, codex_provider, control_center, diagnostics, moonbridge, openclaw, stack_actions
+from . import backups, codex_agent, codex_desktop, codex_provider, control_center, diagnostics, moonbridge, openclaw, stack_actions, thread_migration
 from .config import load_config
 from .models import OperationResult, to_dict
 from .status import get_status
@@ -29,6 +29,18 @@ def _print(value: object, json_output: bool) -> None:
             print(f"stdout: {value.stdout_log}")
         if value.stderr_log:
             print(f"stderr: {value.stderr_log}")
+        if getattr(value, "source_session_id", None):
+            print(f"source_session_id: {value.source_session_id}")
+        if getattr(value, "target_provider", None):
+            print(f"target_provider: {value.target_provider}")
+        if getattr(value, "target_model", None):
+            print(f"target_model: {value.target_model}")
+        if getattr(value, "summary_path", None):
+            print(f"summary_path: {value.summary_path}")
+        if getattr(value, "launch_mode", None):
+            print(f"launch_mode: {value.launch_mode}")
+        if getattr(value, "launched_command", None):
+            print(f"launched_command: {value.launched_command}")
         print(f"duration_ms: {value.duration_ms}")
         return
     print(json.dumps(to_dict(value), ensure_ascii=False, indent=2))
@@ -69,6 +81,11 @@ def build_parser() -> argparse.ArgumentParser:
     switch = subcommands.add_parser("switch-provider", help="Switch Codex provider.")
     switch.add_argument("mode", choices=["native", "moonbridge", "toggle"])
 
+    migrate = subcommands.add_parser("migrate-thread", help="Migrate a thread by summary into a new provider session.")
+    migrate.add_argument("--session-id", required=True)
+    migrate.add_argument("--target-provider", required=True, choices=["native", "moonbridge"])
+    migrate.add_argument("--prompt", default=thread_migration.DEFAULT_CONTINUATION_PROMPT)
+
     stack = subcommands.add_parser("stack", help="Run stack actions.")
     stack.add_argument("action", choices=["start-native", "start-moonbridge", "stop"])
 
@@ -108,6 +125,10 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if result.ok else 1
         if args.command == "switch-provider":
             result = codex_provider.switch_provider(args.mode)
+            _print(result, args.json)
+            return 0 if result.ok else 1
+        if args.command == "migrate-thread":
+            result = thread_migration.migrate_thread(args.session_id, args.target_provider, args.prompt)
             _print(result, args.json)
             return 0 if result.ok else 1
         if args.command == "stack":
