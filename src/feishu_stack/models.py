@@ -3,6 +3,12 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from pydantic import BaseModel as PydanticBaseModel, Field
+
+class ErrorResponse(PydanticBaseModel):
+    error_code: str = Field(..., description="Machine-readable error code, e.g. HTTP_404")
+    message: str = Field(..., description="Human-readable error message")
+    detail: Any = Field(default=None, description="Optional additional detail")
 
 @dataclass
 class ComponentStatus:
@@ -85,6 +91,8 @@ class LogTail:
 
 
 def to_dict(value: Any) -> Any:
+    if isinstance(value, PydanticBaseModel):
+        return value.model_dump()
     if hasattr(value, "__dataclass_fields__"):
         return asdict(value)
     if isinstance(value, list):

@@ -48,8 +48,9 @@ def make_config(tmp_path: Path) -> StackConfig:
         lark_cli_home=stack_root / ".home",
         runtime_dir=runtime_dir,
         log_dir=log_dir,
-        pid_dir=pid_dir,
-    )
+       pid_dir=pid_dir,
+        python_exe=Path("E:/Python/python.exe"),
+   )
 
 
 def write_rollout(cfg: StackConfig, session_id: str, provider: str = "openai", model: str = "gpt-5.5") -> Path:

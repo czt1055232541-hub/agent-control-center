@@ -1,6 +1,7 @@
 {
   "repository": "czt1055232541-hub/agent-control-center",
   "stackRoot": "F:\\1AI\\Agent control center",
+  "pythonExe": "E:\\Python\\python.exe",
   "codexHome": "E:\\codeX",
   "codexBin": "E:\\codeX\\bin\\codex.exe",
   "codexConfig": "E:\\codeX\\config.toml",
@@ -21,7 +22,7 @@
     "a2aBots": [
       {
         "name": "项目调度官",
-        "openId": "ou_c83752acfdd42d21d574cbf306834eb5"
+        "openId": "ou_c5a94af1c2c413a8a3fff949d264d7d1"
       },
       {
         "name": "运维验证官",
@@ -33,11 +34,11 @@
       },
       {
         "name": "质量审计官",
-        "openId": "ou_53814067a4bf58f06cfe7f1f8587a975"
+        "openId": "ou_eb0ee5955e64d44a38f55ba6c5201beb"
       },
       {
         "name": "项目档案官",
-        "openId": "ou_3e58d9c9aedbd7d30248cd2ec1ef8a97"
+        "openId": "ou_da4d9417d9c5d1ac85f4fe9c15cbd3a8"
       }
     ]
   },
@@ -52,7 +53,7 @@
     "a2aBots": [
       {
         "name": "项目调度官",
-        "openId": "ou_c83752acfdd42d21d574cbf306834eb5",
+        "openId": "ou_c5a94af1c2c413a8a3fff949d264d7d1",
         "description": "coordinator"
       },
       {
@@ -67,12 +68,12 @@
       },
       {
         "name": "质量审计官",
-        "openId": "ou_53814067a4bf58f06cfe7f1f8587a975",
+        "openId": "ou_eb0ee5955e64d44a38f55ba6c5201beb",
         "description": "quality-auditor"
       },
       {
         "name": "项目档案官",
-        "openId": "ou_3e58d9c9aedbd7d30248cd2ec1ef8a97",
+        "openId": "ou_da4d9417d9c5d1ac85f4fe9c15cbd3a8",
         "description": "archivist"
       }
     ],
@@ -80,7 +81,7 @@
       "enabled": false,
       "groupChatId": "oc_48eddce2c13083893aeb36d26827b856",
       "peerName": "质量审计官",
-      "peerOpenId": "ou_53814067a4bf58f06cfe7f1f8587a975",
+      "peerOpenId": "ou_eb0ee5955e64d44a38f55ba6c5201beb",
       "peerCliHome": "C:\\Users\\admin"
     }
   },

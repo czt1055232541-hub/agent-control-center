@@ -236,3 +236,68 @@ def test_thread_migration_threads_route_uses_mock(monkeypatch) -> None:
     response = client.get("/api/thread-migration/threads?limit=10")
     assert response.status_code == 200
     assert response.json()["threads"][0]["title"] == "Example Thread"
+
+
+def test_get_log_level_default() -> None:
+    response = client.get("/api/logs/level")
+    assert response.status_code == 200
+    data = response.json()
+    assert "logger" in data
+    assert "level" in data
+
+
+def test_get_log_level_specific() -> None:
+    response = client.get("/api/logs/level?logger=uvicorn")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["logger"] == "uvicorn"
+    assert data["level"] in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+
+
+def test_set_log_level_requires_token() -> None:
+    response = client.post("/api/logs/level", json={"level": "DEBUG"})
+    assert response.status_code == 401
+
+
+def test_set_log_level_invalid_value() -> None:
+    token = _token()
+    response = client.post(
+        "/api/logs/level",
+        headers={"X-Control-Token": token},
+        json={"level": "VERBOSE"},
+    )
+    assert response.status_code == 400
+
+
+def test_set_log_level_success() -> None:
+    token = _token()
+    response = client.post(
+        "/api/logs/level",
+        headers={"X-Control-Token": token},
+        json={"level": "DEBUG"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["level"] == "DEBUG"
+
+
+def test_error_response_format() -> None:
+    response = client.post("/api/openclaw/start")
+    assert response.status_code == 401
+    data = response.json()
+    assert "error_code" in data
+    assert "message" in data
+    assert data["error_code"] == "HTTP_401"
+
+
+def test_validation_error_format() -> None:
+    token = _token()
+    response = client.post(
+        "/api/thread-migration/migrate",
+        headers={"X-Control-Token": token},
+        json={"bad_key": "no_session_id"},
+    )
+    assert response.status_code == 422
+    data = response.json()
+    assert data["error_code"] == "VALIDATION_ERROR"
+    assert isinstance(data["detail"], list)

@@ -33,8 +33,9 @@ def _config(tmp_path: Path) -> StackConfig:
         runtime_dir=tmp_path / "runtime",
         log_dir=log_dir,
         pid_dir=pid_dir,
-        lark_cli_home=tmp_path / ".home",
-    )
+       lark_cli_home=tmp_path / ".home",
+        python_exe=tmp_path / "python.exe",
+   )
 
 
 def test_openclaw_ui_url_uses_gateway_token_fragment(tmp_path) -> None:

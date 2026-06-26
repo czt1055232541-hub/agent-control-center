@@ -1,10 +1,12 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import socket
 import subprocess
 import time
 from pathlib import Path
+
+from .log_manager import open_rotating
 
 from .models import ComponentStatus, OperationResult
 
@@ -106,8 +108,8 @@ def start_process(
 ) -> subprocess.Popen[str]:
     stdout_log.parent.mkdir(parents=True, exist_ok=True)
     stderr_log.parent.mkdir(parents=True, exist_ok=True)
-    stdout_handle = stdout_log.open("w", encoding="utf-8", errors="replace")
-    stderr_handle = stderr_log.open("w", encoding="utf-8", errors="replace")
+    stdout_handle = open_rotating(stdout_log)
+    stderr_handle = open_rotating(stderr_log)
     try:
         return subprocess.Popen(
             command,
