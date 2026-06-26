@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from dataclasses import asdict, dataclass
@@ -10,7 +11,9 @@ from typing import Callable
 from fastapi import HTTPException
 
 from .config import StackConfig, load_config
+from .log_manager import setup_logger
 from .models import OperationResult, to_dict
+from . import metrics
 
 
 @dataclass
@@ -26,6 +29,7 @@ class OperationRecord:
 _lock = threading.Lock()
 _records: list[OperationRecord] = []
 _max_records = 50
+_op_logger: logging.Logger | None = None
 
 
 def recent_operations() -> list[OperationRecord]:
@@ -43,10 +47,13 @@ def _record(result: OperationResult, config: StackConfig) -> None:
     )
     _records.append(record)
     del _records[:-_max_records]
-    path = config.log_dir / "operations.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(asdict(record), ensure_ascii=False) + "\n")
+    global _op_logger
+    if _op_logger is None:
+        _op_logger = setup_logger("operations", config.log_dir / "operations.jsonl")
+        for handler in _op_logger.handlers:
+            handler.setFormatter(logging.Formatter("%(message)s"))
+    _op_logger.info(json.dumps(asdict(record), ensure_ascii=False))
+    metrics.record_operation(record.component, record.action, record.ok)
 
 
 def run_exclusive(component: str, action: str, fn: Callable[[StackConfig], OperationResult]) -> OperationResult:

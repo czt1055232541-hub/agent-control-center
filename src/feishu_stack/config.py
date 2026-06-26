@@ -1,9 +1,104 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from pydantic import BaseModel, Field, model_validator
+
+
+_log = logging.getLogger(__name__)
+
+
+class StackConfigValidation(BaseModel):
+    """Pydantic validation for stack.settings.json before StackConfig construction."""
+    codex_home: str = Field(alias="codexHome")
+    codex_bin: str = Field(alias="codexBin")
+    codex_config: str = Field(alias="codexConfig")
+    codex_switch_script: str = Field(alias="codexSwitchScript")
+    python_exe: str = Field(default="E:\\Python\\python.exe", alias="pythonExe")
+    codex_native_model: str = Field(alias="codexNativeModel")
+    codex_moonbridge_model: str = Field(alias="codexMoonBridgeModel")
+    moonbridge_dir: str
+    moonbridge_exe: str
+    moonbridge_config: str
+    moonbridge_port: int
+    openclaw_home: str
+    openclaw_gateway_cmd: str
+    openclaw_port: int
+    agent_dir: str
+    agent_entry: str
+    lark_cli_bin: str
+    runtime_dir: str
+    log_dir: str
+    pid_dir: str
+
+    @model_validator(mode="after")
+    def validate_ports(self) -> "StackConfigValidation":
+        for name in ("moonbridge_port", "openclaw_port"):
+            port = getattr(self, name)
+            if not (1 <= port <= 65535):
+                raise ValueError(f"{name} must be 1-65535, got {port}")
+        return self
+
+    @model_validator(mode="after")
+    def validate_paths_exist(self) -> "StackConfigValidation":
+        critical_paths = {
+            "codex_home": self.codex_home,
+            "codex_bin": self.codex_bin,
+            "codex_config": self.codex_config,
+            "codex_switch_script": self.codex_switch_script,
+            "moonbridge_dir": self.moonbridge_dir,
+            "moonbridge_exe": self.moonbridge_exe,
+            "moonbridge_config": self.moonbridge_config,
+            "openclaw_home": self.openclaw_home,
+            "openclaw_gateway_cmd": self.openclaw_gateway_cmd,
+            "agent_dir": self.agent_dir,
+            "lark_cli_bin": self.lark_cli_bin,
+        }
+        missing = []
+        for name, path_str in critical_paths.items():
+            p = Path(path_str)
+            if not p.exists():
+                missing.append(f"{name}={path_str}")
+        if missing:
+            _log.warning("paths not found: %s", ", ".join(missing))
+        return self
+
+
+def validate_config(raw: dict[str, Any]) -> StackConfigValidation:
+    """Validate raw stack.settings.json with Pydantic."""
+    moonbridge = raw.get("moonbridge", {})
+    openclaw = raw.get("openclaw", {})
+    agent = raw.get("agent", {})
+    runtime = raw.get("runtime", {})
+
+    return StackConfigValidation(
+        codexHome=raw["codexHome"],
+        codexBin=raw["codexBin"],
+        codexConfig=raw["codexConfig"],
+        codexSwitchScript=raw["codexSwitchScript"],
+        pythonExe=raw.get("pythonExe", os.environ.get("PYTHON_EXE", "E:\\Python\\python.exe")),
+        codexNativeModel=raw["codexNativeModel"],
+        codexMoonBridgeModel=raw["codexMoonBridgeModel"],
+        moonbridge_dir=moonbridge["dir"],
+        moonbridge_exe=moonbridge["exe"],
+        moonbridge_config=moonbridge["config"],
+        moonbridge_port=int(moonbridge["port"]),
+        openclaw_home=openclaw["home"],
+        openclaw_gateway_cmd=openclaw["gatewayCmd"],
+        openclaw_port=int(openclaw["port"]),
+        agent_dir=agent["dir"],
+        agent_entry=agent["entry"],
+        lark_cli_bin=agent["larkCliBin"],
+        runtime_dir=runtime["dir"],
+        log_dir=runtime["logs"],
+        pid_dir=runtime["pids"],
+    )
 
 
 def find_stack_root(start: Path | None = None) -> Path:
@@ -29,6 +124,7 @@ class StackConfig:
     codex_bin: Path
     codex_config: Path
     codex_switch_script: Path
+    python_exe: Path
     native_model: str
     moonbridge_model: str
     moonbridge_dir: Path
@@ -84,6 +180,26 @@ class StackConfig:
         return self.log_dir / "codex-agent-err.log"
 
     @property
+    def typing_indicator_dir(self) -> Path:
+        return self.stack_root / "typing-indicator"
+
+    @property
+    def typing_indicator_launcher(self) -> Path:
+        return self.typing_indicator_dir / "launcher.py"
+
+    @property
+    def pid_typing_indicator(self) -> Path:
+        return self.pid_dir / "typing-indicator.pid"
+
+    @property
+    def typing_indicator_stdout_log(self) -> Path:
+        return self.log_dir / "typing-indicator-out.log"
+
+    @property
+    def typing_indicator_stderr_log(self) -> Path:
+        return self.log_dir / "typing-indicator-err.log"
+
+    @property
     def migration_summary_dir(self) -> Path:
         return self.summary_dir or (self.runtime_dir / "summaries")
 
@@ -97,6 +213,7 @@ class StackConfig:
 def load_config(path: Path | None = None) -> StackConfig:
     settings_path = path or (find_stack_root() / "config" / "stack.settings.json")
     raw = json.loads(settings_path.read_text(encoding="utf-8"))
+    validate_config(raw)  # raises on invalid config
     stack_root = Path(raw.get("stackRoot") or settings_path.parents[1]).resolve()
     moonbridge = raw["moonbridge"]
     openclaw = raw["openclaw"]
@@ -109,6 +226,7 @@ def load_config(path: Path | None = None) -> StackConfig:
         codex_bin=Path(raw["codexBin"]),
         codex_config=Path(raw["codexConfig"]),
         codex_switch_script=Path(raw["codexSwitchScript"]),
+        python_exe=Path(raw.get("pythonExe") or os.environ.get("PYTHON_EXE") or "E:\\Python\\python.exe"),
         native_model=raw["codexNativeModel"],
         moonbridge_model=raw["codexMoonBridgeModel"],
         moonbridge_dir=Path(moonbridge["dir"]),

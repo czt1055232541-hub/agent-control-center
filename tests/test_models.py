@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from feishu_stack.models import OperationResult, to_dict
+from feishu_stack.models import ErrorResponse
 
 
 class ModelTests(unittest.TestCase):
@@ -28,3 +29,14 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(data["stderr_log"], "err.log")
         self.assertEqual(data["duration_ms"], 10)
 
+    def test_error_response_pydantic(self) -> None:
+        err = ErrorResponse(error_code="TEST_ERR", message="something failed", detail={"hint": "retry"})
+        data = to_dict(err)
+        self.assertEqual(data["error_code"], "TEST_ERR")
+        self.assertEqual(data["message"], "something failed")
+        self.assertEqual(data["detail"], {"hint": "retry"})
+
+    def test_error_response_default_detail(self) -> None:
+        err = ErrorResponse(error_code="NO_DETAIL", message="ok")
+        data = to_dict(err)
+        self.assertIsNone(data["detail"])

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 
-from . import codex_agent, codex_provider, moonbridge, openclaw
+from . import codex_agent, codex_provider, moonbridge, openclaw, typing_indicator
 from .config import StackConfig, load_config
 from .models import OperationResult
 
@@ -26,6 +26,7 @@ def start_native(config: StackConfig | None = None) -> OperationResult:
         codex_provider.switch_provider("native", cfg),
         openclaw.start(cfg),
         codex_agent.start(cfg),
+        typing_indicator.start(cfg),
     ]
     return _combine("start-native", results, started)
 
@@ -38,6 +39,7 @@ def start_moonbridge(config: StackConfig | None = None) -> OperationResult:
         codex_provider.switch_provider("moonbridge", cfg),
         openclaw.start(cfg),
         codex_agent.start(cfg),
+        typing_indicator.start(cfg),
     ]
     return _combine("start-moonbridge", results, started)
 
@@ -46,6 +48,7 @@ def stop(config: StackConfig | None = None) -> OperationResult:
     cfg = config or load_config()
     started = time.monotonic()
     results = [
+        typing_indicator.stop(cfg),
         codex_agent.stop(cfg),
         moonbridge.stop(cfg),
         openclaw.stop(cfg),

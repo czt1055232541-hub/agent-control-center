@@ -5,7 +5,7 @@ import json
 import sys
 from typing import Callable
 
-from . import backups, codex_agent, codex_desktop, codex_provider, control_center, diagnostics, moonbridge, openclaw, stack_actions, thread_migration
+from . import backups, codex_agent, codex_desktop, codex_provider, control_center, diagnostics, moonbridge, openclaw, stack_actions, thread_migration, typing_indicator
 from .config import load_config
 from .models import OperationResult, to_dict
 from .status import get_status
@@ -57,9 +57,9 @@ def _component_action(action: str, component: str) -> OperationResult:
         ("start", "codex-agent"): codex_agent.start,
         ("stop", "codex-agent"): codex_agent.stop,
         ("restart", "codex-agent"): codex_agent.restart,
-        ("start", "codex-desktop"): codex_desktop.start,
-        ("stop", "codex-desktop"): codex_desktop.stop,
-        ("restart", "codex-desktop"): codex_desktop.restart,
+        ("start", "typing-indicator"): typing_indicator.start,
+        ("stop", "typing-indicator"): typing_indicator.stop,
+        ("restart", "typing-indicator"): typing_indicator.restart,
     }
     try:
         return table[(action, component)]()
@@ -76,7 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     for action in ("start", "stop", "restart"):
         sub = subcommands.add_parser(action, help=f"{action.title()} a component.")
-        sub.add_argument("component", choices=["openclaw", "moonbridge", "codex-agent", "codex-desktop"])
+        sub.add_argument("component", choices=["openclaw", "moonbridge", "codex-agent", "codex-desktop", "typing-indicator"])
 
     switch = subcommands.add_parser("switch-provider", help="Switch Codex provider.")
     switch.add_argument("mode", choices=["native", "moonbridge", "toggle"])

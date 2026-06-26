@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import subprocess
@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from .config import StackConfig, load_config
+from .log_manager import open_rotating
 from .models import OperationResult
 from .process import CREATE_NO_WINDOW, is_port_listening, process_info, read_pid, run_capture, terminate_pid, write_pid
 
@@ -44,8 +45,8 @@ def start(config: StackConfig | None = None, open_browser: bool = False, build: 
         [_python_exe(), "-m", "uvicorn", "feishu_stack.app:app", "--host", "127.0.0.1", "--port", str(PORT)],
         cwd=str(control_dir),
         stdin=subprocess.DEVNULL,
-        stdout=(cfg.log_dir / "control-center-api-out.log").open("w", encoding="utf-8", errors="replace"),
-        stderr=(cfg.log_dir / "control-center-api-err.log").open("w", encoding="utf-8", errors="replace"),
+        stdout=open_rotating(cfg.log_dir / "control-center-api-out.log"),
+        stderr=open_rotating(cfg.log_dir / "control-center-api-err.log"),
         creationflags=CREATE_NO_WINDOW,
     )
     write_pid(_control_pid(cfg), proc.pid)

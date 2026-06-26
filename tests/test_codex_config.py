@@ -48,8 +48,9 @@ def make_config(tmp_path: Path) -> StackConfig:
         lark_cli_bin=tmp_path / "lark-cli.exe",
         runtime_dir=runtime,
         log_dir=runtime / "logs",
-        pid_dir=runtime / "pids",
-    )
+       pid_dir=runtime / "pids",
+        python_exe=tmp_path / "python.exe",
+   )
 
 
 def test_switch_provider_to_moonbridge_preserves_sections(tmp_path: Path, monkeypatch) -> None:
