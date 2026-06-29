@@ -9,6 +9,13 @@ from .config import StackConfig, load_config
 from .models import OperationResult
 from .process import CREATE_NO_WINDOW, process_info, read_pid, start_process, stop_component, write_pid
 
+AGENT_CONTEXT_ENV_KEYS = (
+    "OPENCLAW_HOME",
+    "CLAW_HOME",
+    "HERMES_HOME",
+    "LARK_CHANNEL",
+)
+
 
 def _build_if_needed(cfg: StackConfig) -> tuple[bool, str]:
     if cfg.agent_entry.exists():
@@ -22,19 +29,12 @@ def _build_if_needed(cfg: StackConfig) -> tuple[bool, str]:
     return cfg.agent_entry.exists(), "Codex Agent build complete."
 
 
-def start(config: StackConfig | None = None) -> OperationResult:
-    cfg = config or load_config()
-    started = time.monotonic()
-    pid = read_pid(cfg.pid_codex_agent)
-    running, _ = process_info(pid)
-    if running:
-        return OperationResult(True, "codex-agent", "start", "Codex Agent is already running.", pid=pid)
-    built, build_message = _build_if_needed(cfg)
-    if not built:
-        return OperationResult(False, "codex-agent", "start", build_message)
+def _build_agent_env(cfg: StackConfig) -> dict[str, str]:
     lark_cli_home = cfg.lark_cli_home or (cfg.stack_root / ".home")
     agent_settings = cfg.raw.get("agent", {})
     env = os.environ.copy()
+    for key in AGENT_CONTEXT_ENV_KEYS:
+        env.pop(key, None)
     env.update(
         {
             "CODEX_HOME": str(cfg.codex_home),
@@ -53,8 +53,6 @@ def start(config: StackConfig | None = None) -> OperationResult:
             "USERPROFILE": str(lark_cli_home),
             "APPDATA": str(lark_cli_home / "AppData" / "Roaming"),
             "LOCALAPPDATA": str(lark_cli_home / "AppData" / "Local"),
-            "OPENCLAW_HOME": "",
-            "CLAW_HOME": "",
         }
     )
     if agent_settings.get("larkBotOpenId"):
@@ -73,6 +71,20 @@ def start(config: StackConfig | None = None) -> OperationResult:
         for key, env_key in relay_env_map.items():
             if a2a_relay.get(key):
                 env[env_key] = str(a2a_relay[key])
+    return env
+
+
+def start(config: StackConfig | None = None) -> OperationResult:
+    cfg = config or load_config()
+    started = time.monotonic()
+    pid = read_pid(cfg.pid_codex_agent)
+    running, _ = process_info(pid)
+    if running:
+        return OperationResult(True, "codex-agent", "start", "Codex Agent is already running.", pid=pid)
+    built, build_message = _build_if_needed(cfg)
+    if not built:
+        return OperationResult(False, "codex-agent", "start", build_message)
+    env = _build_agent_env(cfg)
     proc = start_process(
         ["node.exe", "dist\\src\\index.js"],
         cwd=cfg.agent_dir,

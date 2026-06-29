@@ -61,6 +61,31 @@ class CodexAgentBuildTests(unittest.TestCase):
             self.assertEqual(mock_run.call_count, 2)
 
 
+class CodexAgentEnvTests(unittest.TestCase):
+    def test_build_agent_env_removes_agent_source_detection_vars(self):
+        cfg = _fake_config(codex_bin=Path(r'C:\Codex\current\codex.exe'))
+        with patch.dict(
+            'os.environ',
+            {
+                'OPENCLAW_HOME': r'E:\openclaw\clawclaw',
+                'CLAW_HOME': r'E:\openclaw\clawclaw',
+                'HERMES_HOME': r'E:\hermes',
+                'LARK_CHANNEL': 'enabled',
+            },
+            clear=False,
+        ):
+            from feishu_stack.codex_agent import _build_agent_env
+            env = _build_agent_env(cfg)
+
+        self.assertEqual(env['CODEX_CLI_BIN'], r'C:\Codex\current\codex.exe')
+        self.assertEqual(env['HOME'], str(cfg.lark_cli_home))
+        self.assertEqual(env['LARK_CLI_CWD'], str(cfg.stack_root))
+        self.assertNotIn('OPENCLAW_HOME', env)
+        self.assertNotIn('CLAW_HOME', env)
+        self.assertNotIn('HERMES_HOME', env)
+        self.assertNotIn('LARK_CHANNEL', env)
+
+
 class CodexAgentStartTests(unittest.TestCase):
     def test_already_running(self):
         cfg = _fake_config()
@@ -100,6 +125,9 @@ class CodexAgentStartTests(unittest.TestCase):
             result = start(cfg)
             self.assertTrue(result.ok)
             self.assertEqual(result.pid, 4567)
+            env = mock_sp.call_args.kwargs['env']
+            self.assertEqual(env['CODEX_CLI_BIN'], str(cfg.codex_bin))
+            self.assertNotIn('OPENCLAW_HOME', env)
 
     def test_start_exits_during_startup(self):
         cfg = _fake_config()

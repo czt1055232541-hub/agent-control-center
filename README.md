@@ -16,6 +16,37 @@ E:\Python\python.exe -m feishu_stack.cli switch-provider moonbridge
 E:\Python\python.exe -m feishu_stack.cli backups clean
 ```
 
+## Codex App And MoonBridge Mode
+
+The control center keeps Codex provider switching in the user-level `E:\codeX\config.toml`.
+When the official Codex app writes an app-managed CLI path under `CODEX_CLI_PATH`, the
+control center uses that path for Feishu Codex Agent startup and falls back to the
+configured `codexBin` only when the app-managed path is unavailable. This keeps the
+agent aligned with Codex app updates whose CLI lives under versioned app runtime folders.
+
+MoonBridge mode expects MoonBridge to be listening at the configured base URL, currently:
+
+```text
+http://127.0.0.1:38440/v1
+```
+
+Use these checks after switching provider or updating the Codex app:
+
+```powershell
+E:\Python\python.exe -m feishu_stack.cli start moonbridge
+E:\Python\python.exe -m feishu_stack.cli switch-provider moonbridge
+curl http://127.0.0.1:38440/v1/models
+E:\Python\python.exe -m feishu_stack.cli start codex-agent
+```
+
+`codex-agent` startup intentionally sanitizes only its child-process environment for
+agent-source auto-detection variables such as `OPENCLAW_HOME`, `CLAW_HOME`,
+`HERMES_HOME`, and `LARK_CHANNEL`. This prevents lark-cli from accidentally entering an
+OpenClaw binding flow while preserving the real OpenClaw gateway and Feishu multi-agent
+environment outside that child process. Do not run `lark-cli config bind` as part of
+normal `codex-agent` startup; binding changes identity policy and should remain an
+explicit operational action.
+
 ## GUI
 
 Start the local API and production GUI:

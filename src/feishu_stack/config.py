@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -116,6 +117,27 @@ def infer_lark_cli_home(lark_cli_bin: Path, stack_root: Path) -> Path:
     return stack_root / ".home"
 
 
+def resolve_codex_bin(configured_bin: str, codex_config: Path) -> Path:
+    """Prefer the Codex app-managed CLI path when the app writes one."""
+    configured = Path(configured_bin)
+    if not codex_config.exists():
+        return configured
+    try:
+        data = tomllib.loads(codex_config.read_text(encoding="utf-8", errors="replace"))
+    except tomllib.TOMLDecodeError:
+        return configured
+    env = (
+        data.get("mcp_servers", {})
+        .get("node_repl", {})
+        .get("env", {})
+    )
+    codex_cli_path = env.get("CODEX_CLI_PATH") if isinstance(env, dict) else None
+    if not codex_cli_path:
+        return configured
+    candidate = Path(str(codex_cli_path))
+    return candidate if candidate.exists() else configured
+
+
 @dataclass(frozen=True)
 class StackConfig:
     raw: dict[str, Any]
@@ -219,12 +241,13 @@ def load_config(path: Path | None = None) -> StackConfig:
     openclaw = raw["openclaw"]
     agent = raw["agent"]
     runtime = raw["runtime"]
+    codex_config = Path(raw["codexConfig"])
     config = StackConfig(
         raw=raw,
         stack_root=stack_root,
         codex_home=Path(raw["codexHome"]),
-        codex_bin=Path(raw["codexBin"]),
-        codex_config=Path(raw["codexConfig"]),
+        codex_bin=resolve_codex_bin(raw["codexBin"], codex_config),
+        codex_config=codex_config,
         codex_switch_script=Path(raw["codexSwitchScript"]),
         python_exe=Path(raw.get("pythonExe") or os.environ.get("PYTHON_EXE") or "E:\\Python\\python.exe"),
         native_model=raw["codexNativeModel"],
