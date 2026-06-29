@@ -1,72 +1,191 @@
 # Agent Control Center
 
-Local desktop control center for the machine's agent stack.
+本项目是一个本机桌面控制中心，用来统一管理这台机器上的 Agent 运行栈：Control Center API、React GUI、OpenClaw Gateway、MoonBridge、Feishu Codex Agent、Codex provider 切换、Codex Desktop 状态检测、日志、PID 和诊断。
 
-This project owns the Python control package, FastAPI API, React/Tailwind GUI, local diagnostics, logs, PID files, and desktop-friendly wrappers. It can operate OpenClaw Gateway, MoonBridge, Feishu Codex Agent, Codex provider mode, and Codex Desktop explicit actions from one local console.
+它的定位是“控制面板”，不是 OpenClaw、飞书应用或 Codex 本体。真实的飞书认证、OpenClaw 凭据、Codex 登录态、MoonBridge 上游密钥都应留在各自组件的本机目录中，不应提交到本仓库。
 
-The Feishu agent source and OpenClaw/Feishu connection configuration remain in `F:\1AI\feishu_agent`.
+## 快速开始
 
-## Common Commands
-
-```powershell
-cd "F:\1AI\Agent control center"
-E:\Python\python.exe -m feishu_stack.cli status --json
-E:\Python\python.exe -m feishu_stack.cli stack start-moonbridge
-E:\Python\python.exe -m feishu_stack.cli switch-provider moonbridge
-E:\Python\python.exe -m feishu_stack.cli backups clean
-```
-
-## GUI
-
-Start the local API and production GUI:
+克隆后先安装 Python 依赖：
 
 ```powershell
-F:\1AI\Agent control center\scripts\start-control-center.ps1
+cd "C:\agent-control-center"
+python -m pip install -e .[dev]
 ```
 
-Open:
+准备本机配置：
+
+```powershell
+Copy-Item config\stack.settings.json config\stack.settings.local.json
+notepad config\stack.settings.local.json
+```
+
+把 `stack.settings.local.json` 里的路径、端口、模型名、Python、Node/NPM、OpenClaw、MoonBridge、Feishu Agent、lark-cli 位置改成本机实际值。程序读取配置的优先级是：
+
+1. `STACK_SETTINGS_PATH` 环境变量指定的文件
+2. `config/stack.settings.local.json`
+3. 仓库自带的脱敏模板 `config/stack.settings.json`
+
+`stack.settings.local.json` 已在 `.gitignore` 中，不要提交。
+
+## 常用命令
+
+查看状态：
+
+```powershell
+python -m feishu_stack.cli status --json
+```
+
+启动 MoonBridge 模式：
+
+```powershell
+python -m feishu_stack.cli start moonbridge
+python -m feishu_stack.cli switch-provider moonbridge
+python -m feishu_stack.cli start codex-agent
+```
+
+检查 MoonBridge 活体：
+
+```powershell
+curl http://127.0.0.1:38440/v1/models
+```
+
+启动控制中心 API 和 GUI：
+
+```powershell
+.\scripts\start-control-center.ps1
+```
+
+默认访问地址：
 
 ```text
 http://127.0.0.1:8765
 ```
 
-Install or refresh the desktop shortcut:
+安装或刷新桌面快捷方式：
 
 ```powershell
-F:\1AI\Agent control center\scripts\install-control-center-shortcut.ps1
+.\scripts\install-control-center-shortcut.ps1
 ```
 
-## Development
+## Codex App 与 MoonBridge 模式
 
-Install Python dependencies:
+Codex provider 切换写入用户级 Codex 配置文件，通常是本机 Codex home 下的 `config.toml`。新版官方 Codex App 会把当前可用的 CLI 路径写入 `CODEX_CLI_PATH`；控制中心会优先使用这个 app 管理的 CLI 路径启动 Feishu Codex Agent，只有当该路径不存在时才回退到配置中的 `codexBin`。
 
-```powershell
-cd "F:\1AI\Agent control center"
-E:\Python\python.exe -m pip install -e .[dev]
+这样做的目的是适配官方 App 更新后 CLI 目录随版本或哈希变化的情况，避免把旧的 `codex.exe` 路径写死。
+
+`codex-agent` 启动时只会清理它自己的子进程环境副本中的 Agent source 自动检测变量，例如：
+
+- `OPENCLAW_HOME`
+- `CLAW_HOME`
+- `HERMES_HOME`
+- `LARK_CHANNEL`
+
+这用于避免 lark-cli 误进入 OpenClaw 绑定流程。它不会修改系统环境、不会停止或重配 OpenClaw，也不会改变飞书 multi-agent 的身份策略。不要把 `lark-cli config bind` 放进常规启动流程；绑定会影响身份策略，应作为明确的运维操作单独执行。
+
+## 隐私与公开仓库边界
+
+公开仓库不应包含以下内容：
+
+- 飞书 `open_id`、`chat_id`、机器人身份、用户身份、群聊 ID
+- app secret、API key、MoonBridge 上游模型密钥
+- OpenClaw gateway token
+- Codex `auth.json`、会话数据库、日志数据库、SQLite 状态文件
+- 本机绝对路径中带个人目录、账号或私有项目结构的信息
+- 运行日志、PID、控制 token、二维码、临时审计产物
+
+本仓库提交的是控制中心代码、GUI、脚本、测试和脱敏模板。真实配置应放在：
+
+```text
+config/stack.settings.local.json
+runtime/
+外部组件自己的本机配置目录
 ```
 
-Run tests:
+提交前建议运行：
 
 ```powershell
-E:\Python\python.exe -m pytest -q
+git status --short
+git diff --cached
+rg -n "sk-|appSecret|openId|ou_|chat_id|oc_|api_key|auth.json|token" .
 ```
 
-Build the GUI:
+如果发现真实凭据已经进入 Git 历史，应立即轮换相关密钥，并视情况重写仓库历史。
+
+## 移植到其他电脑
+
+在新电脑上部署时，按这个顺序处理：
+
+1. 安装 Python、Node.js、Git，以及需要的 Codex App、MoonBridge、OpenClaw、lark-cli。
+2. 克隆本仓库。
+3. 执行 `python -m pip install -e .[dev]`。
+4. 复制 `config/stack.settings.json` 为 `config/stack.settings.local.json`。
+5. 修改 local 配置中的路径、端口、模型名、Node/NPM、lark-cli home、Feishu Agent 路径。
+6. 分别确认 OpenClaw、MoonBridge、Codex App、lark-cli 可以独立运行。
+7. 运行 `python -m feishu_stack.cli doctor` 和 `python -m pytest -q`。
+8. 启动 Control Center API / GUI。
+
+迁移时不要复制旧机器的 `runtime/`、SQLite、日志、PID、Codex 登录态、飞书认证缓存，除非你明确知道这些状态可以在目标机器复用。
+
+## 开发
+
+运行测试：
 
 ```powershell
-cd "F:\1AI\Agent control center\web"
+python -m pytest -q
+```
+
+构建前端：
+
+```powershell
+cd web
 npm install
 npm run build
 ```
 
-## Repository Boundaries
+查看 API：
 
-- `src/`: Python control package and FastAPI app
-- `web/`: React/Tailwind GUI
-- `scripts/`: desktop-friendly wrappers
-- `config/`: local stack settings pointing at the real agent/runtime dependencies
-- `docs/`: control center plans and operating notes
-- `runtime/`: ignored local logs, PID files, and control token
-- `tests/`: Python tests
+```text
+http://127.0.0.1:8765/docs
+```
 
-Generated files, logs, PID files, tokens, SQLite files, `node_modules`, and frontend build output are not committed.
+## 项目结构
+
+- `src/`：Python 控制层和 FastAPI 应用
+- `web/`：React/Tailwind GUI
+- `scripts/`：Windows 桌面友好的启动、停止、状态脚本
+- `config/`：脱敏配置模板和本机 local 配置位置
+- `docs/`：规划、迁移和运维说明
+- `runtime/`：本机运行态目录，只保留 `.gitkeep`
+- `tests/`：Python 测试
+- `typing-indicator/`：飞书输入状态辅助组件
+
+## 下一步规划
+
+短期：
+
+- 继续收敛脚本与服务启动入口，让 Python、Node、lark-cli 等运行时都通过配置或环境变量解析。
+- 给 Control Center 增加配置体检页面，明确提示 local 配置缺失、路径不存在、端口冲突和凭据状态。
+- 增加“隐私扫描”命令，提交前检查 open_id、chat_id、token、密钥和本机绝对路径。
+
+中期：
+
+- 把 OpenClaw、MoonBridge、Feishu Agent、Codex App 的启动契约整理为插件式组件注册表。
+- 增加配置向导，帮助新电脑生成 `stack.settings.local.json`。
+- 将 MoonBridge 模型、Codex provider、Feishu Agent 参数做成可审计的变更记录。
+
+长期：
+
+- 支持多套 profile，例如 `local-dev`、`moonbridge-prod`、`native-codex`。
+- 将敏感配置接入系统凭据库或 secret manager，而不是写入 JSON。
+- 把控制中心发展为可迁移、可恢复、可审计的本机 Agent 运维面板。
+
+## 清理规则
+
+稳定运行后可以删除未跟踪的临时脚本、一次性审计产物、调试 JSON、旧日志和生成缓存。删除前确认它们没有被 Git 跟踪：
+
+```powershell
+git status --short
+```
+
+保留源代码、测试、脱敏配置模板、运维文档和必要的 `.gitkeep`。不要删除外部组件自己的配置目录，例如 OpenClaw、MoonBridge、Codex home、Feishu Agent home，除非你正在做明确的迁移或卸载。

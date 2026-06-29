@@ -25,19 +25,22 @@ def codex_desktop_status() -> CodexDesktopStatus:
     import subprocess
     from .process import CREATE_NO_WINDOW
 
-    completed = subprocess.run(
-        [
-            "powershell.exe",
-            "-NoProfile",
-            "-Command",
-            "Get-Process -Name Codex -ErrorAction SilentlyContinue | Select-Object Id,Path | ConvertTo-Json -Compress",
-        ],
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        capture_output=True,
-        creationflags=CREATE_NO_WINDOW,
-    )
+    try:
+        completed = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-Command",
+                "Get-Process -Name Codex -ErrorAction SilentlyContinue | Select-Object Id,Path | ConvertTo-Json -Compress",
+            ],
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            creationflags=CREATE_NO_WINDOW,
+        )
+    except OSError:
+        return CodexDesktopStatus(False, None, 0, None)
     output = completed.stdout.strip()
     if not output:
         return CodexDesktopStatus(False, None, 0, None)

@@ -1,4 +1,4 @@
-# Agent Control Center Independence Plan
+﻿# Agent Control Center Independence Plan
 
 Last updated: 2026-06-19
 
@@ -7,7 +7,7 @@ Last updated: 2026-06-19
 Agent Control Center is now an independent local desktop control project at:
 
 ```text
-F:\1AI\Agent control center
+C:\agent-control-center
 ```
 
 It owns:
@@ -22,7 +22,7 @@ It owns:
 The Feishu-specific agent repository remains at:
 
 ```text
-F:\1AI\feishu_agent
+C:\feishu_agent
 ```
 
 That repository should focus on Feishu Codex Agent source, OpenClaw/Feishu connection files, compatibility wrappers, and recovery notes.
@@ -33,30 +33,30 @@ That repository should focus on Feishu Codex Agent source, OpenClaw/Feishu conne
 - Feishu Codex Agent remains a managed component, not the owner of the control console.
 - Python remains the source of truth for control behavior.
 - PowerShell remains only for double-click usage and legacy wrappers.
-- Runtime files live under `F:\1AI\Agent control center\runtime`.
-- Thread migration summaries live under `F:\1AI\Agent control center\runtime\summaries`.
-- Feishu agent source remains under `F:\1AI\feishu_agent\agents`.
-- Codex home remains `E:\codeX`.
-- OpenClaw home remains `E:\openclaw\clawclaw`.
+- Runtime files live under `C:\agent-control-center\runtime`.
+- Thread migration summaries live under `C:\agent-control-center\runtime\summaries`.
+- Feishu agent source remains under `C:\feishu_agent\agents`.
+- Codex home remains `C:\Users\you\.codex`.
+- OpenClaw home remains `C:\openclaw`.
 
 ## Migration Phases
 
 ### Phase A: Repository Split
 
-- Move the Python/API/GUI control project to `F:\1AI\Agent control center`.
+- Move the Python/API/GUI control project to `C:\agent-control-center`.
 - Create private GitHub repository `czt1055232541-hub/agent-control-center`.
 - Keep `czt1055232541-hub/feishu-codex-stack` for Feishu agent configuration and compatibility wrappers.
 
 ### Phase B: Path Rebinding
 
-- Update `config\stack.settings.json` so `stackRoot` and runtime paths point to `F:\1AI\Agent control center`.
+- Update `config\stack.settings.json` so `stackRoot` and runtime paths point to `C:\agent-control-center`.
 - Keep managed component paths pointing at their real locations.
 - Update control center start/status/shortcut logic to use the new project root.
 - Keep generated migration summaries, import prompts, and rollout excerpts in `runtime\summaries`, not `runtime\logs`.
 
 ### Phase C: Compatibility Wrappers
 
-In `F:\1AI\feishu_agent`, keep thin wrappers only:
+In `C:\feishu_agent`, keep thin wrappers only:
 
 - `scripts\start-all.ps1`
 - `scripts\stop-all.ps1`
@@ -73,8 +73,8 @@ In `F:\1AI\feishu_agent`, keep thin wrappers only:
 These wrappers call:
 
 ```powershell
-cd "F:\1AI\Agent control center"
-E:\Python\python.exe -m feishu_stack.cli ...
+cd "C:\agent-control-center"
+python -m feishu_stack.cli ...
 ```
 
 ### Phase D: Future Cleanup
@@ -108,44 +108,44 @@ After a feature round is functionally complete:
 Python tests:
 
 ```powershell
-cd "F:\1AI\Agent control center"
-E:\Python\python.exe -m pytest -q
+cd "C:\agent-control-center"
+python -m pytest -q
 ```
 
 Frontend build:
 
 ```powershell
-cd "F:\1AI\Agent control center\web"
+cd "C:\agent-control-center\web"
 npm run build
 ```
 
 CLI smoke:
 
 ```powershell
-cd "F:\1AI\Agent control center"
-E:\Python\python.exe -m feishu_stack.cli status --json
-E:\Python\python.exe -m feishu_stack.cli status-control-center
+cd "C:\agent-control-center"
+python -m feishu_stack.cli status --json
+python -m feishu_stack.cli status-control-center
 ```
 
 Thread migration smoke:
 
 ```powershell
-cd "F:\1AI\Agent control center"
-E:\Python\python.exe -m feishu_stack.cli migrate-thread --session-id <session-id> --target-provider moonbridge --json
+cd "C:\agent-control-center"
+python -m feishu_stack.cli migrate-thread --session-id <session-id> --target-provider moonbridge --json
 ```
 
 Expected summary output directory:
 
 ```text
-F:\1AI\Agent control center\runtime\summaries
+C:\agent-control-center\runtime\summaries
 ```
 
 Wrapper syntax:
 
 ```powershell
-[scriptblock]::Create((Get-Content "F:\1AI\Agent control center\scripts\start-control-center.ps1" -Raw))
-[scriptblock]::Create((Get-Content "F:\1AI\feishu_agent\scripts\start-all.ps1" -Raw))
-[scriptblock]::Create((Get-Content "F:\1AI\feishu_agent\codex\Switch-CodexProvider.ps1" -Raw))
+[scriptblock]::Create((Get-Content "C:\agent-control-center\scripts\start-control-center.ps1" -Raw))
+[scriptblock]::Create((Get-Content "C:\feishu_agent\scripts\start-all.ps1" -Raw))
+[scriptblock]::Create((Get-Content "C:\feishu_agent\codex\Switch-CodexProvider.ps1" -Raw))
 ```
 
 GitHub checks:
@@ -159,7 +159,7 @@ GitHub checks:
 Start GUI:
 
 ```powershell
-F:\1AI\Agent control center\scripts\start-control-center.ps1
+C:\agent-control-center\scripts\start-control-center.ps1
 ```
 
 Open:
@@ -171,7 +171,8 @@ http://127.0.0.1:8765
 Legacy Feishu wrappers still work:
 
 ```powershell
-F:\1AI\feishu_agent\scripts\start-all.ps1 -CodexMode moonbridge
-F:\1AI\feishu_agent\scripts\stop-all.ps1
-F:\1AI\feishu_agent\codex\Switch-CodexProvider.ps1 -Mode native
+C:\feishu_agent\scripts\start-all.ps1 -CodexMode moonbridge
+C:\feishu_agent\scripts\stop-all.ps1
+C:\feishu_agent\codex\Switch-CodexProvider.ps1 -Mode native
 ```
+

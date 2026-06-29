@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -21,6 +23,8 @@ class StackConfigValidation(BaseModel):
     codex_config: str = Field(alias="codexConfig")
     codex_switch_script: str = Field(alias="codexSwitchScript")
     python_exe: str = Field(default="E:\\Python\\python.exe", alias="pythonExe")
+    node_exe: str | None = Field(default=None, alias="nodeExe")
+    npm_exe: str | None = Field(default=None, alias="npmExe")
     codex_native_model: str = Field(alias="codexNativeModel")
     codex_moonbridge_model: str = Field(alias="codexMoonBridgeModel")
     moonbridge_dir: str
@@ -83,6 +87,8 @@ def validate_config(raw: dict[str, Any]) -> StackConfigValidation:
         codexConfig=raw["codexConfig"],
         codexSwitchScript=raw["codexSwitchScript"],
         pythonExe=raw.get("pythonExe", os.environ.get("PYTHON_EXE", "E:\\Python\\python.exe")),
+        nodeExe=raw.get("nodeExe"),
+        npmExe=raw.get("npmExe"),
         codexNativeModel=raw["codexNativeModel"],
         codexMoonBridgeModel=raw["codexMoonBridgeModel"],
         moonbridge_dir=moonbridge["dir"],
@@ -104,7 +110,8 @@ def validate_config(raw: dict[str, Any]) -> StackConfigValidation:
 def find_stack_root(start: Path | None = None) -> Path:
     current = (start or Path(__file__)).resolve()
     for parent in [current, *current.parents]:
-        if (parent / "config" / "stack.settings.json").exists():
+        config_dir = parent / "config"
+        if (config_dir / "stack.settings.local.json").exists() or (config_dir / "stack.settings.json").exists():
             return parent
     raise FileNotFoundError("Could not find config/stack.settings.json")
 
@@ -114,6 +121,54 @@ def infer_lark_cli_home(lark_cli_bin: Path, stack_root: Path) -> Path:
         if parent.name == ".npm-global":
             return parent.parent / ".home"
     return stack_root / ".home"
+
+
+def resolve_codex_bin(configured_bin: str, codex_config: Path) -> Path:
+    """Prefer the Codex app-managed CLI path when the app writes one."""
+    configured = Path(configured_bin)
+    if not codex_config.exists():
+        return configured
+    try:
+        data = tomllib.loads(codex_config.read_text(encoding="utf-8", errors="replace"))
+    except tomllib.TOMLDecodeError:
+        return configured
+    env = (
+        data.get("mcp_servers", {})
+        .get("node_repl", {})
+        .get("env", {})
+    )
+    codex_cli_path = env.get("CODEX_CLI_PATH") if isinstance(env, dict) else None
+    if not codex_cli_path:
+        return configured
+    candidate = Path(str(codex_cli_path))
+    return candidate if candidate.exists() else configured
+
+
+def resolve_command(configured: str | None, env_key: str, executable_name: str) -> Path | str:
+    if configured:
+        candidate = Path(configured)
+        if candidate.exists():
+            return candidate
+    env_value = os.environ.get(env_key)
+    if env_value:
+        candidate = Path(env_value)
+        if candidate.exists():
+            return candidate
+    found = shutil.which(executable_name)
+    return Path(found) if found else executable_name
+
+
+def resolve_settings_path(path: Path | None = None) -> Path:
+    if path is not None:
+        return path
+    env_path = os.environ.get("STACK_SETTINGS_PATH")
+    if env_path:
+        return Path(env_path)
+    config_dir = find_stack_root() / "config"
+    local_path = config_dir / "stack.settings.local.json"
+    if local_path.exists():
+        return local_path
+    return config_dir / "stack.settings.json"
 
 
 @dataclass(frozen=True)
@@ -142,6 +197,8 @@ class StackConfig:
     pid_dir: Path
     lark_cli_home: Path | None = None
     summary_dir: Path | None = None
+    node_exe: Path | str = "node"
+    npm_exe: Path | str = "npm"
 
     @property
     def pid_openclaw(self) -> Path:
@@ -211,22 +268,25 @@ class StackConfig:
 
 
 def load_config(path: Path | None = None) -> StackConfig:
-    settings_path = path or (find_stack_root() / "config" / "stack.settings.json")
-    raw = json.loads(settings_path.read_text(encoding="utf-8"))
+    settings_path = resolve_settings_path(path)
+    raw = json.loads(settings_path.read_text(encoding="utf-8-sig"))
     validate_config(raw)  # raises on invalid config
     stack_root = Path(raw.get("stackRoot") or settings_path.parents[1]).resolve()
     moonbridge = raw["moonbridge"]
     openclaw = raw["openclaw"]
     agent = raw["agent"]
     runtime = raw["runtime"]
+    codex_config = Path(raw["codexConfig"])
     config = StackConfig(
         raw=raw,
         stack_root=stack_root,
         codex_home=Path(raw["codexHome"]),
-        codex_bin=Path(raw["codexBin"]),
-        codex_config=Path(raw["codexConfig"]),
+        codex_bin=resolve_codex_bin(raw["codexBin"], codex_config),
+        codex_config=codex_config,
         codex_switch_script=Path(raw["codexSwitchScript"]),
         python_exe=Path(raw.get("pythonExe") or os.environ.get("PYTHON_EXE") or "E:\\Python\\python.exe"),
+        node_exe=resolve_command(raw.get("nodeExe"), "NODE_EXE", "node.exe" if os.name == "nt" else "node"),
+        npm_exe=resolve_command(raw.get("npmExe"), "NPM_EXE", "npm.cmd" if os.name == "nt" else "npm"),
         native_model=raw["codexNativeModel"],
         moonbridge_model=raw["codexMoonBridgeModel"],
         moonbridge_dir=Path(moonbridge["dir"]),

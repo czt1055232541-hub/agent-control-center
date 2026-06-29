@@ -1,5 +1,5 @@
 $StackRoot = Split-Path -Parent $PSScriptRoot
-$PythonExe = "E:\Python\python.exe"
+$PythonExe = if ($env:PYTHON_EXE) { $env:PYTHON_EXE } else { "python" }
 Push-Location -LiteralPath $StackRoot
 try {
     $env:PYTHONPATH = Join-Path $StackRoot "src"

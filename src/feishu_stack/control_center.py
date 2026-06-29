@@ -13,10 +13,6 @@ from .process import CREATE_NO_WINDOW, is_port_listening, process_info, read_pid
 PORT = 8765
 
 
-def _python_exe() -> str:
-    return r"E:\Python\python.exe"
-
-
 def _web_dist_index(cfg: StackConfig) -> Path:
     return cfg.stack_root / "web" / "dist" / "index.html"
 
@@ -42,7 +38,7 @@ def start(config: StackConfig | None = None, open_browser: bool = False, build: 
         if build_result.returncode != 0:
             return OperationResult(False, "control-center", "start", build_result.stderr or build_result.stdout, duration_ms=int((time.monotonic() - started) * 1000))
     proc = subprocess.Popen(
-        [_python_exe(), "-m", "uvicorn", "feishu_stack.app:app", "--host", "127.0.0.1", "--port", str(PORT)],
+        [str(cfg.python_exe), "-m", "uvicorn", "feishu_stack.app:app", "--host", "127.0.0.1", "--port", str(PORT)],
         cwd=str(control_dir),
         stdin=subprocess.DEVNULL,
         stdout=open_rotating(cfg.log_dir / "control-center-api-out.log"),

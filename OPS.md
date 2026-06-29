@@ -3,7 +3,7 @@
 ## 一、目录结构
 
 ```
-F:\1AI\Agent control center\
+C:\agent-control-center\
 ├── API.md                          # API 接口文档（本文档）
 ├── OPS.md                          # 运维手册（本文档）
 ├── README.md                       # 项目简介
@@ -71,19 +71,19 @@ F:\1AI\Agent control center\
 ### 2.1 Python 环境
 
 - **Python 版本：** >= 3.11（推荐 3.13）
-- **Python 路径：** `E:\Python\python.exe`
+- **Python 路径：** `python`
 
 ### 2.2 安装项目依赖
 
 ```powershell
 # 进入项目根目录
-cd F:\1AI\Agent control center
+cd C:\agent-control-center
 
 # 安装核心依赖
-E:\Python\python.exe -m pip install fastapi uvicorn prometheus_client httpx
+python -m pip install fastapi uvicorn prometheus_client httpx
 
 # 安装开发依赖（用于运行测试）
-E:\Python\python.exe -m pip install pytest httpx
+python -m pip install pytest httpx
 ```
 
 依赖清单（来自 `pyproject.toml`）：
@@ -99,7 +99,7 @@ E:\Python\python.exe -m pip install pytest httpx
 ### 2.3 前端构建（可选）
 
 ```powershell
-cd F:\1AI\Agent control center\web
+cd C:\agent-control-center\web
 npm install
 npm run build
 ```
@@ -112,16 +112,16 @@ npm run build
 
 ```powershell
 # 方法一：使用脚本（推荐）
-F:\1AI\Agent control center\scripts\start-all.ps1
+C:\agent-control-center\scripts\start-all.ps1
 
 # 方法二：使用脚本并指定模式
-F:\1AI\Agent control center\scripts\start-all.ps1 -CodexMode moonbridge  # MoonBridge 模式
-F:\1AI\Agent control center\scripts\start-all.ps1 -CodexMode native     # Native 模式
+C:\agent-control-center\scripts\start-all.ps1 -CodexMode moonbridge  # MoonBridge 模式
+C:\agent-control-center\scripts\start-all.ps1 -CodexMode native     # Native 模式
 
 # 方法三：使用 CLI 命令
-cd F:\1AI\Agent control center
+cd C:\agent-control-center
 $env:PYTHONPATH="src"
-E:\Python\python.exe -m feishu_stack.cli stack start-moonbridge
+python -m feishu_stack.cli stack start-moonbridge
 ```
 
 启动后，Control Center API 默认监听 `http://127.0.0.1:8765`。
@@ -130,25 +130,25 @@ E:\Python\python.exe -m feishu_stack.cli stack start-moonbridge
 
 ```powershell
 # 方法一：使用脚本
-F:\1AI\Agent control center\scripts\stop-all.ps1
+C:\agent-control-center\scripts\stop-all.ps1
 
 # 方法二：使用 CLI
-cd F:\1AI\Agent control center
+cd C:\agent-control-center
 $env:PYTHONPATH="src"
-E:\Python\python.exe -m feishu_stack.cli stack stop
+python -m feishu_stack.cli stack stop
 ```
 
 ### 3.3 仅启动 Control Center API
 
 ```powershell
-F:\1AI\Agent control center\scripts\start-control-center.ps1
+C:\agent-control-center\scripts\start-control-center.ps1
 ```
 
 ### 3.4 查看状态
 
 ```powershell
 # 查看全栈状态
-F:\1AI\Agent control center\scripts\status-all.ps1
+C:\agent-control-center\scripts\status-all.ps1
 
 # 通过 API 查看
 curl http://127.0.0.1:8765/api/status
@@ -244,11 +244,11 @@ netstat -ano | findstr :8765
 Get-Process -Name python -ErrorAction SilentlyContinue
 
 # 3. 查看 API 错误日志
-Get-Content "F:\1AI\Agent control center\runtime\logs\control-center-api-err.log" -Tail 30
+Get-Content "C:\agent-control-center\runtime\logs\control-center-api-err.log" -Tail 30
 
 # 4. 重启 API
-F:\1AI\Agent control center\scripts\stop-control-center.ps1
-F:\1AI\Agent control center\scripts\start-control-center.ps1
+C:\agent-control-center\scripts\stop-control-center.ps1
+C:\agent-control-center\scripts\start-control-center.ps1
 ```
 
 ### 5.2 Token 校验失败
@@ -275,10 +275,10 @@ F:\1AI\Agent control center\scripts\start-control-center.ps1
 **解决：**
 ```powershell
 # 查看日志大小
-Get-ChildItem "F:\1AI\Agent control center\runtime\logs" | Select-Object Name, Length
+Get-ChildItem "C:\agent-control-center\runtime\logs" | Select-Object Name, Length
 
 # 清理日志（保留最近 7 天）
-Get-ChildItem "F:\1AI\Agent control center\runtime\logs" -Filter *.log |
+Get-ChildItem "C:\agent-control-center\runtime\logs" -Filter *.log |
   Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) } |
   Remove-Item
 ```
@@ -292,7 +292,7 @@ Get-ChildItem "F:\1AI\Agent control center\runtime\logs" -Filter *.log |
 **解决：**
 ```powershell
 # 运行前设置 PYTHONPATH
-$env:PYTHONPATH="F:\1AI\Agent control center\src"
+$env:PYTHONPATH="C:\agent-control-center\src"
 ```
 
 ### 5.6 Metrics 指标异常
@@ -327,13 +327,14 @@ $env:PYTHONPATH="F:\1AI\Agent control center\src"
 
 ```powershell
 # 运行全部测试
-cd F:\1AI\Agent control center
+cd C:\agent-control-center
 $env:PYTHONPATH="src"
-E:\Python\python.exe -m pytest tests/ -v
+python -m pytest tests/ -v
 
 # 运行特定测试文件
-E:\Python\python.exe -m pytest tests/test_app.py -v
+python -m pytest tests/test_app.py -v
 
 # 运行单个测试
-E:\Python\python.exe -m pytest tests/test_app.py::test_status_is_read_only_without_token -v
+python -m pytest tests/test_app.py::test_status_is_read_only_without_token -v
 ```
+

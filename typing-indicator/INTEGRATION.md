@@ -1,93 +1,53 @@
-# Codex Desktop App — Typing Indicator 集成指南
+# Typing Indicator 集成说明
 
-## 文件位置
-- 主脚本: `F:\1AI\Agent control center\typing-indicator\typing-indicator.py`
-- 启动器: `F:\1AI\Agent control center\typing-indicator\launcher.py`  ← **不改源码用这个**
-- 依赖: Python 3.11+, `E:\Python\python.exe`, `psutil`
-- lark-cli: `F:\1AI\feishu_agent\.npm-global\node_modules\@larksuite\cli\bin\lark-cli.exe`
-- 集成模块: `F:\1AI\Agent control center\src\feishu_stack\typing_indicator.py`
+`typing-indicator` 用于监听飞书消息事件，并短暂发送 typing reaction。它是可选辅助组件，由 Agent Control Center 统一启动和停止。
 
-## 方案 A：不改 App 源码 — 用 launcher.py（推荐）
+## 文件
 
-`launcher.py` 独立运行，自动发现 codex bus 进程，然后启动 typing indicator。
-bus 死了它也跟着停，typing indicator 崩了它自动重启（最多 5 次）。
+- 主脚本：`typing-indicator/typing-indicator.py`
+- 启动器：`typing-indicator/launcher.py`
+- 控制层：`src/feishu_stack/typing_indicator.py`
 
-```batch
-:: 启动（在 codex 栈启动后运行一次即可）
-E:\Python\python.exe -m feishu_stack.cli start typing-indicator
+## 配置
 
-:: 或者随整体 stack 启动（start-all.ps1 已内置）
-E:\Python\python.exe -m feishu_stack.cli stack start-native
-```
+运行时通过环境变量注入本机路径，不在源码里写死：
 
-已深度集成到 Agent Control Center，随 stack 生命周期自动管理，不需要手动启停。
+- `PYTHON_EXE`：Python 解释器路径，未设置时 launcher 使用当前解释器
+- `LARK_CLI_BIN`：lark-cli 可执行文件路径，未设置时尝试 `lark-cli`
+- `LARK_CLI_PROFILE`：可选 lark-cli profile；未设置时使用默认配置
 
-## 方案 B：集成到 Codex Desktop App 源码
+Control Center 从 `config/stack.settings.local.json` 读取 `pythonExe` 和 `agent.larkCliBin` 后传入子进程。若你的 lark-cli 需要固定 profile，可在 local 配置的 `agent` 节点中增加：
 
-在 Codex Desktop App 启动时，和其他 lark-cli 子进程一起启动 typing-indicator.py。
-App 退出时，Kill 整个进程树。
-
-### C# 启动代码
-
-```csharp
-using System.Diagnostics;
-
-// 成员变量
-private Process _typingIndicator;
-
-// 启动 — 加在现有的 lark-cli bus/consumer 启动代码旁边
-private void StartTypingIndicator()
+```json
 {
-    _typingIndicator = new Process
-    {
-        StartInfo = new ProcessStartInfo
-        {
-            FileName = @"E:\Python\python.exe",
-            Arguments = @"F:\1AI\Agent control center\typing-indicator\launcher.py",
-            WorkingDirectory = @"F:\1AI\Agent control center\typing-indicator",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        },
-        EnableRaisingEvents = true
-    };
-
-    _typingIndicator.Start();
-    _typingIndicator.BeginOutputReadLine();
-    _typingIndicator.BeginErrorReadLine();
+  "agent": {
+    "larkCliProfile": "your-profile-name"
+  }
 }
-
-// 退出 — 加在 App 退出/Dispose 逻辑里
-private void StopTypingIndicator()
-{
-    try
-    {
-        if (_typingIndicator != null && !_typingIndicator.HasExited)
-        {
-            _typingIndicator.Kill(entireProcessTree: true);
-            _typingIndicator.Dispose();
-        }
-    }
-    catch { /* already exited */ }
-}
-### 进程关系（启动后）
-
-```
-Agent Control Center (stack_actions.py / CLI)
-├── openclaw-gateway
-├── moonbridge
-├── codex-agent         (lark-cli bus + consumer)
-├── codex-desktop       (WPF app)
-└── typing-indicator    (typing_indicator.py 集成模块)
-    └── launcher.py     (PID 32496)
-        └── typing-indicator.py
-            └── lark-cli consumer  ← 监听 im.message.receive_v1
 ```
 
-- stack start-native → 依次启动所有组件 → typing indicator 最后拉起
-- bus 崩溃 → launcher 检测到 → kill typing-indicator → launcher 退出
-- stack stop → 通过 CLI 统一停止 → launcher → typing-indicator → consumer 全清
+## 启动
 
-### 行为
-收到 codex bot 的消息 → POST typing reaction → "正在输入…"显示 → 60s 后自动 DELETE
+```powershell
+python -m feishu_stack.cli start typing-indicator
+```
+
+或随 stack 启动：
+
+```powershell
+python -m feishu_stack.cli stack start-native
+```
+
+## 运行边界
+
+typing indicator 只继承 Control Center 为它构造的子进程环境。控制层会移除 `OPENCLAW_*`、`CLAW_HOME`、`CODEX_HOME` 等容易触发错误上下文检测的变量；这不会修改系统环境，也不会改变 OpenClaw 或飞书 multi-agent 的配置。
+
+## 行为
+
+收到目标 bot 的消息后：
+
+1. POST typing reaction
+2. 保持短暂“正在输入”状态
+3. 到期后 DELETE reaction
+
+如果 lark-cli bus 退出，launcher 会停止 typing indicator；如果 typing indicator 自身退出，launcher 最多重启 5 次。
