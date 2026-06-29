@@ -8,6 +8,7 @@ Run this as a child process of Codex Desktop App; kill it when the app exits.
 import json
 import os
 import signal
+import shutil
 import subprocess
 import sys
 import threading
@@ -20,8 +21,8 @@ if sys.platform == "win32":
 
 # ─── Config ───────────────────────────────────────────────────────────────
 SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
-LARK_CLI    = r"F:\1AI\feishu_agent\.npm-global\node_modules\@larksuite\cli\bin\lark-cli.exe"
-PROFILE     = "cli_aaa600e91939dcd9"
+LARK_CLI    = os.environ.get("LARK_CLI_BIN") or os.environ.get("LARK_CLI") or shutil.which("lark-cli") or "lark-cli"
+PROFILE     = os.environ.get("LARK_CLI_PROFILE") or ""
 CLEANUP_SEC = 60
 MAX_AGE_MS  = 120_000  # skip messages older than 2 min
 EXIT_FLAG   = threading.Event()
@@ -50,7 +51,9 @@ def log(msg: str):
 # ─── lark-cli API wrapper ─────────────────────────────────────────────────
 def lark_api(method: str, path: str, data: str | None = None) -> dict:
     """Run `lark-cli api <method> <path>` with profile, return {ok, stdout, stderr}."""
-    cmd = [LARK_CLI, "api", method, path, "--profile", PROFILE]
+    cmd = [LARK_CLI, "api", method, path]
+    if PROFILE:
+        cmd += ["--profile", PROFILE]
     if data:
         # Write temporary body file so lark-cli --data @<file> works
         with open(TMP_BODY, "w", encoding="utf-8") as f:
@@ -116,7 +119,7 @@ def main():
     signal.signal(signal.SIGTERM, on_shutdown)
 
     log(f"🚀 Typing Indicator (B2 Python, {CLEANUP_SEC}s timeout)")
-    log(f"   Profile: {PROFILE}")
+    log(f"   Profile: {PROFILE or 'default'}")
     log(f"   lark-cli: {LARK_CLI}")
 
     # Clean up stale tmp files from previous runs
@@ -127,8 +130,9 @@ def main():
             pass
 
     cmd = [LARK_CLI, "event", "consume", "im.message.receive_v1",
-           "--as", "bot", "--max-events", "0", "--timeout", "8760h",
-           "--profile", PROFILE]
+           "--as", "bot", "--max-events", "0", "--timeout", "8760h"]
+    if PROFILE:
+        cmd += ["--profile", PROFILE]
     log("   Connecting to bus...")
     proc = subprocess.Popen(cmd, cwd=SCRIPT_DIR, env=clean_env(),
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,

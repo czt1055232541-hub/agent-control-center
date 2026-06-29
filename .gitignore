@@ -1,6 +1,7 @@
 # Secrets and local auth
 .env
 *.env
+config/stack.settings.local.json
 *.key
 *.pem
 *token*

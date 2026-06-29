@@ -15,9 +15,9 @@ import signal
 import psutil
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PYTHON = r"E:\Python\python.exe"
+PYTHON = os.environ.get("PYTHON_EXE") or sys.executable
 TYPING_SCRIPT = os.path.join(SCRIPT_DIR, "typing-indicator.py")
-BUS_PROFILE = "cli_aaa600e91939dcd9"
+BUS_PROFILE = os.environ.get("LARK_CLI_PROFILE") or ""
 
 typing_proc = None
 shutdown = False
@@ -29,8 +29,8 @@ def find_codex_bus_pid() -> int | None:
         try:
             cmd = proc.info["cmdline"] or []
             if len(cmd) >= 2:
-                # match: lark-cli.exe event _bus --profile cli_aaa600e91939dcd9
-                if "event" in cmd and "_bus" in cmd and BUS_PROFILE in cmd:
+                # match: lark-cli event _bus, optionally scoped to a configured profile.
+                if "event" in cmd and "_bus" in cmd and (not BUS_PROFILE or BUS_PROFILE in cmd):
                     return proc.info["pid"]
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass

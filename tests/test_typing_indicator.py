@@ -16,6 +16,8 @@ def _fake_config(**overrides):
     c.typing_indicator_stdout_log = Path(tempfile.gettempdir()) / 'log' / 'ti-out.log'
     c.typing_indicator_stderr_log = Path(tempfile.gettempdir()) / 'log' / 'ti-err.log'
     c.python_exe = 'python.exe'
+    c.lark_cli_bin = Path('lark-cli.exe')
+    c.raw = {}
     for k, v in overrides.items():
         setattr(c, k, v)
     return c
@@ -54,6 +56,10 @@ class TypingIndicatorStartTests(unittest.TestCase):
             self.assertTrue(result.ok)
             self.assertEqual(result.pid, 5678)
             self.assertIn('started', result.message)
+            env = mock_sp.call_args.kwargs['env']
+            self.assertEqual(env['PYTHON_EXE'], str(cfg.python_exe))
+            self.assertEqual(env['LARK_CLI_BIN'], str(cfg.lark_cli_bin))
+            self.assertNotIn('OPENCLAW_HOME', env)
 
     def test_start_exits_during_startup(self):
         cfg = _fake_config()

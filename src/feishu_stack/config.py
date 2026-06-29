@@ -105,7 +105,8 @@ def validate_config(raw: dict[str, Any]) -> StackConfigValidation:
 def find_stack_root(start: Path | None = None) -> Path:
     current = (start or Path(__file__)).resolve()
     for parent in [current, *current.parents]:
-        if (parent / "config" / "stack.settings.json").exists():
+        config_dir = parent / "config"
+        if (config_dir / "stack.settings.local.json").exists() or (config_dir / "stack.settings.json").exists():
             return parent
     raise FileNotFoundError("Could not find config/stack.settings.json")
 
@@ -136,6 +137,19 @@ def resolve_codex_bin(configured_bin: str, codex_config: Path) -> Path:
         return configured
     candidate = Path(str(codex_cli_path))
     return candidate if candidate.exists() else configured
+
+
+def resolve_settings_path(path: Path | None = None) -> Path:
+    if path is not None:
+        return path
+    env_path = os.environ.get("STACK_SETTINGS_PATH")
+    if env_path:
+        return Path(env_path)
+    config_dir = find_stack_root() / "config"
+    local_path = config_dir / "stack.settings.local.json"
+    if local_path.exists():
+        return local_path
+    return config_dir / "stack.settings.json"
 
 
 @dataclass(frozen=True)
@@ -233,7 +247,7 @@ class StackConfig:
 
 
 def load_config(path: Path | None = None) -> StackConfig:
-    settings_path = path or (find_stack_root() / "config" / "stack.settings.json")
+    settings_path = resolve_settings_path(path)
     raw = json.loads(settings_path.read_text(encoding="utf-8"))
     validate_config(raw)  # raises on invalid config
     stack_root = Path(raw.get("stackRoot") or settings_path.parents[1]).resolve()

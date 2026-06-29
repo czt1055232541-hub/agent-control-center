@@ -5,7 +5,7 @@ param(
 )
 
 $StackRoot = Split-Path -Parent $PSScriptRoot
-$PythonExe = "E:\Python\python.exe"
+$PythonExe = if ($env:PYTHON_EXE) { $env:PYTHON_EXE } else { "python" }
 $argsList = @("-m", "feishu_stack.cli", "serve-control-center")
 if (-not $NoOpen) { $argsList += "--open" }
 if ($NoBuild) { $argsList += "--no-build" }

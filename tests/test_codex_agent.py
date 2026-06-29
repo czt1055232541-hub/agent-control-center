@@ -67,9 +67,9 @@ class CodexAgentEnvTests(unittest.TestCase):
         with patch.dict(
             'os.environ',
             {
-                'OPENCLAW_HOME': r'E:\openclaw\clawclaw',
-                'CLAW_HOME': r'E:\openclaw\clawclaw',
-                'HERMES_HOME': r'E:\hermes',
+                'OPENCLAW_HOME': r'C:\openclaw',
+                'CLAW_HOME': r'C:\openclaw',
+                'HERMES_HOME': r'C:\hermes',
                 'LARK_CHANNEL': 'enabled',
             },
             clear=False,

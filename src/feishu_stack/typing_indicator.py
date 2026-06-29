@@ -32,6 +32,11 @@ def start(config: StackConfig | None = None) -> OperationResult:
     for key in list(env):
         if key.startswith("OPENCLAW_") or key in ("CODEX_HOME", "CLAW_HOME"):
             env.pop(key, None)
+    agent_settings = cfg.raw.get("agent", {})
+    env["PYTHON_EXE"] = str(cfg.python_exe)
+    env["LARK_CLI_BIN"] = str(cfg.lark_cli_bin)
+    if agent_settings.get("larkCliProfile"):
+        env["LARK_CLI_PROFILE"] = str(agent_settings["larkCliProfile"])
     proc = start_process(
         [cfg.python_exe, str(cfg.typing_indicator_launcher)],
         cwd=cfg.typing_indicator_dir,
