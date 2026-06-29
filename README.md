@@ -20,7 +20,7 @@ Copy-Item config\stack.settings.json config\stack.settings.local.json
 notepad config\stack.settings.local.json
 ```
 
-把 `stack.settings.local.json` 里的路径、端口、模型名、OpenClaw、MoonBridge、Feishu Agent、lark-cli 位置改成本机实际值。程序读取配置的优先级是：
+把 `stack.settings.local.json` 里的路径、端口、模型名、Python、Node/NPM、OpenClaw、MoonBridge、Feishu Agent、lark-cli 位置改成本机实际值。程序读取配置的优先级是：
 
 1. `STACK_SETTINGS_PATH` 环境变量指定的文件
 2. `config/stack.settings.local.json`
@@ -120,7 +120,7 @@ rg -n "sk-|appSecret|openId|ou_|chat_id|oc_|api_key|auth.json|token" .
 2. 克隆本仓库。
 3. 执行 `python -m pip install -e .[dev]`。
 4. 复制 `config/stack.settings.json` 为 `config/stack.settings.local.json`。
-5. 修改 local 配置中的路径、端口、模型名、lark-cli home、Feishu Agent 路径。
+5. 修改 local 配置中的路径、端口、模型名、Node/NPM、lark-cli home、Feishu Agent 路径。
 6. 分别确认 OpenClaw、MoonBridge、Codex App、lark-cli 可以独立运行。
 7. 运行 `python -m feishu_stack.cli doctor` 和 `python -m pytest -q`。
 8. 启动 Control Center API / GUI。

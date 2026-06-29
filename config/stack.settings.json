@@ -2,6 +2,8 @@
   "repository": "your-github-org-or-user/agent-control-center",
   "stackRoot": "C:\\agent-control-center",
   "pythonExe": "C:\\Python\\python.exe",
+  "nodeExe": "C:\\Program Files\\nodejs\\node.exe",
+  "npmExe": "C:\\Program Files\\nodejs\\npm.cmd",
   "codexHome": "C:\\Users\\you\\.codex",
   "codexBin": "C:\\Users\\you\\AppData\\Local\\OpenAI\\Codex\\bin\\codex.exe",
   "codexConfig": "C:\\Users\\you\\.codex\\config.toml",

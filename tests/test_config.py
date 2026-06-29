@@ -18,6 +18,8 @@ class ConfigTests(unittest.TestCase):
 {
   "stackRoot": "__ROOT__",
   "pythonExe": "__ROOT__\\\\python.exe",
+  "nodeExe": "__ROOT__\\\\node.exe",
+  "npmExe": "__ROOT__\\\\npm.cmd",
   "codexHome": "__ROOT__\\\\codex",
   "codexBin": "__ROOT__\\\\codex\\\\codex.exe",
   "codexConfig": "__ROOT__\\\\codex\\\\config.toml",
@@ -55,6 +57,8 @@ class ConfigTests(unittest.TestCase):
 
         self.assertEqual(config.openclaw_port, 18789)
         self.assertEqual(config.moonbridge_port, 38440)
+        self.assertEqual(config.node_exe.name, "node.exe")
+        self.assertEqual(config.npm_exe.name, "npm.cmd")
         self.assertEqual(config.pid_dir.name, "pids")
         self.assertEqual(config.migration_summary_dir.name, "summaries")
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import sys
 import tomllib
 from dataclasses import dataclass
@@ -22,6 +23,8 @@ class StackConfigValidation(BaseModel):
     codex_config: str = Field(alias="codexConfig")
     codex_switch_script: str = Field(alias="codexSwitchScript")
     python_exe: str = Field(default="E:\\Python\\python.exe", alias="pythonExe")
+    node_exe: str | None = Field(default=None, alias="nodeExe")
+    npm_exe: str | None = Field(default=None, alias="npmExe")
     codex_native_model: str = Field(alias="codexNativeModel")
     codex_moonbridge_model: str = Field(alias="codexMoonBridgeModel")
     moonbridge_dir: str
@@ -84,6 +87,8 @@ def validate_config(raw: dict[str, Any]) -> StackConfigValidation:
         codexConfig=raw["codexConfig"],
         codexSwitchScript=raw["codexSwitchScript"],
         pythonExe=raw.get("pythonExe", os.environ.get("PYTHON_EXE", "E:\\Python\\python.exe")),
+        nodeExe=raw.get("nodeExe"),
+        npmExe=raw.get("npmExe"),
         codexNativeModel=raw["codexNativeModel"],
         codexMoonBridgeModel=raw["codexMoonBridgeModel"],
         moonbridge_dir=moonbridge["dir"],
@@ -139,6 +144,20 @@ def resolve_codex_bin(configured_bin: str, codex_config: Path) -> Path:
     return candidate if candidate.exists() else configured
 
 
+def resolve_command(configured: str | None, env_key: str, executable_name: str) -> Path | str:
+    if configured:
+        candidate = Path(configured)
+        if candidate.exists():
+            return candidate
+    env_value = os.environ.get(env_key)
+    if env_value:
+        candidate = Path(env_value)
+        if candidate.exists():
+            return candidate
+    found = shutil.which(executable_name)
+    return Path(found) if found else executable_name
+
+
 def resolve_settings_path(path: Path | None = None) -> Path:
     if path is not None:
         return path
@@ -178,6 +197,8 @@ class StackConfig:
     pid_dir: Path
     lark_cli_home: Path | None = None
     summary_dir: Path | None = None
+    node_exe: Path | str = "node"
+    npm_exe: Path | str = "npm"
 
     @property
     def pid_openclaw(self) -> Path:
@@ -248,7 +269,7 @@ class StackConfig:
 
 def load_config(path: Path | None = None) -> StackConfig:
     settings_path = resolve_settings_path(path)
-    raw = json.loads(settings_path.read_text(encoding="utf-8"))
+    raw = json.loads(settings_path.read_text(encoding="utf-8-sig"))
     validate_config(raw)  # raises on invalid config
     stack_root = Path(raw.get("stackRoot") or settings_path.parents[1]).resolve()
     moonbridge = raw["moonbridge"]
@@ -264,6 +285,8 @@ def load_config(path: Path | None = None) -> StackConfig:
         codex_config=codex_config,
         codex_switch_script=Path(raw["codexSwitchScript"]),
         python_exe=Path(raw.get("pythonExe") or os.environ.get("PYTHON_EXE") or "E:\\Python\\python.exe"),
+        node_exe=resolve_command(raw.get("nodeExe"), "NODE_EXE", "node.exe" if os.name == "nt" else "node"),
+        npm_exe=resolve_command(raw.get("npmExe"), "NPM_EXE", "npm.cmd" if os.name == "nt" else "npm"),
         native_model=raw["codexNativeModel"],
         moonbridge_model=raw["codexMoonBridgeModel"],
         moonbridge_dir=Path(moonbridge["dir"]),

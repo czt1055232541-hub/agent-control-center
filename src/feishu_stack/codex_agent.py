@@ -4,6 +4,7 @@ import os
 import json
 import subprocess
 import time
+from pathlib import Path
 
 from .config import StackConfig, load_config
 from .models import OperationResult
@@ -16,14 +17,41 @@ AGENT_CONTEXT_ENV_KEYS = (
     "LARK_CHANNEL",
 )
 
+BUILD_INPUTS = (
+    "src",
+    "package.json",
+    "package-lock.json",
+    "tsconfig.json",
+)
+
+
+def _iter_build_inputs(agent_dir: Path):
+    for relative in BUILD_INPUTS:
+        path = agent_dir / relative
+        if path.is_file():
+            yield path
+        elif path.is_dir():
+            yield from (candidate for candidate in path.rglob("*") if candidate.is_file())
+
+
+def _needs_build(cfg: StackConfig) -> tuple[bool, str]:
+    if not cfg.agent_entry.exists():
+        return True, "Codex Agent build output is missing."
+    entry_mtime = cfg.agent_entry.stat().st_mtime
+    for path in _iter_build_inputs(cfg.agent_dir):
+        if path.stat().st_mtime > entry_mtime:
+            return True, f"Codex Agent build input changed: {path.relative_to(cfg.agent_dir)}"
+    return False, "Codex Agent is already built."
+
 
 def _build_if_needed(cfg: StackConfig) -> tuple[bool, str]:
-    if cfg.agent_entry.exists():
-        return True, "Codex Agent is already built."
-    install = subprocess.run(["npm", "install"], cwd=cfg.agent_dir, text=True, capture_output=True, creationflags=CREATE_NO_WINDOW)
+    needs_build, message = _needs_build(cfg)
+    if not needs_build:
+        return True, message
+    install = subprocess.run([str(cfg.npm_exe), "install"], cwd=cfg.agent_dir, text=True, capture_output=True, creationflags=CREATE_NO_WINDOW)
     if install.returncode != 0:
         return False, install.stderr or install.stdout
-    build = subprocess.run(["npm", "run", "build"], cwd=cfg.agent_dir, text=True, capture_output=True, creationflags=CREATE_NO_WINDOW)
+    build = subprocess.run([str(cfg.npm_exe), "run", "build"], cwd=cfg.agent_dir, text=True, capture_output=True, creationflags=CREATE_NO_WINDOW)
     if build.returncode != 0:
         return False, build.stderr or build.stdout
     return cfg.agent_entry.exists(), "Codex Agent build complete."
@@ -86,7 +114,7 @@ def start(config: StackConfig | None = None) -> OperationResult:
         return OperationResult(False, "codex-agent", "start", build_message)
     env = _build_agent_env(cfg)
     proc = start_process(
-        ["node.exe", "dist\\src\\index.js"],
+        [str(cfg.node_exe), "dist\\src\\index.js"],
         cwd=cfg.agent_dir,
         stdout_log=cfg.codex_agent_stdout_log,
         stderr_log=cfg.codex_agent_stderr_log,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -17,6 +18,8 @@ def _fake_config(**overrides):
     c.codex_agent_stderr_log = Path(tempfile.gettempdir()) / 'log' / 'agent-err.log'
     c.codex_home = Path(tempfile.gettempdir()) / 'codex'
     c.codex_bin = Path('codex.exe')
+    c.node_exe = Path('node.exe')
+    c.npm_exe = Path('npm.cmd')
     c.stack_root = Path(tempfile.gettempdir()) / 'stack'
     c.lark_cli_bin = Path('lark-cli')
     c.lark_cli_home = Path(tempfile.gettempdir()) / '.home'
@@ -29,22 +32,20 @@ def _fake_config(**overrides):
 class CodexAgentBuildTests(unittest.TestCase):
     def test_already_built(self):
         cfg = _fake_config()
-        cfg.agent_entry = MagicMock()
-        cfg.agent_entry.exists.return_value = True
-        from feishu_stack.codex_agent import _build_if_needed
-        ok, msg = _build_if_needed(cfg)
+        with patch('feishu_stack.codex_agent._needs_build', return_value=(False, 'Codex Agent is already built.')):
+            from feishu_stack.codex_agent import _build_if_needed
+            ok, msg = _build_if_needed(cfg)
         self.assertTrue(ok)
         self.assertIn('already built', msg)
 
     def test_build_failure(self):
         import subprocess
         cfg = _fake_config()
-        cfg.agent_entry = MagicMock()
-        cfg.agent_entry.exists.return_value = False
         with patch('subprocess.run') as mock_run:
             mock_run.return_value = subprocess.CompletedProcess([], 1, '', 'npm error')
-            from feishu_stack.codex_agent import _build_if_needed
-            ok, msg = _build_if_needed(cfg)
+            with patch('feishu_stack.codex_agent._needs_build', return_value=(True, 'missing')):
+                from feishu_stack.codex_agent import _build_if_needed
+                ok, msg = _build_if_needed(cfg)
             self.assertFalse(ok)
             self.assertIn('npm error', msg)
 
@@ -52,13 +53,35 @@ class CodexAgentBuildTests(unittest.TestCase):
         import subprocess
         cfg = _fake_config()
         cfg.agent_entry = MagicMock()
-        cfg.agent_entry.exists.side_effect = [False, True]
+        cfg.agent_entry.exists.return_value = True
         with patch('subprocess.run') as mock_run:
             mock_run.return_value = subprocess.CompletedProcess([], 0, '', '')
-            from feishu_stack.codex_agent import _build_if_needed
-            ok, msg = _build_if_needed(cfg)
+            with patch('feishu_stack.codex_agent._needs_build', return_value=(True, 'missing')):
+                from feishu_stack.codex_agent import _build_if_needed
+                ok, msg = _build_if_needed(cfg)
             self.assertTrue(ok)
             self.assertEqual(mock_run.call_count, 2)
+            self.assertEqual(mock_run.call_args_list[0].args[0][0], str(cfg.npm_exe))
+
+    def test_needs_build_when_source_is_newer(self):
+        cfg = _fake_config()
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg.agent_dir = Path(tmp)
+            src = cfg.agent_dir / 'src'
+            dist = cfg.agent_dir / 'dist' / 'src'
+            src.mkdir()
+            dist.mkdir(parents=True)
+            cfg.agent_entry = dist / 'index.js'
+            cfg.agent_entry.write_text('built', encoding='utf-8')
+            (src / 'index.ts').write_text('source', encoding='utf-8')
+            os.utime(cfg.agent_entry, (100, 100))
+            os.utime(src / 'index.ts', (200, 200))
+
+            from feishu_stack.codex_agent import _needs_build
+            ok, msg = _needs_build(cfg)
+
+        self.assertTrue(ok)
+        self.assertIn('src', msg)
 
 
 class CodexAgentEnvTests(unittest.TestCase):
@@ -125,6 +148,7 @@ class CodexAgentStartTests(unittest.TestCase):
             result = start(cfg)
             self.assertTrue(result.ok)
             self.assertEqual(result.pid, 4567)
+            self.assertEqual(mock_sp.call_args.args[0][0], str(cfg.node_exe))
             env = mock_sp.call_args.kwargs['env']
             self.assertEqual(env['CODEX_CLI_BIN'], str(cfg.codex_bin))
             self.assertNotIn('OPENCLAW_HOME', env)
