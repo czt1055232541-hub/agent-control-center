@@ -8,6 +8,7 @@
   "codexBin": "C:\\Users\\you\\AppData\\Local\\OpenAI\\Codex\\bin\\codex.exe",
   "codexConfig": "C:\\Users\\you\\.codex\\config.toml",
   "codexNativeModel": "gpt-5.5",
+  "codexNativeReasoningEffort": "high",
   "codexMoonBridgeModel": "moonbridge",
   "codexSwitchScript": "C:\\agent-control-center\\scripts\\Switch-CodexProvider.ps1",
   "moonBridgeBaseUrl": "http://127.0.0.1:38440/v1",

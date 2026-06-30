@@ -13,6 +13,18 @@ from .models import ComponentStatus, OperationResult
 CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 
 
+def _run_system(command: list[str], timeout: int = 30) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        command,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+        timeout=timeout,
+        creationflags=CREATE_NO_WINDOW,
+    )
+
+
 def is_port_listening(port: int, host: str = "127.0.0.1", timeout: float = 0.5) -> bool:
     try:
         with socket.create_connection((host, port), timeout=timeout):
@@ -50,12 +62,10 @@ def process_info(pid: int | None) -> tuple[bool, str | None]:
             return True, None
         except OSError:
             return False, None
-    completed = subprocess.run(
-        ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
-        text=True,
-        capture_output=True,
-        creationflags=CREATE_NO_WINDOW,
-    )
+    try:
+        completed = _run_system(["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"], timeout=10)
+    except subprocess.TimeoutExpired:
+        return False, None
     output = completed.stdout.strip()
     if not output or "No tasks are running" in output or not output.startswith('"'):
         return False, None
@@ -65,12 +75,10 @@ def process_info(pid: int | None) -> tuple[bool, str | None]:
 
 
 def pids_by_port(port: int) -> list[int]:
-    completed = subprocess.run(
-        ["netstat", "-ano"],
-        text=True,
-        capture_output=True,
-        creationflags=CREATE_NO_WINDOW,
-    )
+    try:
+        completed = _run_system(["netstat", "-ano"], timeout=10)
+    except subprocess.TimeoutExpired:
+        return []
     pids: set[int] = set()
     marker = f":{port}"
     for line in completed.stdout.splitlines():
@@ -143,8 +151,11 @@ def run_capture(command: list[str], cwd: Path | None = None, env: dict[str, str]
 
 def terminate_pid(pid: int) -> bool:
     command = ["taskkill", "/PID", str(pid), "/T", "/F"] if os.name == "nt" else ["kill", str(pid)]
-    completed = subprocess.run(command, text=True, capture_output=True, creationflags=CREATE_NO_WINDOW)
-    return completed.returncode == 0
+    try:
+        completed = _run_system(command, timeout=15)
+        return completed.returncode == 0
+    except subprocess.TimeoutExpired:
+        return False
 
 
 def stop_component(
@@ -159,11 +170,14 @@ def stop_component(
     started = time.monotonic()
     messages: list[str] = []
     if pre_stop:
-        completed = run_capture(pre_stop, cwd=pre_stop_cwd, env=pre_stop_env, timeout=30)
-        if completed.stdout.strip():
-            messages.append(completed.stdout.strip())
-        if completed.stderr.strip():
-            messages.append(completed.stderr.strip())
+        try:
+            completed = run_capture(pre_stop, cwd=pre_stop_cwd, env=pre_stop_env, timeout=30)
+            if completed.stdout.strip():
+                messages.append(completed.stdout.strip())
+            if completed.stderr.strip():
+                messages.append(completed.stderr.strip())
+        except subprocess.TimeoutExpired:
+            messages.append(f"pre-stop command timed out after 30s: {' '.join(pre_stop)}")
     pid = read_pid(pid_file)
     stopped = False
     if pid is not None:

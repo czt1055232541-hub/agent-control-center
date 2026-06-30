@@ -153,6 +153,7 @@ def _moonbridge_has_model(cfg: StackConfig, model: str, timeout: int = 3) -> boo
 
 def _apply_native(lines: list[str], cfg: StackConfig) -> list[str]:
     result = _set_top_level_key(lines, "model", f'"{cfg.native_model}"')
+    result = _set_top_level_key(result, "model_reasoning_effort", f'"{cfg.native_reasoning_effort}"')
     result = _remove_top_level_keys(result, {"model_provider", "model_context_window", "model_max_output_tokens", "model_catalog_json"})
     return _remove_section(result, "model_providers.moonbridge")
 

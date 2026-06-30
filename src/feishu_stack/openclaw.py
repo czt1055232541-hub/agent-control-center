@@ -4,10 +4,11 @@ import json
 import os
 import subprocess
 import time
+from pathlib import Path
 
 from .config import StackConfig, load_config
 from .models import OperationResult
-from .process import CREATE_NO_WINDOW, is_port_listening, start_process, stop_component, wait_for_port, write_pid
+from .process import is_port_listening, pids_by_port, start_process, stop_component, wait_for_port, write_pid
 
 
 def _ensure_feishu_a2a_runtime(cfg: StackConfig) -> None:
@@ -145,6 +146,10 @@ function findNextAt(value, start) {
     send_file.write_text(text.replace(needle, replacement), encoding="utf-8")
 
 
+def _gateway_command(cfg: StackConfig) -> list[str]:
+    return ["cmd.exe", "/d", "/c", str(cfg.openclaw_gateway_cmd)]
+
+
 def start(config: StackConfig | None = None) -> OperationResult:
     cfg = config or load_config()
     started = time.monotonic()
@@ -153,25 +158,32 @@ def start(config: StackConfig | None = None) -> OperationResult:
     _ensure_feishu_a2a_runtime(cfg)
     env = os.environ.copy()
     env["OPENCLAW_HOME"] = str(cfg.openclaw_home)
+    env["OPENCLAW_GATEWAY_PORT"] = str(cfg.openclaw_port)
+    env.setdefault("TMPDIR", str(Path.home() / "AppData" / "Local" / "Temp"))
+    env["NO_PROXY"] = "*"
+    env["no_proxy"] = "*"
+    for proxy_key in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+        env.pop(proxy_key, None)
     openclaw_settings = cfg.raw.get("openclaw", {})
     if openclaw_settings.get("a2aBots"):
         env["OPENCLAW_FEISHU_A2A_BOTS"] = json.dumps(openclaw_settings["a2aBots"], ensure_ascii=False)
     proc = start_process(
-        ["cmd.exe", "/d", "/c", str(cfg.openclaw_gateway_cmd)],
+        _gateway_command(cfg),
         cwd=cfg.openclaw_home,
         stdout_log=cfg.openclaw_stdout_log,
         stderr_log=cfg.openclaw_stderr_log,
         env=env,
     )
-    write_pid(cfg.pid_openclaw, proc.pid)
-    ready = wait_for_port(cfg.openclaw_port, True)
+    ready = wait_for_port(cfg.openclaw_port, True, timeout=480)
+    port_pids = pids_by_port(cfg.openclaw_port) if ready else []
+    write_pid(cfg.pid_openclaw, port_pids[0] if port_pids else proc.pid)
     duration = int((time.monotonic() - started) * 1000)
     return OperationResult(
         ok=ready,
         component="openclaw",
         action="start",
         message="OpenClaw Gateway started." if ready else "OpenClaw Gateway did not become ready.",
-        pid=proc.pid,
+        pid=port_pids[0] if port_pids else proc.pid,
         port=cfg.openclaw_port,
         stdout_log=str(cfg.openclaw_stdout_log),
         stderr_log=str(cfg.openclaw_stderr_log),
@@ -181,15 +193,10 @@ def start(config: StackConfig | None = None) -> OperationResult:
 
 def stop(config: StackConfig | None = None) -> OperationResult:
     cfg = config or load_config()
-    env = os.environ.copy()
-    env["OPENCLAW_HOME"] = str(cfg.openclaw_home)
     return stop_component(
         component="openclaw",
         pid_file=cfg.pid_openclaw,
         port=cfg.openclaw_port,
-        pre_stop=["openclaw.cmd", "gateway", "stop"],
-        pre_stop_cwd=cfg.openclaw_home,
-        pre_stop_env=env,
     )
 
 
@@ -224,6 +231,8 @@ def open_ui(config: StackConfig | None = None) -> OperationResult:
     cfg = config or load_config()
     started = time.monotonic()
     url = ui_url(cfg)
+    from .process import CREATE_NO_WINDOW
+
     subprocess.Popen(
         ["cmd.exe", "/d", "/c", "start", "", url],
         cwd=str(cfg.openclaw_home),

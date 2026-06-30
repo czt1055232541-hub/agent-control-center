@@ -34,6 +34,7 @@ def make_config(tmp_path: Path) -> StackConfig:
         codex_config=codex_home / "config.toml",
         codex_switch_script=stack_root / "scripts" / "switch.ps1",
         native_model="gpt-5.5",
+        native_reasoning_effort="high",
         moonbridge_model="moonbridge",
         moonbridge_dir=stack_root / "moonbridge",
         moonbridge_exe=stack_root / "moonbridge" / "moonbridge.exe",

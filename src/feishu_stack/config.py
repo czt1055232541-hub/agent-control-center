@@ -26,6 +26,7 @@ class StackConfigValidation(BaseModel):
     node_exe: str | None = Field(default=None, alias="nodeExe")
     npm_exe: str | None = Field(default=None, alias="npmExe")
     codex_native_model: str = Field(alias="codexNativeModel")
+    codex_native_reasoning_effort: str = Field(default="high", alias="codexNativeReasoningEffort")
     codex_moonbridge_model: str = Field(alias="codexMoonBridgeModel")
     moonbridge_dir: str
     moonbridge_exe: str
@@ -90,6 +91,7 @@ def validate_config(raw: dict[str, Any]) -> StackConfigValidation:
         nodeExe=raw.get("nodeExe"),
         npmExe=raw.get("npmExe"),
         codexNativeModel=raw["codexNativeModel"],
+        codexNativeReasoningEffort=raw.get("codexNativeReasoningEffort", "high"),
         codexMoonBridgeModel=raw["codexMoonBridgeModel"],
         moonbridge_dir=moonbridge["dir"],
         moonbridge_exe=moonbridge["exe"],
@@ -181,6 +183,7 @@ class StackConfig:
     codex_switch_script: Path
     python_exe: Path
     native_model: str
+    native_reasoning_effort: str
     moonbridge_model: str
     moonbridge_dir: Path
     moonbridge_exe: Path
@@ -288,6 +291,7 @@ def load_config(path: Path | None = None) -> StackConfig:
         node_exe=resolve_command(raw.get("nodeExe"), "NODE_EXE", "node.exe" if os.name == "nt" else "node"),
         npm_exe=resolve_command(raw.get("npmExe"), "NPM_EXE", "npm.cmd" if os.name == "nt" else "npm"),
         native_model=raw["codexNativeModel"],
+        native_reasoning_effort=str(raw.get("codexNativeReasoningEffort") or "high"),
         moonbridge_model=raw["codexMoonBridgeModel"],
         moonbridge_dir=Path(moonbridge["dir"]),
         moonbridge_exe=Path(moonbridge["exe"]),

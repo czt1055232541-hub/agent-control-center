@@ -178,6 +178,7 @@ Control Center API 使用 `uvicorn` 运行，进程管理逻辑：
   "codexBin": "E:\\codeX\\bin\\codex.exe",
   "codexConfig": "E:\\codeX\\config.toml",
   "codexNativeModel": "gpt-5.5",
+  "codexNativeReasoningEffort": "high",
   "codexMoonBridgeModel": "deepseek-v4-flash",
   "moonBridgeBaseUrl": "http://127.0.0.1:38440/v1",
   "moonbridge": {

@@ -30,30 +30,46 @@ notepad config\stack.settings.local.json
 
 ## 常用命令
 
+优先使用 Python 入口管理 Codex Agent、OpenClaw、MoonBridge 和 provider 切换。PowerShell 脚本仅保留给双击启动、桌面快捷方式和旧流程兼容。
+
 查看状态：
 
-```powershell
-python -m feishu_stack.cli status --json
+```bash
+python scripts/stack.py status --json
 ```
 
 启动 MoonBridge 模式：
 
-```powershell
-python -m feishu_stack.cli start moonbridge
-python -m feishu_stack.cli switch-provider moonbridge
-python -m feishu_stack.cli start codex-agent
+```bash
+python scripts/stack.py start moonbridge
+python scripts/stack.py switch-provider moonbridge
+python scripts/stack.py start codex-agent
+```
+
+切回 native 模式：
+
+```bash
+python scripts/stack.py switch-provider native
+python scripts/stack.py restart codex-agent
+```
+
+启动或重启 OpenClaw Gateway：
+
+```bash
+python scripts/stack.py start openclaw
+python scripts/stack.py restart openclaw
 ```
 
 检查 MoonBridge 活体：
 
-```powershell
+```bash
 curl http://127.0.0.1:38440/v1/models
 ```
 
 启动控制中心 API 和 GUI：
 
-```powershell
-.\scripts\start-control-center.ps1
+```bash
+python scripts/stack.py serve-control-center --open
 ```
 
 默认访问地址：
@@ -64,8 +80,8 @@ http://127.0.0.1:8765
 
 安装或刷新桌面快捷方式：
 
-```powershell
-.\scripts\install-control-center-shortcut.ps1
+```bash
+python scripts/stack.py install-shortcut
 ```
 
 ## Codex App 与 MoonBridge 模式
@@ -104,7 +120,7 @@ runtime/
 
 提交前建议运行：
 
-```powershell
+```bash
 git status --short
 git diff --cached
 rg -n "sk-|appSecret|openId|ou_|chat_id|oc_|api_key|auth.json|token" .
@@ -131,13 +147,13 @@ rg -n "sk-|appSecret|openId|ou_|chat_id|oc_|api_key|auth.json|token" .
 
 运行测试：
 
-```powershell
+```bash
 python -m pytest -q
 ```
 
 构建前端：
 
-```powershell
+```bash
 cd web
 npm install
 npm run build

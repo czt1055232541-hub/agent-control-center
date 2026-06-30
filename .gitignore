@@ -2,6 +2,7 @@
 .env
 *.env
 config/stack.settings.local.json
+config/stack.settings.local.json.bak-*
 *.key
 *.pem
 *token*
@@ -53,6 +54,8 @@ __pycache__/
 
 # Generated images and backups
 *qr*.png
+*.bak
+*.bak-*
 *.bak-goal-*
 *.bak-switch-*
 *.bak-restore-native-*

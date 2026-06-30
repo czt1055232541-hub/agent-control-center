@@ -19,6 +19,7 @@ def _config(tmp_path: Path) -> StackConfig:
         codex_config=tmp_path / "codex" / "config.toml",
         codex_switch_script=tmp_path / "codex" / "Switch-CodexProvider.ps1",
         native_model="gpt-5.5",
+        native_reasoning_effort="high",
         moonbridge_model="moonbridge",
         moonbridge_dir=tmp_path / "moonbridge",
         moonbridge_exe=tmp_path / "moonbridge" / "moonbridge.exe",

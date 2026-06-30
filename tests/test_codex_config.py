@@ -35,6 +35,7 @@ def make_config(tmp_path: Path) -> StackConfig:
         codex_config=config_path,
         codex_switch_script=stack_root / "codex" / "Switch-CodexProvider.ps1",
         native_model="gpt-5.5",
+        native_reasoning_effort="high",
         moonbridge_model="moonbridge-flash",
         moonbridge_dir=tmp_path,
         moonbridge_exe=tmp_path / "moonbridge.exe",
@@ -75,6 +76,7 @@ def test_switch_provider_to_native_removes_moonbridge_keys(tmp_path: Path, monke
     assert switch_provider("native", cfg).ok is True
     text = cfg.codex_config.read_text(encoding="utf-8")
     assert 'model = "gpt-5.5"' in text
+    assert 'model_reasoning_effort = "high"' in text
     assert "model_provider" not in text
     assert "[model_providers.moonbridge]" not in text
     assert len(list(cfg.codex_home.glob("config.toml.bak-switch-*"))) == 1
