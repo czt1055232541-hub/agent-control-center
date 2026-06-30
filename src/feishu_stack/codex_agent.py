@@ -67,6 +67,7 @@ def _build_agent_env(cfg: StackConfig) -> dict[str, str]:
         {
             "CODEX_HOME": str(cfg.codex_home),
             "CODEX_CLI_BIN": str(cfg.codex_bin),
+            "CODEX_CLI_PATH": str(cfg.codex_bin),
             "CODEX_AGENT_ARGS": str(agent_settings.get("codexAgentArgs") or "exec --skip-git-repo-check"),
             "AGENT_PROVIDER": str(agent_settings.get("provider") or "local"),
             "AGENT_NAME": "codex",

@@ -101,6 +101,7 @@ class CodexAgentEnvTests(unittest.TestCase):
             env = _build_agent_env(cfg)
 
         self.assertEqual(env['CODEX_CLI_BIN'], r'C:\Codex\current\codex.exe')
+        self.assertEqual(env['CODEX_CLI_PATH'], r'C:\Codex\current\codex.exe')
         self.assertEqual(env['HOME'], str(cfg.lark_cli_home))
         self.assertEqual(env['LARK_CLI_CWD'], str(cfg.stack_root))
         self.assertNotIn('OPENCLAW_HOME', env)
@@ -151,6 +152,7 @@ class CodexAgentStartTests(unittest.TestCase):
             self.assertEqual(mock_sp.call_args.args[0][0], str(cfg.node_exe))
             env = mock_sp.call_args.kwargs['env']
             self.assertEqual(env['CODEX_CLI_BIN'], str(cfg.codex_bin))
+            self.assertEqual(env['CODEX_CLI_PATH'], str(cfg.codex_bin))
             self.assertNotIn('OPENCLAW_HOME', env)
 
     def test_start_exits_during_startup(self):
