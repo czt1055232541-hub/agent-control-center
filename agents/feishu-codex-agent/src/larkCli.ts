@@ -50,6 +50,18 @@ export class LarkCli {
     );
   }
 
+  setTypingStatus(chatId: string, status: "Started" | "Stopped"): Promise<CliResult> {
+    return this.run([
+      "api",
+      "POST",
+      "/open-apis/im/v1/typing_status",
+      "--data",
+      JSON.stringify({ chat_id: chatId, status }),
+      "--as",
+      this.config.larkIdentity
+    ]);
+  }
+
   commandPreview(args: string[]): string {
     return [this.config.larkCliBin, ...args].map(quoteArg).join(" ");
   }

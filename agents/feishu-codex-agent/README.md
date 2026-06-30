@@ -113,7 +113,7 @@ DRY_RUN=true
 LOG_LEVEL=info
 LARK_IDENTITY=bot
 LARK_BOT_NAME=Codex
-LARK_CLI_OUTPUT_ENCODING=auto
+LARK_CLI_OUTPUT_ENCODING=utf-8
 AGENT_PROVIDER=local
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
@@ -194,7 +194,6 @@ MVP 支持：
 - 搜索/读取/生成飞书文档。
 - 妙搭/Spark/Miaoda/Apps 操作规划。
 - 创建任务。
-- 查询日历或准备会议安排。
 
 工具调用策略：
 
@@ -207,6 +206,15 @@ lark-cli api METHOD /open-apis/xxx --params '{}'
 ```
 
 当前实现对缺少完整参数的写操作采用“先规划、后执行”的安全策略，避免在 live 模式下用不完整参数创建或覆盖真实飞书资源。
+
+## 多 Agent 协作 Skill
+
+代码执行官的群内协作规则见 `SKILL.md`。关键点：
+
+- native 模式使用 `model_reasoning_effort = "high"`，避免 `reasoning.effort invalid_value`。
+- MoonBridge 和 native 的执行速度、参数兼容性不同，轮询 codeX agent 时按 2-5 分钟观察。
+- 代码执行官只做本地开发和自测，完成后 @项目调度官 回报路径、变更、运行方式、自测结果。
+- 回复正文写 `@项目调度官` 即可，发送层会转换为飞书 post 富文本 at 标签；不要输出字面 `<at user_id="...">...</at>`。
 
 ## 安全确认
 
@@ -303,6 +311,6 @@ lark-cli im +chat-list --as bot --json
 - `event status` 的 `RECEIVED` 不增长：确认机器人已加入群聊，事件 `im.message.receive_v1` 已订阅，发送的是 `@Codex ...` 或私聊消息。
 - Agent 收到事件但不回复：查看 `.runtime\agent-live.err.log`，确认 `respond=true`，并检查 `DRY_RUN=false`。
 - PowerShell 拦截 `.ps1`：使用 `.cmd` 或 `.exe` 路径调用，不需要把工具装到 C 盘。
-- Agent 日志中文乱码：保留 `LARK_CLI_OUTPUT_ENCODING=auto`，或按机器编码改为 `gb18030`/`utf-8`。
+- Agent 日志中文乱码：优先使用 `LARK_CLI_OUTPUT_ENCODING=utf-8`；只有确认当前 lark-cli 输出是系统本地编码时，才改为 `gb18030`。
 - 发送消息失败：检查 bot 是否有发消息权限，群聊是否允许机器人发言，scope 是否包含 IM 发送相关权限。
 - user token `needs_refresh`：通常会在下一次 user API 调用时刷新；如果失败，重新执行 `lark-cli auth login --recommend`。

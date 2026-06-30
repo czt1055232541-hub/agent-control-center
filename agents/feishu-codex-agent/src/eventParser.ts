@@ -82,10 +82,39 @@ function extractPlainText(rawContent: string): string {
   try {
     const parsed = JSON.parse(rawContent) as unknown;
     const record = asRecord(parsed);
-    return stringValue(record.text ?? record.title ?? record.content) ?? rawContent;
+    const text = stringValue(record.text ?? record.title ?? record.content);
+    if (text) {
+      return text;
+    }
+    const postText = extractPostPlainText(record);
+    return postText || rawContent;
   } catch {
     return rawContent;
   }
+}
+
+function extractPostPlainText(record: Record<string, unknown>): string {
+  const locale = asRecord(record.zh_cn ?? record.en_us ?? record.ja_jp);
+  const blocks = Array.isArray(locale.content) ? locale.content : [];
+  const lines: string[] = [];
+  for (const block of blocks) {
+    const elements = Array.isArray(block) ? block : [];
+    const line = elements.map((element) => {
+      const item = asRecord(element);
+      const tag = stringValue(item.tag);
+      if (tag === "text") {
+        return stringValue(item.text) ?? "";
+      }
+      if (tag === "at") {
+        return `@${stringValue(item.user_name) ?? stringValue(item.user_id) ?? ""}`;
+      }
+      return stringValue(item.text) ?? "";
+    }).join("");
+    if (line) {
+      lines.push(line);
+    }
+  }
+  return lines.join("\n").trim();
 }
 
 function extractMentions(message: Record<string, unknown>, plainText: string): string[] {

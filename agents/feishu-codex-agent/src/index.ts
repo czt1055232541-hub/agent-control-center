@@ -40,7 +40,11 @@ consumer.on("close", (code, stderrTail) => {
 
 process.on("SIGINT", () => {
   consumer.stop();
-  process.exit(0);
+  handler.flush().then(() => process.exit(0));
 });
+
+function infoLog(message: string): void {
+  console.error(`[agent] ${message}`);
+}
 
 consumer.start();

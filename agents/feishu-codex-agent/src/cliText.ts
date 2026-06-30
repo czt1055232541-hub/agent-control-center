@@ -7,6 +7,9 @@ export function decodeCliChunk(chunk: Buffer | string, encoding = "auto"): strin
     return new TextDecoder(normalized).decode(chunk);
   }
   const utf8 = new TextDecoder("utf-8").decode(chunk);
+  if (!utf8.includes("\uFFFD")) {
+    return utf8;
+  }
   const gb18030 = new TextDecoder("gb18030").decode(chunk);
   return mojibakeScore(gb18030) < mojibakeScore(utf8) ? gb18030 : utf8;
 }

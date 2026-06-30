@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+﻿import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import path from "node:path";
 import type { AppConfig } from "./env.js";
@@ -22,26 +22,32 @@ export class EventConsumer extends EventEmitter<EventConsumerEvents> {
   }
 
   start(): void {
-    const child = spawn(
-      this.config.larkCliBin,
-      [
-        "event",
-        "consume",
-        "im.message.receive_v1",
-        "--as",
-        this.config.larkIdentity,
-        "--max-events",
-        "0",
-        "--timeout",
-        this.config.larkEventTimeout
-      ],
-      {
-        windowsHide: true,
-        env: process.env,
-        cwd: this.config.larkCliCwd,
-        stdio: ["pipe", "pipe", "pipe"]
-      }
-    );
+    const isWin = process.platform === "win32";
+    const cmdFile = this.config.larkCliBin;
+    const cmdArgs = [
+      "event",
+      "consume",
+      "im.message.receive_v1",
+      "--as",
+      this.config.larkIdentity,
+      "--max-events",
+      "0",
+      "--timeout",
+      this.config.larkEventTimeout
+    ];
+    const child = isWin
+      ? spawn("cmd.exe", ["/c", cmdFile, ...cmdArgs], {
+          windowsHide: true,
+          env: process.env,
+          cwd: this.config.larkCliCwd,
+          stdio: ["pipe", "pipe", "pipe"]
+        })
+      : spawn(cmdFile, cmdArgs, {
+          windowsHide: true,
+          env: process.env,
+          cwd: this.config.larkCliCwd,
+          stdio: ["pipe", "pipe", "pipe"]
+        });
     this.child = child;
     let stdoutBuffer = "";
     let stderrBuffer = "";
@@ -80,3 +86,4 @@ export class EventConsumer extends EventEmitter<EventConsumerEvents> {
     this.child = null;
   }
 }
+

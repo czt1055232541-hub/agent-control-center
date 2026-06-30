@@ -26,18 +26,71 @@ function detectIntent(text: string): RouteIntent {
   if (/(?:\u603b\u7ed3|\u7eaa\u8981|\u884c\u52a8\u9879|\u8ba8\u8bba)/.test(text)) {
     return "summarize";
   }
-  if (/(?:\u5999\u642d|miaoda|spark|\u5e94\u7528|app|\u9759\u6001\u9875\u9762|html|\u53d1\u5e03)/i.test(text)) {
+  if (isExplicitAppsRequest(text)) {
     return "apps";
   }
-  if (/(?:\u4efb\u52a1|task|\u5f85\u529e|\u6e05\u5355)/i.test(text)) {
+  if (isExplicitTaskRequest(text)) {
     return "task";
   }
-  if (/(?:\u65e5\u5386|\u4f1a\u8bae|\u590d\u76d8\u4f1a|\u5b89\u6392|calendar|agenda)/i.test(text)) {
+  if (isCalendarRequest(text)) {
     return "calendar";
   }
   return "unknown";
 }
 
+function isExplicitAppsRequest(text: string): boolean {
+  if (/(?:no|not|don't|do not|without|\u4e0d|\u4e0d\u8981|\u4e0d\u8d70|\u4e0d\u7528|\u4e0d\u4f7f\u7528|\u65e0\u9700|\u65e0\u987b|\u7981\u6b62).{0,80}(?:\u5999\u642d|miaoda|spark|lark-cli\s*apps?|feishu\s*apps?|\u98de\u4e66\u5e94\u7528|\u5e94\u7528|app)/i.test(text)) {
+    return false;
+  }
+  if (/(?:local|single-file|\u672c\u5730|\u5355\u4e2a\s*HTML|\u5355\u6587\u4ef6\s*HTML)/i.test(text) && /(?:no|not|don't|do not|without|\u4e0d|\u4e0d\u8981|\u4e0d\u8d70|\u4e0d\u7528|\u4e0d\u4f7f\u7528|\u65e0\u9700|\u65e0\u987b|\u7981\u6b62).{0,120}(?:\u5999\u642d|miaoda|spark|lark-cli\s*apps?|feishu\s*apps?|\u98de\u4e66\u5e94\u7528|\u5e94\u7528|app)/i.test(text)) {
+    return false;
+  }
+  if (/(?:\u5999\u642d|miaoda|spark|lark\s*apps?|feishu\s*apps?)/i.test(text)) {
+    return true;
+  }
+  if (/(?:\u98de\u4e66|\u591a\u7ef4|\u4e91\u7a7a\u95f4).*(?:\u5e94\u7528|app)/i.test(text)) {
+    return true;
+  }
+  if (/(?:\u521b\u5efa|\u65b0\u5efa|\u751f\u6210|\u642d\u5efa|\u53d1\u5e03).*(?:\u98de\u4e66\u5e94\u7528|\u98de\u4e66\s*app|apps?\s*\u5e94\u7528)/i.test(text)) {
+    return true;
+  }
+  if (/(?:\u53d1\u5e03|publish|html-publish).*(?:\u98de\u4e66|\u5999\u642d|miaoda|spark|\u5e94\u7528|app)/i.test(text)) {
+    return true;
+  }
+  if (/(?:\u9759\u6001\u9875\u9762|html).*(?:\u53d1\u5e03\u5230\u98de\u4e66|\u53d1\u5e03\u4e3a\u5e94\u7528|\u5999\u642d|miaoda|spark)/i.test(text)) {
+    return true;
+  }
+  return false;
+}
+
+function isExplicitTaskRequest(text: string): boolean {
+  if (/(?:\u5f00\u53d1\u4efb\u52a1|\u5b9e\u73b0\u4efb\u52a1|\u534f\u4f5c\u4efb\u52a1|\u6d4b\u8bd5\u4efb\u52a1|\u4efb\u52a1\s*[:：]\s*(?:\u5f00\u53d1|\u5b9e\u73b0|build|create))/i.test(text)) {
+    return false;
+  }
+  if (/(?:\u98de\u4e66\u4efb\u52a1|\u98de\u4e66\u5f85\u529e|\u5f85\u529e|todo|task\s+list|\u4efb\u52a1\u6e05\u5355)/i.test(text)) {
+    return /(?:\u521b\u5efa|\u65b0\u5efa|\u751f\u6210|\u767b\u8bb0|\u5199\u5165|\u6dfb\u52a0|\u5206\u914d|create|add|assign)/i.test(text);
+  }
+  return false;
+}
+
+function isCalendarRequest(text: string): boolean {
+  if (/(?:拆分|测试|审计|开发|实现|修复|代码|部署|配置|重构|debug|test|build|implement|refactor|Phase\s*\d|单元测试|集成测试|任务拆解|任务分配|代码任务|开发任务|返工|自测)/i.test(text)) {
+    return false;
+  }
+  if (/(?:今天|明天|本周|下周|这周|查).*(?:日程|日历|有什么会|开会|会议|会议室)/i.test(text)) {
+    return true;
+  }
+  if (/(?:日程|日历|会议室|会议时间|忙闲|agenda|calendar|meeting\s+room)/i.test(text)) {
+    return true;
+  }
+  if (/(?:查看|查询|显示|show|list).*(?:日程|日历|会议|会议室)/i.test(text)) {
+    return true;
+  }
+  if (/(?:创建|新建|预定|安排).*(?:日程|日历|会议|会议室)/i.test(text)) {
+    return true;
+  }
+  return false;
+}
 function buildPlan(intent: RouteIntent, text: string): CommandPlan {
   switch (intent) {
     case "greeting":
@@ -53,7 +106,7 @@ function buildPlan(intent: RouteIntent, text: string): CommandPlan {
     case "summarize":
       return {
         title: "\u7fa4\u804a\u603b\u7ed3",
-        commands: [["im", "+chat-messages-list", "--chat-id", "$CHAT_ID", "--limit", "30", "--as", "bot"]],
+        commands: [["im", "+chat-messages-list", "--chat-id", "$CHAT_ID", "--page-size", "30", "--as", "bot"]],
         executable: true,
         requiresConfirmation: false,
         responsePreview: "\u6211\u4f1a\u57fa\u4e8e\u5f53\u524d\u6d88\u606f\u548c\u53ef\u83b7\u53d6\u7684\u6700\u8fd1\u4e0a\u4e0b\u6587\u8f93\u51fa\uff1a\u80cc\u666f\u3001\u5173\u952e\u7ed3\u8bba\u3001\u884c\u52a8\u9879\u3001\u8d1f\u8d23\u4eba\u3001\u622a\u6b62\u65f6\u95f4\u3002"
@@ -114,8 +167,7 @@ function buildPlan(intent: RouteIntent, text: string): CommandPlan {
         title: "\u65e5\u5386\u4e0e\u4f1a\u8bae",
         commands: [["calendar", "+agenda"]],
         executable: true,
-        requiresConfirmation: /(?:\u9080\u8bf7|\u6210\u5458|\u5927\u5bb6|\u591a\u4eba|\u4f1a\u8bae|\u590d\u76d8\u4f1a)/.test(text),
-        confirmationReason: "\u521b\u5efa\u6d89\u53ca\u591a\u4eba\u53c2\u4e0e\u7684\u65e5\u5386\u4e8b\u4ef6\u524d\u9700\u8981\u786e\u8ba4\u3002",
+        requiresConfirmation: false,
         responsePreview: `\u6211\u4f1a\u67e5\u8be2\u65e5\u5386\u6216\u51c6\u5907\u4f1a\u8bae\u65e5\u7a0b\u3002\u9700\u6c42\uff1a${text}`
       };
     default:

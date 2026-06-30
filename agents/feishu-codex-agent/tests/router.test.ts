@@ -7,6 +7,15 @@ import { LarkCli } from "../src/larkCli.js";
 import { MessageHandler } from "../src/handler.js";
 import { decodeCliChunk } from "../src/cliText.js";
 import { draftAgentResponse } from "../src/agent.js";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+process.env.AGENT_PROVIDER = "local";
+process.env.DRY_RUN = "true";
+process.env.LARK_BOT_NAME = "Codex";
+process.env.LARK_BOT_OPEN_ID = "ou_bot";
+process.env.A2A_BOTS = "";
 
 const hello = "\u4f60\u597d\uff0c\u4ecb\u7ecd\u4e00\u4e0b\u4f60\u80fd\u505a\u4ec0\u4e48";
 const presence = "\u5728\u5417\uff1f";
@@ -15,6 +24,7 @@ const baseCreate = "\u521b\u5efa\u4e00\u4e2a\u9879\u76ee\u4efb\u52a1\u591a\u7ef4
 const baseWrite = "\u628a\u521a\u624d\u8ba8\u8bba\u4e2d\u7684\u884c\u52a8\u9879\u5199\u5165\u8fd9\u4e2a\u591a\u7ef4\u8868\u683c";
 const docSearch = "\u641c\u7d22\u201c\u9879\u76ee\u8ba1\u5212\u201d\u76f8\u5173\u6587\u6863\u5e76\u603b\u7ed3";
 const appsCreate = "\u6839\u636e\u8fd9\u6bb5\u9700\u6c42\u521b\u5efa\u4e00\u4e2a\u5999\u642d\u5e94\u7528\u539f\u578b\uff0c\u4f46\u6267\u884c\u524d\u5148\u8ba9\u6211\u786e\u8ba4";
+const localUiApp = "\u751f\u6210\u4e00\u4e2a\u5177\u6709 UI \u754c\u9762\u7684\u8ba1\u7b97\u5668\u5c0f\u8f6f\u4ef6";
 const confirm = "\u786e\u8ba4";
 
 test("responds to group mention and extracts core event fields", () => {
@@ -64,26 +74,78 @@ test("routes required MVP examples", () => {
   const ping = routeCommand(presence);
   assert.equal(ping.intent, "greeting");
   assert.match(ping.plan.responsePreview, /\u6211\u5728/);
-  assert.equal(routeCommand(summarize).intent, "summarize");
+  const summaryRoute = routeCommand(summarize);
+  assert.equal(summaryRoute.intent, "summarize");
+  assert.deepEqual(summaryRoute.plan.commands[0], ["im", "+chat-messages-list", "--chat-id", "$CHAT_ID", "--page-size", "30", "--as", "bot"]);
   assert.equal(routeCommand(baseCreate).intent, "baseCreate");
   assert.equal(routeCommand(baseWrite).intent, "baseWrite");
   assert.equal(routeCommand(docSearch).intent, "docSearch");
   const apps = routeCommand(appsCreate);
   assert.equal(apps.intent, "apps");
   assert.equal(apps.plan.requiresConfirmation, true);
+  assert.equal(routeCommand(localUiApp).intent, "unknown");
+  assert.equal(routeCommand("No Feishu Apps. Build a local temporary GUI calculator as one HTML file.").intent, "unknown");
+  assert.equal(routeCommand("不要创建飞书应用，只生成本地 HTML 计算器").intent, "unknown");
+  assert.equal(routeCommand("任务：开发一个本地单文件 HTML 图形计算器").intent, "unknown");
+  assert.equal(routeCommand("请 codeX agent 完成这个开发任务，完成后回报").intent, "unknown");
+  assert.equal(routeCommand("创建一个飞书任务清单，分配给团队成员").intent, "task");
+  const feishuPublish = routeCommand("\u628a\u8fd9\u4e2a HTML \u9875\u9762\u53d1\u5e03\u5230\u98de\u4e66\u5e94\u7528");
+  assert.equal(feishuPublish.intent, "apps");
+  assert.equal(feishuPublish.plan.requiresConfirmation, true);
+
+test("routes calendar intent to agenda command plan", () => {
+  const r1 = routeCommand("查看我的日程");
+  assert.equal(r1.intent, "calendar");
+  assert.equal(r1.plan.title, "日历与会议");
+  assert.deepEqual(r1.plan.commands, [["calendar", "+agenda"]]);
+  assert.equal(r1.plan.executable, true);
+  assert.equal(r1.plan.requiresConfirmation, false);
+
+  const r2 = routeCommand("今天有什么会议");
+  assert.equal(r2.intent, "calendar");
+
+  const r3 = routeCommand("预定下周一的会议室");
+  assert.equal(r3.intent, "calendar");
+
+  const r4 = routeCommand("查询会议室忙闲");
+  assert.equal(r4.intent, "calendar");
+
+  const r5 = routeCommand("show my agenda");
+  assert.equal(r5.intent, "calendar");
+
+  const r6 = routeCommand("安排一个明天的会议");
+  assert.equal(r6.intent, "calendar");
+});
+
+test("development task mentions are not misrouted as calendar", () => {
+  assert.notEqual(routeCommand("日历开发任务实现").intent, "calendar");
+  assert.notEqual(routeCommand("会议室订阅系统开发").intent, "calendar");
+});
+
 });
 
 test("codex provider uses model draft instead of local quick reply", async () => {
   const route = routeCommand(summarize);
+  const scriptPath = path.join(os.tmpdir(), `feishu-codex-agent-codex-mock-${Date.now()}.js`);
+  fs.writeFileSync(
+    scriptPath,
+    [
+      "const fs = require('node:fs');",
+      "const index = process.argv.indexOf('--output-last-message');",
+      "if (index >= 0 && process.argv[index + 1]) fs.writeFileSync(process.argv[index + 1], 'MODEL_RESPONSE_FROM_TEST');"
+    ].join("\n"),
+    "utf8"
+  );
   const response = await draftAgentResponse(
     {
       ...getConfig(),
       agentProvider: "codex",
       codexCliBin: process.execPath,
-      codexAgentArgs: ["-e", "console.log('MODEL_RESPONSE_FROM_TEST')"]
+      codexAgentArgs: [scriptPath]
     },
     route
   );
+  fs.rmSync(scriptPath, { force: true });
   assert.equal(response, "MODEL_RESPONSE_FROM_TEST");
   assert.doesNotMatch(response, /执行策略/);
 });
@@ -105,8 +167,8 @@ test("asks for confirmation before apps creation and executes after confirmation
   };
 
   const ask = await handler.handleEvent(baseEvent);
-  assert.match(ask, /\u8bf7\u56de\u590d \u786e\u8ba4 \u7ee7\u7eed/);
-  assert.match(ask, /10 \u5206\u949f/);
+  assert.match(ask, /Reply with confirmation to continue/);
+  assert.match(ask, /10 minutes/);
 
   const done = await handler.handleEvent({
     ...baseEvent,
@@ -114,7 +176,7 @@ test("asks for confirmation before apps creation and executes after confirmation
     plainText: confirm,
     mentions: []
   });
-  assert.match(done, /\u5df2\u6536\u5230\u786e\u8ba4/);
+  assert.match(done, /Confirmed\. Continuing execution/);
   assert.match(done, /DRY_RUN/);
   assert.match(done, /apps \+create/);
 });
@@ -179,9 +241,9 @@ test("sendPost uses Feishu rich text post content for mentions", async () => {
   const content = {
     zh_cn: {
       content: [[
-        { tag: "text" as const, text: "[需要协作] " },
-        { tag: "at" as const, user_id: "ou_peer", user_name: "龙虾酱" },
-        { tag: "text" as const, text: " 请处理" }
+        { tag: "text" as const, text: "[\u9700\u8981\u534f\u4f5c] " },
+        { tag: "at" as const, user_id: "ou_peer", user_name: "\u8d28\u91cf\u5ba1\u8ba1\u5b98" },
+        { tag: "text" as const, text: " \u8bf7\u5904\u7406" }
       ]]
     }
   };
@@ -202,19 +264,141 @@ test("sendPost uses Feishu rich text post content for mentions", async () => {
   ]);
 });
 
+test("setTypingStatus uses Feishu typing status OpenAPI", async () => {
+  const config = { ...getConfig(), dryRun: true };
+  const lark = new LarkCli(config);
+  const result = await lark.setTypingStatus("oc_chat", "Started");
+  assert.equal(result.ok, true);
+  const payload = JSON.parse(result.stdout) as { command: string[] };
+  assert.deepEqual(payload.command.slice(1), [
+    "api",
+    "POST",
+    "/open-apis/im/v1/typing_status",
+    "--data",
+    JSON.stringify({ chat_id: "oc_chat", status: "Started" }),
+    "--as",
+    "bot"
+  ]);
+});
+
+test("handler starts and stops typing status around agent reply", async () => {
+  const statuses: string[] = [];
+  const config = {
+    ...getConfig(),
+    dryRun: false,
+    agentProvider: "local" as const,
+    a2aBots: [],
+    a2aRelay: { enabled: false }
+  };
+  const fakeLark = {
+    setTypingStatus: async (_chatId: string, status: "Started" | "Stopped") => {
+      statuses.push(status);
+      return { ok: true, code: 0, stdout: "", stderr: "" };
+    },
+    sendText: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    sendPost: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    run: async () => ({ ok: true, code: 0, stdout: "", stderr: "" })
+  } as unknown as LarkCli;
+  const handler = new MessageHandler(config, fakeLark);
+  await handler.handleEvent({
+    chatId: "oc_chat",
+    messageId: "om_msg",
+    sender: { openId: "ou_user", senderType: "user" },
+    content: "",
+    plainText: `@Codex ${summarize}`,
+    messageType: "text",
+    createTime: "1710000000000",
+    chatType: "group",
+    mentions: ["Codex"],
+    raw: {}
+  });
+  assert.deepEqual(statuses, ["Started", "Stopped"]);
+});
+
+test("handler suppresses stale replies when a newer chat request finishes first", async () => {
+  const sent: string[] = [];
+  const statuses: string[] = [];
+  const scriptPath = path.join(os.tmpdir(), `feishu-codex-agent-stale-mock-${Date.now()}.js`);
+  fs.writeFileSync(
+    scriptPath,
+    [
+      "const fs = require('node:fs');",
+      "const stdin = fs.readFileSync(0, 'utf8');",
+      "const index = process.argv.indexOf('--output-last-message');",
+      "const output = index >= 0 ? process.argv[index + 1] : '';",
+      "const slow = stdin.includes('slow task');",
+      "setTimeout(() => {",
+      "  if (output) fs.writeFileSync(output, slow ? 'SLOW_RESPONSE_FROM_TEST' : 'FAST_RESPONSE_FROM_TEST');",
+      "}, slow ? 200 : 0);"
+    ].join("\n"),
+    "utf8"
+  );
+  const config = {
+    ...getConfig(),
+    dryRun: false,
+    agentProvider: "codex" as const,
+    codexCliBin: process.execPath,
+    codexAgentArgs: [scriptPath],
+    a2aBots: [],
+    a2aRelay: { enabled: false }
+  };
+  const fakeLark = {
+    setTypingStatus: async (_chatId: string, status: "Started" | "Stopped") => {
+      statuses.push(status);
+      return { ok: true, code: 0, stdout: "", stderr: "" };
+    },
+    sendText: async (_chatId: string, text: string) => {
+      sent.push(text);
+      return { ok: true, code: 0, stdout: "", stderr: "" };
+    },
+    sendPost: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    run: async () => {
+      throw new Error("stale test should not run commands");
+    }
+  } as unknown as LarkCli;
+  const handler = new MessageHandler(config, fakeLark);
+  const baseEvent = {
+    chatId: "oc_chat",
+    sender: { openId: "ou_user", senderType: "user" },
+    content: "",
+    messageType: "text",
+    createTime: "1710000000000",
+    chatType: "group",
+    mentions: ["Codex"],
+    raw: {}
+  };
+
+  const slow = handler.handleEvent({
+    ...baseEvent,
+    messageId: "om_slow",
+    plainText: "@Codex slow task"
+  });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  await handler.handleEvent({
+    ...baseEvent,
+    messageId: "om_fast",
+    plainText: "@Codex fast task"
+  });
+  await slow;
+  fs.rmSync(scriptPath, { force: true });
+
+  assert.deepEqual(sent, ["FAST_RESPONSE_FROM_TEST"]);
+  assert.deepEqual(statuses, ["Started", "Started", "Stopped"]);
+});
+
 test("A2A relay sends bot-to-bot mentions as rich text posts", async () => {
   const sent: Array<{ chatId: string; content?: unknown; text?: string; options?: unknown }> = [];
   const config = {
     ...getConfig(),
     dryRun: false,
     botOpenId: "ou_codex",
-    a2aBots: [{ name: "龙虾酱", openId: "ou_peer" }],
+    a2aBots: [{ name: "\u8d28\u91cf\u5ba1\u8ba1\u5b98", openId: "ou_peer" }],
     a2aRelay: {
       enabled: true,
       groupChatId: "oc_group",
-      peerName: "龙虾酱",
+      peerName: "\u8d28\u91cf\u5ba1\u8ba1\u5b98",
       peerOpenId: "ou_peer",
-      peerCliHome: "C:\\Users\\admin"
+      peerCliHome: "C:\Users\admin"
     }
   };
   const fakeLark = {
@@ -234,7 +418,7 @@ test("A2A relay sends bot-to-bot mentions as rich text posts", async () => {
     messageId: "om_a2a",
     sender: { openId: "ou_user", senderType: "user" },
     content: "",
-    plainText: "@Codex 请和龙虾酱协作讨论一下",
+    plainText: "@Codex A2A relay test: \u8bf7\u548c\u8d28\u91cf\u5ba1\u8ba1\u5b98\u534f\u4f5c\u8ba8\u8bba\u4e00\u4e0b",
     messageType: "text",
     createTime: "1710000000000",
     chatType: "group",
@@ -247,7 +431,7 @@ test("A2A relay sends bot-to-bot mentions as rich text posts", async () => {
   assert.equal(sent.filter((item) => item.text).length, 1);
   assert.deepEqual(
     (sent[0].content as { zh_cn: { content: Array<Array<{ tag: string; user_id?: string }>> } }).zh_cn.content[0][1],
-    { tag: "at", user_id: "ou_peer", user_name: "龙虾酱" }
+    { tag: "at", user_id: "ou_peer", user_name: "\u8d28\u91cf\u5ba1\u8ba1\u5b98" }
   );
   assert.deepEqual(
     (sent[1].content as { zh_cn: { content: Array<Array<{ tag: string; user_id?: string }>> } }).zh_cn.content[0][1],
@@ -261,7 +445,7 @@ test("known A2A bot sender can receive a rich text mention reply", async () => {
     ...getConfig(),
     dryRun: false,
     botOpenId: "ou_codex",
-    a2aBots: [{ name: "龙虾酱", openId: "ou_peer" }],
+    a2aBots: [{ name: "\u8d28\u91cf\u5ba1\u8ba1\u5b98", openId: "ou_peer" }],
     a2aRelay: { enabled: false }
   };
   const fakeLark = {
@@ -284,7 +468,7 @@ test("known A2A bot sender can receive a rich text mention reply", async () => {
         message_id: "om_peer",
         message_type: "text",
         chat_type: "group",
-        content: JSON.stringify({ text: "@Codex 请处理这个协作请求" }),
+        content: JSON.stringify({ text: "@Codex \u8bf7\u5904\u7406\u8fd9\u4e2a\u534f\u4f5c\u8bf7\u6c42" }),
         mentions: [{ name: "Codex" }]
       }
     }
@@ -294,7 +478,7 @@ test("known A2A bot sender can receive a rich text mention reply", async () => {
   assert.equal(sent[0].text, undefined);
   assert.deepEqual(
     (sent[0].content as { zh_cn: { content: Array<Array<{ tag: string; user_id?: string }>> } }).zh_cn.content[0][1],
-    { tag: "at", user_id: "ou_peer", user_name: "龙虾酱" }
+    { tag: "at", user_id: "ou_peer", user_name: "\u8d28\u91cf\u5ba1\u8ba1\u5b98" }
   );
 });
 
@@ -304,13 +488,13 @@ test("A2A result handoff does not trigger a second bot mention", async () => {
     ...getConfig(),
     dryRun: false,
     botOpenId: "ou_codex",
-    a2aBots: [{ name: "龙虾酱", openId: "ou_peer" }],
+    a2aBots: [{ name: "\u8d28\u91cf\u5ba1\u8ba1\u5b98", openId: "ou_peer" }],
     a2aRelay: {
       enabled: true,
       groupChatId: "oc_group",
-      peerName: "龙虾酱",
+      peerName: "\u8d28\u91cf\u5ba1\u8ba1\u5b98",
       peerOpenId: "ou_peer",
-      peerCliHome: "C:\\Users\\admin"
+      peerCliHome: "C:\Users\admin"
     }
   };
   const fakeLark = {
@@ -333,7 +517,7 @@ test("A2A result handoff does not trigger a second bot mention", async () => {
         message_id: "om_result",
         message_type: "text",
         chat_type: "group",
-        content: JSON.stringify({ text: "[结果回传] @Codex 已完成协作请求" }),
+        content: JSON.stringify({ text: "[\u7ed3\u679c\u56de\u4f20] @Codex \u5df2\u5b8c\u6210\u534f\u4f5c\u8bf7\u6c42" }),
         mentions: [{ name: "Codex" }]
       }
     }
@@ -342,6 +526,42 @@ test("A2A result handoff does not trigger a second bot mention", async () => {
   assert.equal(sent[0].chatId, "oc_group");
   assert.notEqual(sent[0].text, undefined);
   assert.equal(sent[0].content, undefined);
+});
+
+test("long replies are persisted and shortened before sending to Feishu", async () => {
+  const sent: Array<{ chatId: string; text?: string }> = [];
+  const config = {
+    ...getConfig(),
+    dryRun: false,
+    agentProvider: "local" as const,
+    a2aBots: [],
+    a2aRelay: { enabled: false }
+  };
+  const fakeLark = {
+    sendText: async (chatId: string, text: string) => {
+      sent.push({ chatId, text });
+      return { ok: true, code: 0, stdout: "", stderr: "" };
+    },
+    sendPost: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    run: async () => ({ ok: true, code: 0, stdout: "", stderr: "" })
+  } as unknown as LarkCli;
+  const handler = new MessageHandler(config, fakeLark);
+  const response = await handler.handleEvent({
+    chatId: "oc_chat",
+    messageId: "om_long",
+    sender: { openId: "ou_user", senderType: "user" },
+    content: "",
+    plainText: `@Codex ${"build a local calculator ".repeat(220)}`,
+    messageType: "text",
+    createTime: "1710000000000",
+    chatType: "group",
+    mentions: ["Codex"],
+    raw: {}
+  });
+  assert.equal(sent.length, 1);
+  assert.ok((sent[0].text ?? "").length <= 3000);
+  assert.match(response, /Full output was saved to a local file/);
+  assert.match(response, /codex-agent-replies/);
 });
 
 test("non-executable write plans do not run in live mode without completed parameters", async () => {
@@ -366,12 +586,18 @@ test("non-executable write plans do not run in live mode without completed param
     mentions: ["Codex"],
     raw: {}
   });
-  assert.match(response, /\u9700\u8981\u8865\u9f50/);
+  assert.match(response, /needs target document\/table tokens/);
   assert.doesNotMatch(response, /DRY_RUN/);
 });
 
 test("decodes gb18030 lark-cli output without mojibake", () => {
   const text = "\u4f60\u597d\uff0c\u4f60\u662f\u8c01";
   const bytes = Buffer.from([0xc4, 0xe3, 0xba, 0xc3, 0xa3, 0xac, 0xc4, 0xe3, 0xca, 0xc7, 0xcb, 0xad]);
+  assert.equal(decodeCliChunk(bytes, "auto"), text);
+});
+
+test("prefers utf-8 lark-cli output when decoding is lossless", () => {
+  const text = "\u9879\u76ee\u8c03\u5ea6\u5b98 @\u4ee3\u7801\u6267\u884c\u5b98";
+  const bytes = Buffer.from(text, "utf8");
   assert.equal(decodeCliChunk(bytes, "auto"), text);
 });
