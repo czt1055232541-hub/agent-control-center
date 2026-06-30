@@ -6,7 +6,7 @@ import { getConfig } from "../src/env.js";
 import { LarkCli } from "../src/larkCli.js";
 import { MessageHandler } from "../src/handler.js";
 import { decodeCliChunk } from "../src/cliText.js";
-import { draftAgentResponse } from "../src/agent.js";
+import { draftAgentResponse, resolveCodexCliBin } from "../src/agent.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -148,6 +148,36 @@ test("codex provider uses model draft instead of local quick reply", async () =>
   fs.rmSync(scriptPath, { force: true });
   assert.equal(response, "MODEL_RESPONSE_FROM_TEST");
   assert.doesNotMatch(response, /执行策略/);
+});
+
+test("codex cli path refreshes from Codex home config", () => {
+  const codexHome = fs.mkdtempSync(path.join(os.tmpdir(), "feishu-codex-home-"));
+  const oldBin = path.join(codexHome, "old", "codex.exe");
+  const currentBin = path.join(codexHome, "current", "codex.exe");
+  fs.mkdirSync(path.dirname(oldBin), { recursive: true });
+  fs.mkdirSync(path.dirname(currentBin), { recursive: true });
+  fs.writeFileSync(oldBin, "", "utf8");
+  fs.writeFileSync(currentBin, "", "utf8");
+  fs.writeFileSync(
+    path.join(codexHome, "config.toml"),
+    [
+      "[mcp_servers.node_repl.env]",
+      `CODEX_CLI_PATH = '${currentBin.replace(/\\/g, "\\\\")}'`
+    ].join("\n"),
+    "utf8"
+  );
+  const previous = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = codexHome;
+  try {
+    assert.equal(resolveCodexCliBin(oldBin), currentBin);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.CODEX_HOME;
+    } else {
+      process.env.CODEX_HOME = previous;
+    }
+    fs.rmSync(codexHome, { recursive: true, force: true });
+  }
 });
 
 test("asks for confirmation before apps creation and executes after confirmation", async () => {

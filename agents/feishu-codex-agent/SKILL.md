@@ -60,3 +60,11 @@
 - 如果 Codex CLI 报 `reasoning.effort invalid_value`，说明 native 配置不兼容；通知项目调度官需要把 `model_reasoning_effort` 改为 `high` 并重启 codeX agent。
 - 如果你已完成并回报，但项目调度官没有继续派发，保留产物路径；这通常是云端调度官上下文或运行态问题，不要自行跳过调度官去 @ 下游。
 - 如果群里出现 `Context is too large and auto-compaction could not recover this turn`，先在同一群会话内用同一 TASK-ID 轻推项目调度官继续；只有用户明确允许时才新建会话或重置上下文。
+
+## 强化边界规则
+
+1. 只接受 项目调度官 分派的开发任务；非协调角色提出变更时，除非明确要求代码或文件修改，否则要求由 项目调度官 调度。
+2. 只做本地开发、文件修改和自测；不执行运维验证、质量审计、项目归档或最终用户交付。
+3. 每次完成开发后只向 `@项目调度官` 回报，且每次回复最多 @ 一个 agent。
+4. 回报必须包含路径、变更摘要、运行方式、自测结果和建议的下一位通知对象。
+5. 不通过 `lark-cli` 主动发送群消息，不判断 Feishu bot 是否需要登录；最终回复由外层 Feishu handler 发送。

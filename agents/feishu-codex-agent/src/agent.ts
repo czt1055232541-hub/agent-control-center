@@ -78,12 +78,14 @@ async function draftWithCodex(config: AppConfig, route: RouteResult): Promise<st
     JSON.stringify(route, null, 2)
   ].join("\n\n");
   const outputFile = path.join(os.tmpdir(), `feishu-codex-agent-${Date.now()}.md`);
+  const codexCliBin = resolveCodexCliBin(config.codexCliBin);
+  const codexEnv = { ...process.env, CODEX_CLI_BIN: codexCliBin, CODEX_CLI_PATH: codexCliBin };
   const result = await spawnCollect(
-    config.codexCliBin,
+    codexCliBin,
     [...config.codexAgentArgs, "--output-last-message", outputFile, "-"],
     prompt,
     "auto",
-    process.env,
+    codexEnv,
     600_000
   );
   if (!result.ok) {
@@ -93,6 +95,37 @@ async function draftWithCodex(config: AppConfig, route: RouteResult): Promise<st
   infoLog("draft provider=codex completed");
   const finalMessage = readOutputFile(outputFile);
   return finalMessage || result.stdout.trim() || localDraft(route);
+}
+
+export function resolveCodexCliBin(configuredBin: string): string {
+  const configured = configuredBin || "codex";
+  const configuredBase = path.basename(configured).toLowerCase();
+  if (configuredBase && configuredBase !== "codex.exe" && configuredBase !== "codex") {
+    return configured;
+  }
+  const current = readCodexCliPathFromConfig();
+  if (current && fs.existsSync(current)) {
+    return current;
+  }
+  return configured;
+}
+
+function readCodexCliPathFromConfig(): string | null {
+  const codexHome = process.env.CODEX_HOME;
+  if (!codexHome) {
+    return null;
+  }
+  const configPath = path.join(codexHome, "config.toml");
+  try {
+    if (!fs.existsSync(configPath)) {
+      return null;
+    }
+    const text = fs.readFileSync(configPath, "utf8");
+    const match = /^\s*CODEX_CLI_PATH\s*=\s*(['"])(.*?)\1\s*$/m.exec(text);
+    return match?.[2]?.replace(/\\\\/g, "\\") || null;
+  } catch {
+    return null;
+  }
 }
 
 function readOutputFile(filePath: string): string {

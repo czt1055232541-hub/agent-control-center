@@ -8,8 +8,8 @@
 
 ## Team Map
 
-| Name | Open ID |
-|---|---|
+| Name | ID Source | Role |
+|---|---|---|
 | 项目调度官 | 本地 A2A 配置 | 任务拆解、调度、进度管理 |
 | 代码执行官 | 本地 A2A 配置 | 代码实现、修复和本地测试 |
 | 运维验证官 | 本地 A2A 配置 | 运行、环境、部署和验证 |
@@ -30,6 +30,6 @@
 
 ## Mention Rule
 
-When mentioning another bot in Feishu, use post rich text `tag: "at"` with that bot's Open ID. Plain text `@name` is not enough unless the sender converts it to rich text.
+When mentioning another bot in Feishu, write the normalized role name such as `@项目调度官`. The outer sender must convert it to Feishu post rich text `tag: "at"` using local A2A configuration. Do not output literal `<at user_id="...">...</at>` or hardcode Open IDs.
 
 Report back to `@项目调度官` when your task is complete.
