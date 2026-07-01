@@ -90,6 +90,71 @@ class LogTail:
     lines: list[str]
 
 
+@dataclass
+class AgentConfig:
+    id: str
+    name: str
+    role: str
+    status: str
+    provider: str
+    model: str
+    pid: int | None
+    port: int | None
+    uptime: str
+    feishuBinding: str
+    triggerMode: str
+    tools: list[str]
+    permissionLevel: str
+    promptVersion: str
+    configPath: str
+    currentTask: str
+    lastCalledAt: str | None
+    lastLatencyMs: int | None
+    lastError: str
+    todayTaskCount: int | None
+    successRate: float | None
+    controlComponent: str | None = None
+    logsComponent: str | None = None
+    backendActions: list[dict[str, Any]] | None = None
+    source: str = "unknown"
+    agentId: str | None = None
+    displayName: str | None = None
+    bindingStatus: str = "unknown"
+    feishuAccountEnabled: bool | None = None
+    workspacePath: str | None = None
+    backingComponent: str | None = None
+    sessionCount: int | None = None
+    lastInteractionAt: str | None = None
+    a2aPeers: list[dict[str, Any]] | None = None
+    configFacts: dict[str, Any] | None = None
+
+
+@dataclass
+class DashboardSummary:
+    systemHealth: str
+    provider: str
+    feishuStatus: str
+    onlineAgents: int
+    totalAgents: int
+    activeTasks: int | None
+    todayMessages: int | None
+    failedRequests: int
+
+
+@dataclass
+class ExplainedDiagnosticItem:
+    id: str
+    level: str
+    title: str
+    affectedModules: list[str]
+    status: str
+    rawError: str
+    possibleCauses: list[str]
+    suggestions: list[str]
+    actions: list[dict[str, Any]]
+    relatedLogs: list[str]
+
+
 def to_dict(value: Any) -> Any:
     if isinstance(value, PydanticBaseModel):
         return value.model_dump()

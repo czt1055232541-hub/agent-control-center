@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from feishu_stack import app as app_module
-from feishu_stack.models import OperationResult, ThreadMigrationResult
+from feishu_stack.models import AgentConfig, DashboardSummary, ExplainedDiagnosticItem, OperationResult, ThreadMigrationResult
 from feishu_stack.operations import _lock
 
 
@@ -22,6 +22,130 @@ def test_status_is_read_only_without_token() -> None:
     data = response.json()
     assert "codex" in data
     assert "codex_desktop_running" in data
+
+
+def test_dashboard_summary_is_read_only_without_token(monkeypatch) -> None:
+    monkeypatch.setattr(
+        app_module.agent_dashboard,
+        "dashboard_summary",
+        lambda: DashboardSummary("normal", "native / gpt-5.5", "unknown", 3, 4, None, None, 0),
+    )
+    response = client.get("/api/dashboard/summary")
+    assert response.status_code == 200
+    assert response.json()["systemHealth"] == "normal"
+
+
+def test_agents_route_is_read_only_without_token(monkeypatch) -> None:
+    monkeypatch.setattr(
+        app_module.agent_dashboard,
+        "list_agents",
+        lambda: [
+            AgentConfig(
+                id="moonbridge",
+                name="MoonBridge",
+                role="Provider proxy",
+                status="running",
+                provider="moonbridge",
+                model="deepseek-v4-pro",
+                pid=123,
+                port=38440,
+                uptime="--",
+                feishuBinding="--",
+                triggerMode="Provider",
+                tools=["models"],
+                permissionLevel="network",
+                promptVersion="--",
+                configPath="E:/moonbridge/config.yml",
+                currentTask="--",
+                lastCalledAt=None,
+                lastLatencyMs=None,
+                lastError="",
+                todayTaskCount=0,
+                successRate=None,
+                controlComponent="moonbridge",
+                logsComponent="moonbridge",
+            )
+        ],
+    )
+    response = client.get("/api/agents")
+    assert response.status_code == 200
+    assert response.json()["agents"][0]["id"] == "moonbridge"
+
+
+def test_infrastructure_route_is_read_only_without_token(monkeypatch) -> None:
+    monkeypatch.setattr(app_module.agent_dashboard, "list_infrastructure", lambda: [])
+    response = client.get("/api/infrastructure")
+    assert response.status_code == 200
+    assert response.json()["agents"] == []
+
+
+def test_agent_detail_route_handles_unknown_agent(monkeypatch) -> None:
+    monkeypatch.setattr(app_module.agent_dashboard, "get_agent", lambda agent_id: None)
+    response = client.get("/api/agents/missing")
+    assert response.status_code == 404
+
+
+def test_agent_editable_config_route_is_read_only_without_token(monkeypatch) -> None:
+    monkeypatch.setattr(
+        app_module.agent_config_editor,
+        "get_editable_config",
+        lambda agent_id: {"agentId": agent_id, "values": {"AGENT_PROVIDER": "codex"}},
+    )
+    response = client.get("/api/agents/codex-code-agent/editable-config")
+    assert response.status_code == 200
+    assert response.json()["values"]["AGENT_PROVIDER"] == "codex"
+
+
+def test_agent_editable_config_write_requires_token() -> None:
+    response = client.put("/api/agents/codex-code-agent/editable-config", json={"values": {"AGENT_PROVIDER": "local"}})
+    assert response.status_code == 401
+    response = client.post("/api/agents/codex-code-agent/config-backup")
+    assert response.status_code == 401
+    response = client.post("/api/agents/codex-code-agent/config-rollback-latest")
+    assert response.status_code == 401
+
+
+def test_agent_editable_config_update_uses_mock(monkeypatch) -> None:
+    token = _token()
+    called = {"update": False}
+
+    def fake_update(agent_id, values):
+        called["update"] = True
+        return {"ok": True, "agentId": agent_id, "values": values}
+
+    monkeypatch.setattr(app_module.agent_config_editor, "update_editable_config", fake_update)
+    response = client.put(
+        "/api/agents/codex-code-agent/editable-config",
+        headers={"X-Control-Token": token},
+        json={"values": {"AGENT_PROVIDER": "local"}},
+    )
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert called["update"] is True
+
+
+def test_explained_diagnostics_route_is_read_only_without_token(monkeypatch) -> None:
+    monkeypatch.setattr(
+        app_module.agent_dashboard,
+        "explained_diagnostics",
+        lambda: [
+            ExplainedDiagnosticItem(
+                id="system-normal",
+                level="normal",
+                title="核心链路暂无异常",
+                affectedModules=["Stack"],
+                status="正常",
+                rawError="",
+                possibleCauses=[],
+                suggestions=["继续观察"],
+                actions=[],
+                relatedLogs=["operations"],
+            )
+        ],
+    )
+    response = client.get("/api/diagnostics/explained")
+    assert response.status_code == 200
+    assert response.json()["items"][0]["level"] == "normal"
 
 
 def test_write_requires_token() -> None:

@@ -6,6 +6,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
@@ -16,6 +17,8 @@ from pydantic import BaseModel
 
 from . import (
     backups,
+    agent_config_editor,
+    agent_dashboard,
     codex_agent,
     codex_desktop,
     codex_provider,
@@ -45,6 +48,7 @@ LOGS_TAG = "Logs"
 METRICS_TAG = "Metrics"
 DIAGNOSTICS_TAG = "Diagnostics"
 THREAD_MIGRATION_TAG = "Thread Migration"
+DASHBOARD_TAG = "Dashboard"
 
 
 _main_loop: asyncio.AbstractEventLoop | None = None
@@ -68,6 +72,7 @@ app = FastAPI(
         {"name": LOGS_TAG, "description": "Log level management and log tailing"},
         {"name": METRICS_TAG, "description": "Prometheus metrics endpoint"},
         {"name": DIAGNOSTICS_TAG, "description": "Debugging and diagnostics tools"},
+        {"name": DASHBOARD_TAG, "description": "Read-only command dashboard aggregates"},
         {"name": THREAD_MIGRATION_TAG, "description": "Cross-provider thread migration"},
     ],
 )
@@ -94,6 +99,10 @@ class LogLevelSetRequest(BaseModel):
 
 class MoonBridgeModelSwitchRequest(BaseModel):
     model: str
+
+
+class AgentEditableConfigUpdateRequest(BaseModel):
+    values: dict
 
 
 # ---------------------------------------------------------------------------
@@ -263,6 +272,123 @@ def operations() -> dict:
     return {"operations": to_dict(recent_operations())}
 
 
+@app.get(
+    "/api/dashboard/summary",
+    summary="Dashboard summary",
+    description="Return the command dashboard top-level health and activity counters.",
+    tags=[DASHBOARD_TAG],
+)
+def dashboard_summary() -> dict:
+    return to_dict(agent_dashboard.dashboard_summary())
+
+
+@app.get(
+    "/api/agents",
+    summary="Agent inventory",
+    description="Return the v1 read-only agent inventory used by the command dashboard.",
+    tags=[DASHBOARD_TAG],
+)
+def agents() -> dict:
+    return {"agents": to_dict(agent_dashboard.list_agents())}
+
+
+@app.get(
+    "/api/infrastructure",
+    summary="Infrastructure inventory",
+    description="Return the real backend services that carry the agent roles.",
+    tags=[DASHBOARD_TAG],
+)
+def infrastructure() -> dict:
+    return {"agents": to_dict(agent_dashboard.list_infrastructure())}
+
+
+@app.get(
+    "/api/agents/{agent_id}",
+    summary="Agent detail",
+    description="Return a single read-only agent configuration summary.",
+    tags=[DASHBOARD_TAG],
+)
+def agent_detail(agent_id: str) -> dict:
+    agent = agent_dashboard.get_agent(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail=f"Unknown agent: {agent_id}")
+    return to_dict(agent)
+
+
+@app.get(
+    "/api/agents/{agent_id}/editable-config",
+    summary="Editable agent config",
+    description="Return safe, editable configuration fields for a real agent.",
+    tags=[DASHBOARD_TAG],
+)
+def agent_editable_config(agent_id: str) -> dict:
+    try:
+        return agent_config_editor.get_editable_config(agent_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get(
+    "/api/agents/{agent_id}/config-preview",
+    summary="Agent config preview",
+    description="Return current safe config values and editing notes.",
+    tags=[DASHBOARD_TAG],
+)
+def agent_config_preview(agent_id: str) -> dict:
+    try:
+        return agent_config_editor.preview_config(agent_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.put(
+    "/api/agents/{agent_id}/editable-config",
+    summary="Update editable agent config",
+    description="Update whitelisted low-risk config fields. Requires control token.",
+    tags=[DASHBOARD_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def update_agent_editable_config(agent_id: str, request: AgentEditableConfigUpdateRequest) -> dict:
+    try:
+        return agent_config_editor.update_editable_config(agent_id, request.values)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post(
+    "/api/agents/{agent_id}/config-backup",
+    summary="Backup agent config",
+    description="Create a backup for the editable config file. Requires control token.",
+    tags=[DASHBOARD_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def backup_agent_config(agent_id: str) -> dict:
+    try:
+        return agent_config_editor.backup_config(agent_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post(
+    "/api/agents/{agent_id}/config-rollback-latest",
+    summary="Rollback latest agent config backup",
+    description="Restore the latest backup for the editable config file. Requires control token.",
+    tags=[DASHBOARD_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def rollback_agent_config(agent_id: str) -> dict:
+    try:
+        return agent_config_editor.rollback_latest(agent_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 # ---------------------------------------------------------------------------
 # Logs
 # ---------------------------------------------------------------------------
@@ -364,6 +490,16 @@ def lark_auth_status() -> dict:
 )
 def diagnostics() -> dict:
     return to_dict(diagnostics_module.diagnostics())
+
+
+@app.get(
+    "/api/diagnostics/explained",
+    summary="Explained diagnostics",
+    description="Return Chinese, action-oriented diagnostics for the command dashboard.",
+    tags=[DIAGNOSTICS_TAG],
+)
+def explained_diagnostics() -> dict:
+    return {"items": to_dict(agent_dashboard.explained_diagnostics())}
 
 # ---------------------------------------------------------------------------
 # Thread migration
