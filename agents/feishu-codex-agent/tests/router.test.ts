@@ -77,6 +77,9 @@ test("routes required MVP examples", () => {
   const summaryRoute = routeCommand(summarize);
   assert.equal(summaryRoute.intent, "summarize");
   assert.deepEqual(summaryRoute.plan.commands[0], ["im", "+chat-messages-list", "--chat-id", "$CHAT_ID", "--page-size", "30", "--as", "bot"]);
+  const phaseAdvice = routeCommand("Phase 1 仅做技术可行性意见，评估指标、探活方式、告警渠道、复杂度、风险点和行动项，不写代码。");
+  assert.equal(phaseAdvice.intent, "unknown");
+  assert.deepEqual(phaseAdvice.plan.commands, []);
   assert.equal(routeCommand(baseCreate).intent, "baseCreate");
   assert.equal(routeCommand(baseWrite).intent, "baseWrite");
   assert.equal(routeCommand(docSearch).intent, "docSearch");
@@ -92,6 +95,7 @@ test("routes required MVP examples", () => {
   const feishuPublish = routeCommand("\u628a\u8fd9\u4e2a HTML \u9875\u9762\u53d1\u5e03\u5230\u98de\u4e66\u5e94\u7528");
   assert.equal(feishuPublish.intent, "apps");
   assert.equal(feishuPublish.plan.requiresConfirmation, true);
+});
 
 test("routes calendar intent to agenda command plan", () => {
   const r1 = routeCommand("查看我的日程");
@@ -120,8 +124,6 @@ test("routes calendar intent to agenda command plan", () => {
 test("development task mentions are not misrouted as calendar", () => {
   assert.notEqual(routeCommand("日历开发任务实现").intent, "calendar");
   assert.notEqual(routeCommand("会议室订阅系统开发").intent, "calendar");
-});
-
 });
 
 test("codex provider uses model draft instead of local quick reply", async () => {
@@ -207,8 +209,72 @@ test("asks for confirmation before apps creation and executes after confirmation
     mentions: []
   });
   assert.match(done, /Confirmed\. Continuing execution/);
-  assert.match(done, /DRY_RUN/);
-  assert.match(done, /apps \+create/);
+  assert.match(done, /计划的飞书操作/);
+  assert.match(done, /飞书应用操作/);
+  assert.doesNotMatch(done, /apps \+create/);
+});
+
+test("handler strips internal lark-cli tails from codex replies", async () => {
+  const sent: string[] = [];
+  const scriptPath = path.join(os.tmpdir(), `feishu-codex-agent-tail-mock-${Date.now()}.js`);
+  fs.writeFileSync(
+    scriptPath,
+    [
+      "const fs = require('node:fs');",
+      "const index = process.argv.indexOf('--output-last-message');",
+      "const output = index >= 0 ? process.argv[index + 1] : '';",
+      "const text = [",
+      "  '收到。Phase 1 仅做技术可行性意见。',",
+      "  '',",
+      "  'lark-cli execution results:',",
+      "  '- lark-cli im +chat-messages-list --chat-id oc_secret --page-size 30 --as bot => failed',",
+      "  '  {\"error\":{\"message\":\"run lark-cli auth login\"}}'",
+      "].join('\\n');",
+      "if (output) fs.writeFileSync(output, text);"
+    ].join("\n"),
+    "utf8"
+  );
+  const config = {
+    ...getConfig(),
+    dryRun: false,
+    agentProvider: "codex" as const,
+    codexCliBin: process.execPath,
+    codexAgentArgs: [scriptPath],
+    a2aBots: [],
+    a2aRelay: { enabled: false }
+  };
+  const fakeLark = {
+    setTypingStatus: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    sendText: async (_chatId: string, text: string) => {
+      sent.push(text);
+      return { ok: true, code: 0, stdout: "", stderr: "" };
+    },
+    sendPost: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    run: async () => {
+      throw new Error("technical advice should not run lark-cli commands");
+    }
+  } as unknown as LarkCli;
+  const handler = new MessageHandler(config, fakeLark);
+  const response = await handler.handleEvent({
+    chatId: "oc_chat",
+    messageId: "om_tail",
+    sender: { openId: "ou_user", senderType: "user" },
+    content: "",
+    plainText: "@Codex Phase 1 仅做技术可行性意见，评估指标、行动项和风险点",
+    messageType: "text",
+    createTime: "1710000000000",
+    chatType: "group",
+    mentions: ["Codex"],
+    raw: {}
+  });
+  fs.rmSync(scriptPath, { force: true });
+
+  assert.equal(sent.length, 2);
+  assert.match(sent[0], /代码执行官处理中/);
+  assert.match(response, /技术可行性意见/);
+  assert.doesNotMatch(response, /lark-cli execution results/);
+  assert.doesNotMatch(response, /chat-messages-list/);
+  assert.doesNotMatch(response, /auth login/);
 });
 
 test("responds to private chat without mention", () => {
@@ -227,6 +293,59 @@ test("responds to private chat without mention", () => {
   });
   assert.ok(event);
   assert.equal(shouldRespond(event, config), true);
+});
+
+test("private chat codex route uses direct-reply context", async () => {
+  const sent: string[] = [];
+  const scriptPath = path.join(os.tmpdir(), `feishu-codex-agent-private-mock-${Date.now()}.js`);
+  fs.writeFileSync(
+    scriptPath,
+    [
+      "const fs = require('node:fs');",
+      "const stdin = fs.readFileSync(0, 'utf8');",
+      "const index = process.argv.indexOf('--output-last-message');",
+      "const output = index >= 0 ? process.argv[index + 1] : '';",
+      "if (output) fs.writeFileSync(output, stdin.includes('[Private chat mode]') ? 'PRIVATE_CONTEXT_OK' : 'PRIVATE_CONTEXT_MISSING');"
+    ].join("\n"),
+    "utf8"
+  );
+  const config = {
+    ...getConfig(),
+    dryRun: false,
+    agentProvider: "codex" as const,
+    codexCliBin: process.execPath,
+    codexAgentArgs: [scriptPath],
+    a2aBots: [],
+    a2aRelay: { enabled: false }
+  };
+  const fakeLark = {
+    setTypingStatus: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    sendText: async (_chatId: string, text: string) => {
+      sent.push(text);
+      return { ok: true, code: 0, stdout: "", stderr: "" };
+    },
+    sendPost: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    run: async () => ({ ok: true, code: 0, stdout: "", stderr: "" })
+  } as unknown as LarkCli;
+  const handler = new MessageHandler(config, fakeLark);
+  const response = await handler.handleEvent({
+    chatId: "oc_private",
+    messageId: "om_private_dev",
+    sender: { openId: "ou_user", senderType: "user" },
+    content: "",
+    plainText: "帮我开发一个本地小工具",
+    messageType: "text",
+    createTime: "1710000000000",
+    chatType: "p2p",
+    mentions: [],
+    raw: {}
+  });
+  fs.rmSync(scriptPath, { force: true });
+
+  assert.equal(response, "PRIVATE_CONTEXT_OK");
+  assert.match(sent[0], /私聊任务/);
+  assert.doesNotMatch(sent[0], /项目调度官/);
+  assert.equal(sent.at(-1), "PRIVATE_CONTEXT_OK");
 });
 
 test("parses flattened lark-cli event consume payload", () => {
@@ -302,7 +421,7 @@ test("setTypingStatus uses Feishu typing status OpenAPI", async () => {
   const payload = JSON.parse(result.stdout) as { command: string[] };
   assert.deepEqual(payload.command.slice(1), [
     "api",
-    "POST",
+    "PATCH",
     "/open-apis/im/v1/typing_status",
     "--data",
     JSON.stringify({ chat_id: "oc_chat", status: "Started" }),
@@ -412,7 +531,11 @@ test("handler suppresses stale replies when a newer chat request finishes first"
   await slow;
   fs.rmSync(scriptPath, { force: true });
 
-  assert.deepEqual(sent, ["FAST_RESPONSE_FROM_TEST"]);
+  assert.deepEqual(sent, [
+    "[代码执行官处理中] 已收到任务，开始执行。本条是进度提示；最终结果完成后再按协作流程回报项目调度官。",
+    "[代码执行官处理中] 已收到任务，开始执行。本条是进度提示；最终结果完成后再按协作流程回报项目调度官。",
+    "FAST_RESPONSE_FROM_TEST"
+  ]);
   assert.deepEqual(statuses, ["Started", "Started", "Stopped"]);
 });
 
@@ -588,10 +711,9 @@ test("long replies are persisted and shortened before sending to Feishu", async 
     mentions: ["Codex"],
     raw: {}
   });
-  assert.equal(sent.length, 1);
-  assert.ok((sent[0].text ?? "").length <= 3000);
-  assert.match(response, /Full output was saved to a local file/);
-  assert.match(response, /codex-agent-replies/);
+  assert.ok(sent.length > 1);
+  assert.ok(sent.every((item) => (item.text ?? "").length <= 2800));
+  assert.equal(response.includes("Full output was saved to a local file"), response.length > 9000);
 });
 
 test("non-executable write plans do not run in live mode without completed parameters", async () => {

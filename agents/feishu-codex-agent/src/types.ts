@@ -43,6 +43,11 @@ export type RouteResult = {
   intent: RouteIntent;
   cleanText: string;
   plan: CommandPlan;
+  context?: {
+    chatType?: string;
+    isPrivate: boolean;
+    senderIsA2ABot: boolean;
+  };
 };
 
 export type CliResult = {

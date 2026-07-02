@@ -11,6 +11,9 @@ function detectIntent(text: string): RouteIntent {
   if (!text || /^(?:\u4f60\u597d|\u5728\u5417|\u5728\u4e0d\u5728|hi|hello|help|\u5e2e\u52a9|\u4ecb\u7ecd)/i.test(text)) {
     return "greeting";
   }
+  if (isDevelopmentOrAnalysisRequest(text)) {
+    return "unknown";
+  }
   if (/(?:\u591a\u7ef4\u8868\u683c|base|\u8868\u683c).*(?:\u521b\u5efa|\u65b0\u5efa)|(?:\u521b\u5efa|\u65b0\u5efa).*(?:\u591a\u7ef4\u8868\u683c|base|\u8868\u683c)/i.test(text)) {
     return "baseCreate";
   }
@@ -23,7 +26,7 @@ function detectIntent(text: string): RouteIntent {
   if (/(?:\u6574\u7406|\u751f\u6210|\u521b\u5efa|\u65b0\u5efa).*(?:\u6587\u6863|\u98de\u4e66\u6587\u6863|wiki)/i.test(text)) {
     return "docCreate";
   }
-  if (/(?:\u603b\u7ed3|\u7eaa\u8981|\u884c\u52a8\u9879|\u8ba8\u8bba)/.test(text)) {
+  if (isExplicitChatSummaryRequest(text)) {
     return "summarize";
   }
   if (isExplicitAppsRequest(text)) {
@@ -36,6 +39,26 @@ function detectIntent(text: string): RouteIntent {
     return "calendar";
   }
   return "unknown";
+}
+
+function isDevelopmentOrAnalysisRequest(text: string): boolean {
+  if (isExplicitAppsRequest(text) || isExplicitTaskRequest(text) || isCalendarRequest(text)) {
+    return false;
+  }
+  return /(?:Phase\s*\d+|技术意见|技术建议|技术可行性|可行性意见|复杂度评估|风险点|架构建议|开发|实现|修复|代码|自测|产物路径|本地文件|本地项目|健康监控|监控面板|MVP|只读健康监控|方案评估)/i.test(text);
+}
+
+function isExplicitChatSummaryRequest(text: string): boolean {
+  if (isDevelopmentOrAnalysisRequest(text)) {
+    return false;
+  }
+  if (/(?:总结|复盘|整理).{0,20}(?:群聊|聊天记录|最近消息|刚才的讨论|上面的讨论|这个群)/.test(text)) {
+    return true;
+  }
+  if (/(?:群聊|聊天记录|最近消息|刚才的讨论|上面的讨论).{0,20}(?:总结|复盘|整理|纪要|行动项)/.test(text)) {
+    return true;
+  }
+  return false;
 }
 
 function isExplicitAppsRequest(text: string): boolean {
@@ -176,7 +199,7 @@ function buildPlan(intent: RouteIntent, text: string): CommandPlan {
         commands: [],
         executable: true,
         requiresConfirmation: false,
-        responsePreview: `\u6211\u4f1a\u5148\u7406\u89e3\u4f60\u7684\u8bf7\u6c42\uff0c\u518d\u9009\u62e9 lark-cli \u5feb\u6377\u547d\u4ee4\u6216 OpenAPI \u8c03\u7528\u3002\u8bf7\u6c42\uff1a${text}`
+        responsePreview: `\u6211\u4f1a\u6309\u4ee3\u7801\u6267\u884c\u5b98\u804c\u8d23\u5904\u7406\u8be5\u8bf7\u6c42\uff0c\u53ea\u5728\u660e\u786e\u9700\u8981\u98de\u4e66\u8d44\u6e90\u64cd\u4f5c\u65f6\u624d\u4f7f\u7528 lark-cli \u6216 OpenAPI\u3002\u8bf7\u6c42\uff1a${text}`
       };
   }
 }

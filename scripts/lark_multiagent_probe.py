@@ -8,6 +8,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from a2a_workflow_config import default_chat_id as configured_default_chat_id
+from a2a_workflow_config import require_role_open_id
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
 if hasattr(sys.stderr, "reconfigure"):
@@ -16,43 +19,22 @@ if hasattr(sys.stderr, "reconfigure"):
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LARK_CLI = REPO_ROOT / ".npm-global" / "node_modules" / "@larksuite" / "cli" / "bin" / "lark-cli.exe"
 AGENT_HOME = REPO_ROOT / ".home"
-CONTROL_CENTER_LOCAL_CONFIG = Path(r"F:\1AI\Agent control center\config\stack.settings.local.json")
 DEFAULT_CHAT_ID_ENV = "MULTIAGENT_DEFAULT_CHAT_ID"
 COORDINATOR_OPEN_ID_ENV = "MULTIAGENT_COORDINATOR_OPEN_ID"
-
-
-def _local_stack_settings() -> dict:
-    if not CONTROL_CENTER_LOCAL_CONFIG.exists():
-        return {}
-    try:
-        return json.loads(CONTROL_CENTER_LOCAL_CONFIG.read_text(encoding="utf-8-sig"))
-    except (OSError, json.JSONDecodeError):
-        return {}
 
 
 def default_chat_id() -> str:
     value = os.environ.get(DEFAULT_CHAT_ID_ENV)
     if value:
         return value
-    settings = _local_stack_settings()
-    value = settings.get("agent", {}).get("a2aRelay", {}).get("groupChatId")
-    if value:
-        return str(value)
-    raise RuntimeError(f"missing group chat id; set {DEFAULT_CHAT_ID_ENV}")
+    return configured_default_chat_id()
 
 
 def coordinator_open_id() -> str:
     value = os.environ.get(COORDINATOR_OPEN_ID_ENV)
     if value:
         return value
-    settings = _local_stack_settings()
-    for bot in settings.get("agent", {}).get("a2aBots", []):
-        if bot.get("name") == "项目调度官" and bot.get("openId"):
-            return str(bot["openId"])
-    for bot in settings.get("openclaw", {}).get("a2aBots", []):
-        if bot.get("name") == "项目调度官" and bot.get("openId"):
-            return str(bot["openId"])
-    raise RuntimeError(f"missing coordinator open id; set {COORDINATOR_OPEN_ID_ENV}")
+    return require_role_open_id("项目调度官")
 
 
 def lark_env() -> dict[str, str]:

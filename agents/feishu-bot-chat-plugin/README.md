@@ -141,6 +141,8 @@ npm run build
 | `a2a-interrupt` | 协作中断与取消处理 |
 | `a2a-status-check` | 协作状态查询与进度汇报 |
 | `a2a-mode-switch` | 协作模式切换（独立/指定/全力） |
+| `academic-search` | 学术搜索、论文检索、DOI/arXiv/文献证据整理 |
+| `web-search-fallback` | OpenClaw 内置网页搜索超时/403 时的本地搜索兜底 |
 
 ## License
 

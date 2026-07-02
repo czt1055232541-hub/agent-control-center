@@ -16,8 +16,11 @@ import path from "node:path";
    agentProvider: "local" | "openai" | "codex";
    openaiApiKey?: string;
    openaiModel: string;
-   codexCliBin: string;
-   codexAgentArgs: string[];
+    codexCliBin: string;
+    codexAgentArgs: string[];
+    codexCliTimeoutMs: number;
+    codexProgressInitialMs: number;
+    codexProgressIntervalMs: number;
    confirmTimeoutMs: number;
    maxContextMessages: number;
    a2aBots: Array<{ name: string; openId: string; description?: string }>;
@@ -68,9 +71,12 @@ export function getConfig(): AppConfig {
     agentProvider: providerEnv(process.env.AGENT_PROVIDER),
     openaiApiKey: emptyToUndefined(process.env.OPENAI_API_KEY),
     openaiModel: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-     codexCliBin: process.env.CODEX_CLI_BIN || "codex",
-     codexAgentArgs: splitArgs(process.env.CODEX_AGENT_ARGS || "exec --skip-git-repo-check"),
-     confirmTimeoutMs: numberEnv("CONFIRM_TIMEOUT_MS", 600_000),
+      codexCliBin: process.env.CODEX_CLI_BIN || "codex",
+      codexAgentArgs: splitArgs(process.env.CODEX_AGENT_ARGS || "exec --skip-git-repo-check"),
+      codexCliTimeoutMs: numberEnv("CODEX_CLI_TIMEOUT_MS", 0, { allowZero: true }),
+      codexProgressInitialMs: numberEnv("CODEX_PROGRESS_INITIAL_MS", 15_000),
+      codexProgressIntervalMs: numberEnv("CODEX_PROGRESS_INTERVAL_MS", 120_000),
+      confirmTimeoutMs: numberEnv("CONFIRM_TIMEOUT_MS", 600_000),
      maxContextMessages: numberEnv("MAX_CONTEXT_MESSAGES", 30),
      a2aBots: parseA2ABots(process.env.A2A_BOTS || ""),
      a2aRelay: {
@@ -102,9 +108,15 @@ function boolEnv(key: string, defaultValue: boolean): boolean {
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 }
 
-function numberEnv(key: string, defaultValue: number): number {
+function numberEnv(key: string, defaultValue: number, options: { allowZero?: boolean } = {}): number {
   const parsed = Number(process.env[key]);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
+  if (!Number.isFinite(parsed)) {
+    return defaultValue;
+  }
+  if (options.allowZero && parsed === 0) {
+    return 0;
+  }
+  return parsed > 0 ? parsed : defaultValue;
 }
 
 function emptyToUndefined(value: string | undefined): string | undefined {

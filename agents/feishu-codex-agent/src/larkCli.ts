@@ -53,7 +53,7 @@ export class LarkCli {
   setTypingStatus(chatId: string, status: "Started" | "Stopped"): Promise<CliResult> {
     return this.run([
       "api",
-      "POST",
+      "PATCH",
       "/open-apis/im/v1/typing_status",
       "--data",
       JSON.stringify({ chat_id: chatId, status }),
@@ -99,13 +99,17 @@ export function spawnCollect(
         return;
       }
       settled = true;
-      clearTimeout(timer);
+      if (timer) {
+        clearTimeout(timer);
+      }
       resolve(result);
     };
-    const timer = setTimeout(() => {
-      child.kill();
-      finish({ ok: false, code: null, stdout, stderr: `${stderr}Command timed out after ${timeoutMs}ms` });
-    }, timeoutMs);
+    const timer =
+      timeoutMs > 0
+        ? setTimeout(() => {
+            finish({ ok: false, code: null, stdout, stderr: `${stderr}Command timed out after ${timeoutMs}ms; process was left running by policy.` });
+          }, timeoutMs)
+        : undefined;
     child.stdout.on("data", (chunk: Buffer | string) => {
       stdout += decodeCliChunk(chunk, outputEncoding);
     });

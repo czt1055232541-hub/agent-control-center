@@ -5,7 +5,7 @@ import { cleanTriggerText, parseMessageEvent, shouldRespond } from "./eventParse
 import { routeCommand } from "./router.js";
 import { draftAgentResponse } from "./agent.js";
 import { ConfirmationStore } from "./confirmationStore.js";
-import type { FeishuMessageEvent, RouteResult } from "./types.js";
+import type { CliResult, FeishuMessageEvent, RouteResult } from "./types.js";
 import { LarkCli, type LarkPostContent, type LarkPostElement } from "./larkCli.js";
 import { A2ARelay } from "./a2aRelay.js";
 
@@ -96,9 +96,11 @@ export class MessageHandler {
     if (confirmed) {
       return this.executeAndReply(event.chatId, confirmed.route, true);
     }
-    const route = this.a2aBotOpenIds.has(event.sender.openId || "")
+    const senderIsA2ABot = this.a2aBotOpenIds.has(event.sender.openId || "");
+    const route = senderIsA2ABot
       ? routeCommandAsAgentTask(cleanText)
       : routeCommand(cleanText);
+    attachConversationContext(route, event, senderIsA2ABot);
     if (route.plan.requiresConfirmation) {
       this.confirmations.create(event.chatId, senderKey, route);
       const response = formatConfirmation(route);
@@ -111,6 +113,7 @@ export class MessageHandler {
   private async executeAndReply(chatId: string, route: RouteResult, confirmed: boolean): Promise<string> {
     const generation = this.nextReplyGeneration(chatId);
     await this.setTypingStatus(chatId, "Started");
+    const progress = this.startProgressReporter(chatId, route, generation);
     try {
       const agentText = sanitizeAgentText(await draftAgentResponse(this.config, route));
       if (!this.isCurrentReplyGeneration(chatId, generation)) {
@@ -143,10 +146,7 @@ export class MessageHandler {
         infoLog(`suppressed stale reply chat_id=${chatId} generation=${generation}`);
         return response;
       }
-      const richResponse = this.toRichTextWithA2AMentions(response);
-      const sendResult = richResponse
-        ? await this.larkCli.sendPost(chatId, richResponse)
-        : await this.larkCli.sendText(chatId, response);
+      const sendResult = await this.sendResponse(chatId, response);
       if (!sendResult.ok) {
         console.error(`[agent] failed to reply chat_id=${chatId} code=${sendResult.code} stderr=${preview(sendResult.stderr || sendResult.stdout, 1000)}`);
       } else {
@@ -154,6 +154,7 @@ export class MessageHandler {
       }
       return response;
     } finally {
+      progress.stop();
       if (this.isCurrentReplyGeneration(chatId, generation)) {
         await this.setTypingStatus(chatId, "Stopped");
       }
@@ -182,6 +183,66 @@ export class MessageHandler {
     } catch (error) {
       debugLog(`typing status ${status} threw chat_id=${chatId} error=${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  private startProgressReporter(chatId: string, route: RouteResult, generation: number): { stop: () => void } {
+    if (this.config.agentProvider !== "codex" || !shouldSendProgress(route)) {
+      return { stop: () => undefined };
+    }
+    let stopped = false;
+    let timer: NodeJS.Timeout | undefined;
+    let interval: NodeJS.Timeout | undefined;
+    let count = 0;
+    const sendProgress = async (kind: "received" | "working") => {
+      if (stopped || !this.isCurrentReplyGeneration(chatId, generation)) {
+        return;
+      }
+      const text =
+        kind === "received"
+          ? progressReceivedText(route)
+          : progressWorkingText(route, ++count);
+      try {
+        const result = await this.larkCli.sendText(chatId, text);
+        if (!result.ok) {
+          debugLog(`progress send failed chat_id=${chatId} code=${result.code} stderr=${preview(result.stderr || result.stdout, 500)}`);
+        }
+      } catch (error) {
+        debugLog(`progress send threw chat_id=${chatId} error=${error instanceof Error ? error.message : String(error)}`);
+      }
+    };
+    void sendProgress("received");
+    timer = setTimeout(() => {
+      void sendProgress("working");
+      interval = setInterval(() => void sendProgress("working"), this.config.codexProgressIntervalMs);
+    }, this.config.codexProgressInitialMs);
+    return {
+      stop: () => {
+        stopped = true;
+        if (timer) {
+          clearTimeout(timer);
+        }
+        if (interval) {
+          clearInterval(interval);
+        }
+      }
+    };
+  }
+
+  private async sendResponse(chatId: string, response: string): Promise<CliResult> {
+    const chunks = splitResponseForFeishu(response, this.config.a2aBots);
+    let lastResult: CliResult = { ok: true, code: 0, stdout: "", stderr: "" };
+    for (let index = 0; index < chunks.length; index += 1) {
+      const isLast = index === chunks.length - 1;
+      const chunk = chunks[index];
+      const richResponse = isLast ? this.toRichTextWithA2AMentions(chunk) : null;
+      lastResult = richResponse
+        ? await this.larkCli.sendPost(chatId, richResponse)
+        : await this.larkCli.sendText(chatId, isLast ? chunk : neutralizeA2AMentions(chunk, this.config.a2aBots));
+      if (!lastResult.ok) {
+        return lastResult;
+      }
+    }
+    return lastResult;
   }
 
   private toRichTextWithA2AMentions(value: string): LarkPostContent | null {
@@ -253,13 +314,47 @@ function routeCommandAsAgentTask(cleanText: string): RouteResult {
   return route;
 }
 
+function attachConversationContext(route: RouteResult, event: FeishuMessageEvent, senderIsA2ABot: boolean): RouteResult {
+  route.context = {
+    chatType: event.chatType,
+    isPrivate: isPrivateChat(event.chatType),
+    senderIsA2ABot
+  };
+  return route;
+}
+
+function isPrivateChat(chatType: string | undefined): boolean {
+  return /^(p2p|private|single)$/i.test(chatType ?? "");
+}
+
+function shouldSendProgress(route: RouteResult): boolean {
+  if (route.intent !== "unknown") {
+    return false;
+  }
+  return route.plan.executable || /(?:Phase\s*\d+|开发|实现|修复|返工|GUI|Lumerical|FDTD|仿真|本地文件|代码|自测|产物)/i.test(route.cleanText);
+}
+
+function progressReceivedText(route: RouteResult): string {
+  if (route.context?.isPrivate) {
+    return "[代码执行官处理中] 已收到私聊任务，开始执行。本条是进度提示；最终结果会直接回复你。";
+  }
+  return "[代码执行官处理中] 已收到任务，开始执行。本条是进度提示；最终结果完成后再按协作流程回报项目调度官。";
+}
+
+function progressWorkingText(route: RouteResult, count: number): string {
+  const suffix = route.context?.isPrivate
+    ? "我会在最终结果里说明已完成项、阻塞点和下一步，并直接回复你。"
+    : "我会在最终结果里说明已完成项、阻塞点和下一步。";
+  return `[代码执行官处理中] 仍在执行第 ${count} 轮检查/处理。若任务涉及 GUI 或长耗时步骤，${suffix}`;
+}
+
 function prepareResponseForFeishu(response: string): string {
-  const maxLength = 3000;
-  if (response.length <= maxLength) {
+  const maxTotalLength = 9_000;
+  if (response.length <= maxTotalLength) {
     return response;
   }
   const filePath = persistLongResponse(response);
-  const headLength = Math.max(1000, maxLength - filePath.length - 260);
+  const headLength = Math.max(6_000, maxTotalLength - filePath.length - 260);
   return [
     response.slice(0, headLength).trimEnd(),
     "",
@@ -268,11 +363,68 @@ function prepareResponseForFeishu(response: string): string {
   ].join("\n");
 }
 
+function splitResponseForFeishu(response: string, bots: Array<{ name: string; openId: string }>): string[] {
+  const maxLength = 2800;
+  if (response.length <= maxLength) {
+    return [response];
+  }
+  const chunks: string[] = [];
+  let cursor = 0;
+  while (cursor < response.length) {
+    const next = findChunkEnd(response, cursor, maxLength);
+    chunks.push(response.slice(cursor, next).trim());
+    cursor = next;
+  }
+  if (chunks.length > 1) {
+    for (let i = 0; i < chunks.length - 1; i += 1) {
+      chunks[i] = neutralizeA2AMentions(chunks[i], bots);
+    }
+  }
+  return chunks.filter(Boolean);
+}
+
+function findChunkEnd(value: string, start: number, maxLength: number): number {
+  const hardEnd = Math.min(value.length, start + maxLength);
+  if (hardEnd === value.length) {
+    return hardEnd;
+  }
+  const window = value.slice(start, hardEnd);
+  const candidates = [window.lastIndexOf("\n\n"), window.lastIndexOf("\n"), window.lastIndexOf("。"), window.lastIndexOf(". ")].filter((n) => n > 800);
+  if (candidates.length === 0) {
+    return hardEnd;
+  }
+  return start + Math.max(...candidates) + 1;
+}
+
+function neutralizeA2AMentions(value: string, bots: Array<{ name: string; openId: string }>): string {
+  let text = value;
+  for (const bot of bots) {
+    text = text.replace(new RegExp(`@${escapeRegExp(bot.name)}`, "g"), `＠${bot.name}`);
+    text = text.replace(new RegExp(`<at\\s+user_id=["']${escapeRegExp(bot.openId)}["']\\s*>[^<]*<\\/at>`, "g"), bot.name);
+  }
+  return text;
+}
+
 function sanitizeAgentText(response: string): string {
   const lines = response.split(/\r?\n/);
   const cleaned: string[] = [];
   let skippingAuthBlock = false;
+  let skippingCliBlock = false;
   for (const line of lines) {
+    const cliLeakHeader =
+      /^\s*(?:lark-cli execution results|DRY_RUN planned commands|Planned commands|Execution policy)\s*:/i.test(line) ||
+      /^\s*Codex CLI call failed:/i.test(line);
+    if (cliLeakHeader) {
+      skippingCliBlock = true;
+      continue;
+    }
+    if (skippingCliBlock) {
+      if (/^\s*(?:#{1,6}\s+|\*\*[^*]+\*\*|\d+[.、]\s+|[一二三四五六七八九十]+[、.]\s+)\S/.test(line)) {
+        skippingCliBlock = false;
+      } else {
+        continue;
+      }
+    }
     const mentionsLarkAuth =
       /lark-cli\s+auth\s+login/i.test(line) ||
       /bot\s*认证.*重新登录/i.test(line) ||
@@ -329,15 +481,37 @@ function formatPlanOnly(route: RouteResult): string {
 }
 
 function formatCommandResults(items: Array<{ command: string[]; result: { ok: boolean; stdout: string; stderr: string } }>, dryRun: boolean): string {
-  const header = dryRun ? "DRY_RUN planned commands:" : "lark-cli execution results:";
+  const header = dryRun ? "计划的飞书操作：" : "飞书操作执行结果：";
   return [
     header,
     ...items.map(({ command, result }) => {
-      const status = result.ok ? "ok" : "failed";
-      const output = (result.stdout || result.stderr).trim();
-      return `- lark-cli ${command.join(" ")} => ${status}${output ? `\n  ${truncate(output, 500)}` : ""}`;
+      const status = result.ok ? "成功" : "失败，内部错误已记录";
+      return `- ${describeLarkOperation(command)}：${status}`;
     })
   ].join("\n");
+}
+
+function describeLarkOperation(command: string[]): string {
+  const [domain, action] = command;
+  if (domain === "im") {
+    return "飞书消息操作";
+  }
+  if (domain === "task") {
+    return "飞书任务操作";
+  }
+  if (domain === "apps") {
+    return "飞书应用操作";
+  }
+  if (domain === "calendar") {
+    return "飞书日历操作";
+  }
+  if (domain === "base") {
+    return "飞书多维表格操作";
+  }
+  if (domain === "docs") {
+    return "飞书文档操作";
+  }
+  return action ? `飞书 ${domain} ${action} 操作` : "飞书操作";
 }
 
 function senderKeyFor(event: FeishuMessageEvent): string {

@@ -69,11 +69,15 @@ async function draftWithOpenAI(config: AppConfig, route: RouteResult): Promise<s
 
 async function draftWithCodex(config: AppConfig, route: RouteResult): Promise<string> {
   const a2aSection = buildA2ASection(config);
+  const conversationSection = buildConversationSection(route);
   const prompt = [
-    `You are ${developer} in a Feishu group. Reply concisely in Chinese according to the route plan below.`,
+    `You are ${developer}. Reply concisely in Chinese according to the route plan below.`,
     "Do not fabricate lark-cli execution results. Ask the user to reply with confirmation before high-risk actions.",
     "Do not try to send Feishu group messages with lark-cli, and do not decide whether the Feishu bot needs auth login. The outer Feishu handler sends your final reply.",
     "For A2A collaboration tasks, report only task results, artifact paths, self-test results, and the next agent to notify. Never suggest running `lark-cli auth login`.",
+    "For Lumerical, MODE, FDTD, lumapi, GUI startup, or license checkout tasks, expect long waits. Prefer small observable steps, write the script first, run only the requested step, and report any long-running GUI/license wait as progress instead of assuming failure.",
+    "Do not kill GUI, Lumerical, MODE, FDTD, license, or simulation processes just because they are slow. If a process appears to be waiting, report the script path, command, visible output, elapsed time, and likely blocker.",
+    conversationSection,
     ...(a2aSection ? [a2aSection] : []),
     JSON.stringify(route, null, 2)
   ].join("\n\n");
@@ -86,11 +90,12 @@ async function draftWithCodex(config: AppConfig, route: RouteResult): Promise<st
     prompt,
     "auto",
     codexEnv,
-    600_000
+    config.codexCliTimeoutMs
   );
   if (!result.ok) {
-    infoLog(`draft provider=codex failed code=${result.code}`);
-    return `${localDraft(route)}\n\nCodex CLI call failed: ${summarizeCodexFailure(result.stderr, result.code)}`;
+    const failure = summarizeCodexFailure(result.stderr, result.code);
+    infoLog(`draft provider=codex failed code=${result.code} stderr=${preview(failure, 800)}`);
+    return formatCodexFailure(route, failure);
   }
   infoLog("draft provider=codex completed");
   const finalMessage = readOutputFile(outputFile);
@@ -154,6 +159,25 @@ function summarizeCodexFailure(stderr: string, code: number | null): string {
   return meaningful || `exit code ${code ?? "unknown"}`;
 }
 
+function formatCodexFailure(route: RouteResult, failure: string): string {
+  const fromCoordinator = route.cleanText.includes(`机器人「${coordinator}」`) || route.cleanText.includes(`@${coordinator}`);
+  return [
+    fromCoordinator ? `@${coordinator}` : "",
+    "代码执行官本轮没有产出有效结果。",
+    "",
+    `原因：Codex CLI 子进程失败：${failure}`,
+    "",
+    "建议：把任务拆成更小的单步执行项后重试；如果是 GUI/长耗时任务，先让我回报阶段状态，再执行下一步。"
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function preview(value: string, max: number): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
+}
+
 function buildA2ASection(config: AppConfig): string | null {
   const bots = config.a2aBots;
   if (bots.length === 0) {
@@ -197,6 +221,22 @@ function buildA2ASection(config: AppConfig): string | null {
     `- If a non-coordinator agent mentions you, act only when it explicitly asks for code or file changes; otherwise say ${coordinator} should schedule the work.`,
     "- Use names without @ when merely referring to a bot.",
     "- When you need to notify another bot, write @name exactly; the sender converts it to Feishu post rich-text mention."
+  ].join("\n");
+}
+
+function buildConversationSection(route: RouteResult): string {
+  if (route.context?.isPrivate) {
+    return [
+      "[Private chat mode]",
+      "You are in a one-to-one private chat with the user.",
+      "Reply directly to the user. Do not mention or notify 项目调度官 unless the user explicitly asks you to draft a message for the coordinator.",
+      "Do not assign work to other agents from private chat. If team coordination is needed, explain that the user should start that workflow in the group chat.",
+      "Do not use @mentions in private replies unless the user explicitly asks for mention text."
+    ].join("\n");
+  }
+  return [
+    "[Group chat mode]",
+    "You are in a Feishu group. Follow the configured multi-agent workflow and use @name only when another bot must be notified by the outer sender."
   ].join("\n");
 }
 
