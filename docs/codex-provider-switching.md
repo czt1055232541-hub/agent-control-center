@@ -4,9 +4,9 @@
 
 ## Switch Provider
 
-```powershell
-.\codex\Switch-CodexProvider.ps1 -Mode native
-.\codex\Switch-CodexProvider.ps1 -Mode moonbridge
+```bash
+python codex/switch_provider.py native
+python codex/switch_provider.py moonbridge
 ```
 
 MoonBridge mode requires `http://127.0.0.1:38440/v1/models` to be reachable unless `-AllowUnavailableMoonBridge` is passed.
@@ -15,10 +15,10 @@ Each successful switch keeps only the newest `config.toml.bak-switch-*` file. Go
 
 ## Start Services
 
-```powershell
-.\scripts\start-all.ps1 -CodexMode native
-.\scripts\start-all.ps1 -CodexMode moonbridge
-.\scripts\start-all.ps1 -CodexMode current
+```bash
+python scripts/stack.py stack start-native
+python scripts/stack.py stack start-moonbridge
+python scripts/stack.py status
 ```
 
 `native` starts OpenClaw and Codex Feishu Agent, and skips MoonBridge.
@@ -50,16 +50,16 @@ Projects and sessions share the same `CODEX_HOME`, but Codex Desktop may not sea
 
 When Codex Desktop is not actively using the target session, use:
 
-```powershell
-.\codex\Test-CodexProviderThread.ps1 -SessionId <session-id> -TargetModel moonbridge
+```bash
+python scripts/stack.py migrate-thread --session-id <session-id> --target-provider moonbridge
 ```
 
 The test records whether `resume` or `fork` can cross providers. Headless `fork` is expected to fail unless it has a real terminal.
 
 If direct continuation fails, use:
 
-```powershell
-.\codex\Continue-CodexThreadWithProvider.ps1 -SessionId <session-id> -TargetModel moonbridge
+```bash
+python scripts/stack.py migrate-thread --session-id <session-id> --target-provider moonbridge
 ```
 
 That tool first attempts bounded `codex exec resume`. If it fails or times out, it creates a new provider run using a summary migration prompt from the prior rollout tail. The tool writes stdout/stderr logs under `runtime\logs`, which is intentionally ignored by git.

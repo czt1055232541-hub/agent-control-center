@@ -9,7 +9,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
 
-TEXT_SUFFIXES = {".ts", ".js", ".md", ".json", ".env", ".py", ".txt", ".ps1", ".cmd"}
+TEXT_SUFFIXES = {".ts", ".js", ".md", ".json", ".env", ".py", ".txt", ".cmd"}
 
 
 def read_text(path: Path) -> str | None:

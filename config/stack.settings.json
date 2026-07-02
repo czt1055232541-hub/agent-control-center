@@ -6,7 +6,7 @@
   "codexConfig": "E:\\codeX\\config.toml",
   "codexNativeModel": "gpt-5.5",
   "codexMoonBridgeModel": "moonbridge",
-  "codexSwitchScript": "F:\\1AI\\feishu_agent\\codex\\Switch-CodexProvider.ps1",
+  "codexSwitchScript": "F:\\1AI\\feishu_agent\\codex\\switch_provider.py",
   "moonBridgeBaseUrl": "http://127.0.0.1:38440/v1",
   "moonbridge": {
     "dir": "E:\\codeX\\moon-bridge",

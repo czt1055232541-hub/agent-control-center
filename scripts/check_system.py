@@ -1,23 +1,78 @@
-import subprocess, json, sys, os
+from __future__ import annotations
 
-def run_pwsh(script):
-    r = subprocess.run(
-        ['powershell', '-NoProfile', '-Command', script],
-        capture_output=True, text=True, timeout=15,
-        env={**os.environ, 'PYTHONIOENCODING': 'utf-8'}
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
+
+
+def run(command: list[str], timeout: int = 15) -> str:
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return str(exc)
+    payload = result.stdout or result.stderr or b""
+    for encoding in ("utf-8", "gb18030", "mbcs"):
+        try:
+            return payload.decode(encoding).strip()
+        except UnicodeDecodeError:
+            continue
+        except LookupError:
+            continue
+    return payload.decode("utf-8", errors="replace").strip()
+
+
+def wmic_value(alias: str, fields: list[str]) -> dict[str, str]:
+    output = run(["wmic", alias, "get", ",".join(fields), "/format:csv"])
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    if len(lines) < 2:
+        return {}
+    header = [item.strip() for item in lines[0].split(",")]
+    values = [item.strip() for item in lines[1].split(",")]
+    return {key: values[index] if index < len(values) else "" for index, key in enumerate(header) if key != "Node"}
+
+
+def free_space(path: str) -> int | None:
+    try:
+        return shutil.disk_usage(path).free
+    except OSError:
+        return None
+
+
+def main() -> int:
+    os_info = wmic_value("os", ["Caption", "BuildNumber", "OSArchitecture"])
+    cpu_info = wmic_value(
+        "cpu",
+        ["VirtualizationFirmwareEnabled", "SecondLevelAddressTranslationExtensions"],
     )
-    return r.stdout.strip() or r.stderr.strip() or ''
+    computer_info = wmic_value("computersystem", ["HypervisorPresent"])
+    info = {
+        "OS": os_info.get("Caption") or platform.platform(),
+        "Build": os_info.get("BuildNumber") or platform.version(),
+        "OSArch": os_info.get("OSArchitecture") or platform.machine(),
+        "HyperV": computer_info.get("HypervisorPresent", ""),
+        "VirtFW": cpu_info.get("VirtualizationFirmwareEnabled", ""),
+        "SLAT": cpu_info.get("SecondLevelAddressTranslationExtensions", ""),
+        "BuildOK": str(int(os_info.get("BuildNumber") or "0") >= 19041),
+        "WSL_Status": run(["wsl", "--status"]),
+        "Docker_Exists": str(Path(r"C:\Program Files\Docker\Docker\Docker Desktop.exe").exists()),
+        "FreeSpace_E": free_space("E:\\"),
+    }
+    print(json.dumps(info, indent=2, ensure_ascii=False))
+    return 0
 
-info = {}
-info['OS'] = run_pwsh('(Get-CimInstance Win32_OperatingSystem).Caption')
-info['Build'] = run_pwsh('[Environment]::OSVersion.Version.Build')
-info['OSArch'] = run_pwsh('[Environment]::Is64BitProcess')
-info['HyperV'] = run_pwsh('(Get-WmiObject -Class Win32_ComputerSystem).HypervisorPresent')
-info['VirtFW'] = run_pwsh('(Get-CimInstance Win32_Processor | Select-Object -First 1).VirtualizationFirmwareEnabled')
-info['SLAT'] = run_pwsh('(Get-CimInstance Win32_Processor | Select-Object -First 1).SecondLevelAddressTranslationExtensions')
-info['BuildOK'] = run_pwsh('[Environment]::OSVersion.Version.Build -ge 19041')
-info['WSL_Status'] = run_pwsh('wsl --status 2>&1')
-info['Docker_Exists'] = str(os.path.exists(r'C:\Program Files\Docker\Docker\Docker Desktop.exe'))
-info['FreeSpace_E'] = run_pwsh('(Get-PSDrive E).Free')
 
-print(json.dumps(info, indent=2, ensure_ascii=False))
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -28,7 +28,7 @@ Do not store real Feishu `open_id`, `chat_id`, `app_id`, app secrets, tokens, or
 
 - Prefer protocol over memory. Shared rules should live in files that every agent can load.
 - Prefer same-session recovery. Continue the same group conversation and TASK-ID unless the user explicitly allows a new session or reset.
-- Prefer Python-first operations. Use Python CLIs and `subprocess([...])` argv arrays before PowerShell/cmd shell strings.
+- Prefer Python-first operations. Use Python CLIs and `subprocess([...])` argv arrays before shell strings.
 - Prefer evidence over assumption. Check logs, message positions, PID/port state, status commands, and actual group replies.
 - Keep local artifacts separate. Runtime replies, generated demos, logs, summaries, and backup configs must stay out of Git.
 - Use role boundaries. Agents should not perform another agent's job merely because they can.
@@ -50,7 +50,7 @@ Add reusable patterns:
 - **Python-First Windows Operations**
   - Prefer Python wrapper scripts for operational commands.
   - Use `subprocess.run([...])` with argv arrays to avoid shell quoting issues.
-  - Treat PowerShell/cmd as last-resort launchers for Windows-native entrypoints.
+  - Treat shell launchers as last-resort wrappers for Windows-native entrypoints.
 
 - **Privacy-Preserving Git Closeout**
   - Scan staged diffs and tracked files before commit.
@@ -266,7 +266,7 @@ Keep main/default OpenClaw binding explicit. Previous discovery failed when the 
 
 #### D1. Python status replacement
 
-Replace remaining PowerShell-first status scripts with Python wrappers.
+Replace remaining shell-first status scripts with Python wrappers.
 
 Preferred command surface:
 
@@ -277,7 +277,7 @@ python scripts/stack.py restart codex-agent
 python scripts/lark_multiagent_probe.py recent-summary
 ```
 
-PowerShell scripts may remain only as compatibility wrappers or desktop shortcuts.
+Compatibility wrappers should call Python directly and must not carry runtime logic.
 
 #### D2. Multiagent config checker
 
@@ -388,7 +388,7 @@ Validation:
 - Do not require a new conversation/session to recover ordinary workflow stalls.
 - Do not make code executor responsible for ops, audit, archive, or Feishu app creation.
 - Do not keep cloud-agent assumptions now that the five agents are local.
-- Do not migrate every PowerShell script at once; prioritize operational paths used by agents.
+- Do not migrate every legacy wrapper at once; prioritize operational paths used by agents.
 
 ## Open Questions
 
@@ -402,7 +402,7 @@ Validation:
 - `git status --short` is reviewed before edits.
 - Config values are read from ignored local files or environment variables.
 - No real Feishu IDs, secrets, tokens, or group transcripts are committed.
-- Python wrappers are used before PowerShell/cmd.
+- Python wrappers are used before shell launchers.
 - OpenClaw gateway and codex-agent are running after changes.
 - The same TASK-ID is used throughout a workflow test.
 - Feishu messages show non-empty `mentions` for bot-to-bot handoff.

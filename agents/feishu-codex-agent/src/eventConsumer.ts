@@ -22,7 +22,6 @@ export class EventConsumer extends EventEmitter<EventConsumerEvents> {
   }
 
   start(): void {
-    const isWin = process.platform === "win32";
     const cmdFile = this.config.larkCliBin;
     const cmdArgs = [
       "event",
@@ -35,19 +34,13 @@ export class EventConsumer extends EventEmitter<EventConsumerEvents> {
       "--timeout",
       this.config.larkEventTimeout
     ];
-    const child = isWin
-      ? spawn("cmd.exe", ["/c", cmdFile, ...cmdArgs], {
-          windowsHide: true,
-          env: process.env,
-          cwd: this.config.larkCliCwd,
-          stdio: ["pipe", "pipe", "pipe"]
-        })
-      : spawn(cmdFile, cmdArgs, {
-          windowsHide: true,
-          env: process.env,
-          cwd: this.config.larkCliCwd,
-          stdio: ["pipe", "pipe", "pipe"]
-        });
+    const child = spawn(cmdFile, cmdArgs, {
+      shell: false,
+      windowsHide: true,
+      env: process.env,
+      cwd: this.config.larkCliCwd,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
     this.child = child;
     let stdoutBuffer = "";
     let stderrBuffer = "";

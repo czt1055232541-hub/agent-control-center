@@ -33,7 +33,6 @@ F:\1AI\feishu_agent
     |-- .env.example
     |-- README.md
     |-- scripts/
-    |   `-- use-local-tools.ps1
     |-- src/
     |   |-- index.ts
     |   |-- env.ts
@@ -51,20 +50,13 @@ F:\1AI\feishu_agent
 
 ## 环境加载
 
-PowerShell 默认可能禁止运行 `.ps1` shim。推荐先加载本项目的 F 盘工具链：
+运行链路优先使用 Python/Node 直接调用可执行文件，不依赖 shell shim：
 
-```powershell
-Set-Location -LiteralPath 'F:\1AI\feishu_agent\feishu-codex-agent'
-.\scripts\use-local-tools.ps1
-```
-
-如果系统策略阻止 `.ps1`，可以直接调用 `.cmd`：
-
-```powershell
-& 'F:\1AI\feishu_agent\.tools\node-v24.16.0-win-x64\node.exe' -v
-& 'F:\1AI\feishu_agent\.tools\node-v24.16.0-win-x64\npm.cmd' -v
-& 'F:\1AI\feishu_agent\.npm-global\codex.cmd' --version
-& 'F:\1AI\feishu_agent\.npm-global\lark-cli.cmd' --help
+```bash
+F:\1AI\feishu_agent\.tools\node-v24.16.0-win-x64\node.exe -v
+F:\1AI\feishu_agent\.tools\node-v24.16.0-win-x64\npm.cmd -v
+F:\1AI\feishu_agent\.npm-global\codex.cmd --version
+F:\1AI\feishu_agent\.npm-global\lark-cli.cmd --help
 ```
 
 已验证版本：
@@ -78,8 +70,8 @@ lark-cli 1.0.53
 
 ## 安装与测试
 
-```powershell
-Set-Location -LiteralPath 'F:\1AI\feishu_agent\feishu-codex-agent'
+```bash
+cd /d F:\1AI\feishu_agent\feishu-codex-agent
 npm install
 npm test
 ```
@@ -102,8 +94,8 @@ npm test
 
 从模板创建：
 
-```powershell
-Copy-Item .env.example .env
+```bash
+python -c "from pathlib import Path; Path('.env').write_text(Path('.env.example').read_text(encoding='utf-8'), encoding='utf-8')"
 ```
 
 关键变量：
@@ -127,7 +119,7 @@ MAX_CONTEXT_MESSAGES=30
 
 创建或绑定飞书应用：
 
-```powershell
+```bash
 lark-cli config init --new
 ```
 
@@ -135,7 +127,7 @@ lark-cli config init --new
 
 登录并验证：
 
-```powershell
+```bash
 lark-cli auth login --recommend
 lark-cli auth status
 ```
@@ -144,7 +136,7 @@ lark-cli auth status
 
 验证事件能力：
 
-```powershell
+```bash
 lark-cli event list --json
 lark-cli event schema im.message.receive_v1 --json
 lark-cli event consume im.message.receive_v1 --as bot
@@ -166,8 +158,8 @@ lark-cli event consume im.message.receive_v1 --as bot
 
 ## 启动
 
-```powershell
-Set-Location -LiteralPath 'F:\1AI\feishu_agent\feishu-codex-agent'
+```bash
+cd /d F:\1AI\feishu_agent\feishu-codex-agent
 npm run build
 npm start
 ```
@@ -180,7 +172,7 @@ Agent 只响应：
 
 回复使用官方快捷命令：
 
-```powershell
+```bash
 lark-cli im +messages-send --chat-id <CHAT_ID> --text <TEXT> --as bot
 ```
 
@@ -201,7 +193,7 @@ MVP 支持：
 2. 快捷命令不足时，使用 `lark-cli` 暴露的普通 API 命令。
 3. 仍不足时，使用：
 
-```powershell
+```bash
 lark-cli api METHOD /open-apis/xxx --params '{}'
 ```
 
@@ -261,7 +253,7 @@ lark-cli api METHOD /open-apis/xxx --params '{}'
 
 生产前可用：
 
-```powershell
+```bash
 lark-cli schema <service.resource.method>
 ```
 
@@ -282,7 +274,7 @@ lark-cli schema <service.resource.method>
 
 运行：
 
-```powershell
+```bash
 npm test
 ```
 
@@ -300,7 +292,7 @@ npm test
 
 查看状态：
 
-```powershell
+```bash
 lark-cli auth status
 lark-cli event status
 lark-cli im +chat-list --as bot --json
@@ -310,7 +302,7 @@ lark-cli im +chat-list --as bot --json
 
 - `event status` 的 `RECEIVED` 不增长：确认机器人已加入群聊，事件 `im.message.receive_v1` 已订阅，发送的是 `@Codex ...` 或私聊消息。
 - Agent 收到事件但不回复：查看 `.runtime\agent-live.err.log`，确认 `respond=true`，并检查 `DRY_RUN=false`。
-- PowerShell 拦截 `.ps1`：使用 `.cmd` 或 `.exe` 路径调用，不需要把工具装到 C 盘。
+- Shell 编码或执行策略问题：不要让运行链路经过 shell 管道；使用 Python、Node 或 `.exe` 路径直接调用。
 - Agent 日志中文乱码：优先使用 `LARK_CLI_OUTPUT_ENCODING=utf-8`；只有确认当前 lark-cli 输出是系统本地编码时，才改为 `gb18030`。
 - 发送消息失败：检查 bot 是否有发消息权限，群聊是否允许机器人发言，scope 是否包含 IM 发送相关权限。
 - user token `needs_refresh`：通常会在下一次 user API 调用时刷新；如果失败，重新执行 `lark-cli auth login --recommend`。

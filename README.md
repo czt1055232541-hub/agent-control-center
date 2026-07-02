@@ -38,7 +38,7 @@ python scripts/sync_a2a_workflow_files.py
 
 ## Python-First Operations
 
-日常运行、状态检查和 provider 切换优先走 Python wrapper，不直接调用 PowerShell：
+日常运行、状态检查和 provider 切换统一走 Python wrapper：
 
 ```bash
 python scripts/stack.py status --json
@@ -47,7 +47,9 @@ python scripts/stack.py restart codex-agent
 python scripts/stack.py restart openclaw
 ```
 
-OpenClaw Gateway 的底层 Windows 入口仍是 OpenClaw 自带 `gateway.cmd`，但它由 Agent Control Center 的 Python 控制层启动、记录 PID 和写日志；不要在常规流程里直接运行 PowerShell 脚本。
+OpenClaw Gateway 的底层 Windows 入口仍是 OpenClaw 自带 `gateway.cmd`，但它由 Agent Control Center 的 Python 控制层启动、记录 PID 和写日志；不要在常规流程里直接运行 shell 脚本。
+
+新增或修改运行链路时必须优先使用 Python、Node.js 直接 `spawn` 可执行文件，或稳定的 Windows 原生命令；不要把中文文本、角色名、JSON payload 或飞书 mention 流程穿过 shell 管道。
 
 ## Scheduler Watchdog
 
