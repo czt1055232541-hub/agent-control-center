@@ -11,8 +11,8 @@
 - 下游 agent 完成任务、验证、审计或归档时，最终报告第一行必须以 `@项目调度官` 开头；不要只在“建议下一步”里写项目调度官。
 - 真实发送必须由 Feishu sender 转成 `msg_type=post` 富文本 `at` 标签；不得把 `<at user_id="...">名称</at>` 当作交接格式。
 - 如果 Feishu 已发送消息的 `mentions` 为空，该次交接视为失败，必须修复映射/发送层后补发。
-- 项目调度官每次派发必须调用 `python scripts/start_scheduler_watchdog.py --task-id ... --assignee ... --phase ... --task-text ...`；该入口会先发送富文本 @assignee 派发消息，再启动 watchdog。不要手写“Watchdog 已就绪”来替代派发。
-- 如果 `start_scheduler_watchdog.py` 返回 `dispatch_failed` 或 `dispatch_sent=false`，该次派发视为失败，必须先修复发送层，不得等待下游 agent。
+- 项目调度官每次派发必须先由自己当前回复真实 @ 当前 assignee 发布任务；随后调用 `python scripts/start_scheduler_watchdog.py --task-id ... --assignee ... --phase ... --task-text ... --no-dispatch` 启动 watchdog。
+- `start_scheduler_watchdog.py` 默认不再代发派发消息；返回 `dispatch_sent=false` 且 `reason=coordinator_dispatch_required/no_dispatch` 是正常状态，不是失败。
 - 收到下游有效回报后必须调用 `python scripts/stop_scheduler_watchdog.py --task-id ... --assignee ... --phase ...` 关闭对应 watchdog。
 - 不在配置、文档、回复中暴露真实 open_id、chat_id、app_id、app_secret、token 或会话数据。
 

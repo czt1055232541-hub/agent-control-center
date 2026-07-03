@@ -53,13 +53,13 @@ OpenClaw Gateway 的底层 Windows 入口仍是 OpenClaw 自带 `gateway.cmd`，
 
 ## Scheduler Watchdog
 
-项目调度官每次向下游 agent 派发任务后，必须启动轻量倒计时提醒器。它会按任务内容自动估计等待时间，到点后以 user 身份向群内 `@项目调度官` 发送富文本 `post` 检查 prompt，防止执行 agent 失效或任务卡死。
+项目调度官每次向下游 agent 派发任务时，必须先在自己的当前回复里真实 `@` 当前 assignee 发布任务，然后启动轻量倒计时提醒器。提醒器会按任务内容自动估计等待时间，到点后向群内 `@项目调度官` 发送富文本 `post` 检查 prompt，防止执行 agent 失效或任务卡死。
 
 ```bash
-python scripts/start_scheduler_watchdog.py --task-id TASK-YYYYMMDD-NNN --assignee 代码执行官 --phase 开发实现 --task-text "派发任务摘要"
+python scripts/start_scheduler_watchdog.py --task-id TASK-YYYYMMDD-NNN --assignee 代码执行官 --phase 开发实现 --task-text "派发任务摘要" --no-dispatch
 ```
 
-`start_scheduler_watchdog.py` 会先发送富文本 @assignee 派发消息，再非阻塞启动 Python watchdog 进程，并立即返回 PID、日志路径和状态文件路径。启动同一 `task-id` 的新 watchdog 时，默认会终止并标记旧 watchdog 为 `superseded`，避免多个倒计时堆积。
+`start_scheduler_watchdog.py` 默认只非阻塞启动 Python watchdog 进程，并立即返回 PID、日志路径和状态文件路径；它不再代替项目调度官发送派发消息。启动同一 `task-id` 的新 watchdog 时，默认会终止并标记旧 watchdog 为 `superseded`，避免多个倒计时堆积。
 
 当被派发 agent 已经有效回复时，项目调度官或消息处理流程必须关闭对应 watchdog：
 

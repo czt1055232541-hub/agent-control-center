@@ -212,7 +212,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--delay-minutes", type=float, default=None)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--keep-existing", action="store_true", help="Do not cancel earlier watchdogs for the same task.")
-    parser.add_argument("--no-dispatch", action="store_true", help="Only launch the watchdog; do not send the assignee mention dispatch.")
+    parser.add_argument("--no-dispatch", action="store_true", help="Only launch the watchdog; kept for backwards-compatible explicitness.")
+    parser.add_argument(
+        "--dispatch-as-user",
+        action="store_true",
+        help="Deprecated compatibility mode: send the assignee dispatch as the authenticated user before launching the watchdog.",
+    )
     args = parser.parse_args(argv)
 
     command = [sys.executable, "-X", "utf8", str(SCRIPT)]
@@ -242,8 +247,8 @@ def main(argv: list[str] | None = None) -> int:
     log_path = LOG_DIR / f"{safe_task}_{args.assignee}_{stamp}_watchdog.log"
     state_path = WATCHDOG_DIR / f"{safe_task}_{safe_assignee}_{stamp}.json"
     command.extend(["--state-file", str(state_path)])
-    dispatch_result = {"ok": True, "skipped": True, "reason": "no_dispatch"}
-    if not args.no_dispatch:
+    dispatch_result = {"ok": True, "skipped": True, "reason": "coordinator_dispatch_required"}
+    if args.dispatch_as_user and not args.no_dispatch:
         dispatch_result = send_dispatch_message(args.task_id, args.assignee, args.phase, args.task_text, args.dry_run)
         if not dispatch_result.get("ok"):
             state = {
@@ -293,6 +298,7 @@ def main(argv: list[str] | None = None) -> int:
         "launcher": "python",
         "cancelled_previous": cancelled,
         "dispatch_sent": bool(dispatch_result.get("ok") and not dispatch_result.get("skipped")),
+        "dispatch_required_from": "项目调度官",
     }, ensure_ascii=False))
     return 0
 

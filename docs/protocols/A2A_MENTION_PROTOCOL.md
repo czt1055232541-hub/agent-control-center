@@ -15,8 +15,10 @@
 - The Feishu sender converts normalized role names to `msg_type=post` rich-text `at` elements.
 - Do not output literal `<at user_id="...">名称</at>` as the handoff format.
 - Mention at most one agent in a handoff reply.
-- Assignment or reminder messages may only truly mention the current assignee; write the coordinator name without `@` when explaining where the assignee should report back.
+- Assignment or downstream reminder messages may only truly mention the current assignee; write the coordinator name without `@` when explaining where the assignee should report back.
 - If a delivered Feishu message has an empty `mentions` list after a supposed handoff, the handoff failed and must be retried after fixing the mapping or sender layer.
+- The coordinator must publish every assignment in its own current reply with a real rich-text mention of the assignee.
+- `start_scheduler_watchdog.py` only starts delayed coordinator-check reminders by default; it must not be treated as the assignment sender.
 - Watchdog prompts are also sent as Feishu `post` messages with a real `at` element for 项目调度官.
 
 ## Team Map

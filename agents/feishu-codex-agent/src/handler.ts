@@ -190,19 +190,12 @@ export class MessageHandler {
       return { stop: () => undefined };
     }
     let stopped = false;
-    let timer: NodeJS.Timeout | undefined;
-    let interval: NodeJS.Timeout | undefined;
-    let count = 0;
-    const sendProgress = async (kind: "received" | "working") => {
+    const sendProgress = async () => {
       if (stopped || !this.isCurrentReplyGeneration(chatId, generation)) {
         return;
       }
-      const text =
-        kind === "received"
-          ? progressReceivedText(route)
-          : progressWorkingText(route, ++count);
       try {
-        const result = await this.larkCli.sendText(chatId, text);
+        const result = await this.larkCli.sendText(chatId, progressReceivedText(route));
         if (!result.ok) {
           debugLog(`progress send failed chat_id=${chatId} code=${result.code} stderr=${preview(result.stderr || result.stdout, 500)}`);
         }
@@ -210,20 +203,10 @@ export class MessageHandler {
         debugLog(`progress send threw chat_id=${chatId} error=${error instanceof Error ? error.message : String(error)}`);
       }
     };
-    void sendProgress("received");
-    timer = setTimeout(() => {
-      void sendProgress("working");
-      interval = setInterval(() => void sendProgress("working"), this.config.codexProgressIntervalMs);
-    }, this.config.codexProgressInitialMs);
+    void sendProgress();
     return {
       stop: () => {
         stopped = true;
-        if (timer) {
-          clearTimeout(timer);
-        }
-        if (interval) {
-          clearInterval(interval);
-        }
       }
     };
   }
@@ -364,13 +347,6 @@ function progressReceivedText(route: RouteResult): string {
     return "[代码执行官处理中] 已收到私聊任务，开始执行。本条是进度提示；最终结果会直接回复你。";
   }
   return "[代码执行官处理中] 已收到任务，开始执行。本条是进度提示；最终结果完成后再按协作流程回报项目调度官。";
-}
-
-function progressWorkingText(route: RouteResult, count: number): string {
-  const suffix = route.context?.isPrivate
-    ? "我会在最终结果里说明已完成项、阻塞点和下一步，并直接回复你。"
-    : "我会在最终结果里说明已完成项、阻塞点和下一步。";
-  return `[代码执行官处理中] 仍在执行第 ${count} 轮检查/处理。若任务涉及 GUI 或长耗时步骤，${suffix}`;
 }
 
 function prepareResponseForFeishu(response: string): string {

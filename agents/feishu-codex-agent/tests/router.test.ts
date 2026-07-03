@@ -539,6 +539,63 @@ test("handler suppresses stale replies when a newer chat request finishes first"
   assert.deepEqual(statuses, ["Started", "Started", "Stopped"]);
 });
 
+test("codex progress reporter sends only the first status message", async () => {
+  const sent: string[] = [];
+  const scriptPath = path.join(os.tmpdir(), `feishu-codex-agent-single-progress-${Date.now()}.js`);
+  fs.writeFileSync(
+    scriptPath,
+    [
+      "const fs = require('node:fs');",
+      "const index = process.argv.indexOf('--output-last-message');",
+      "const output = index >= 0 ? process.argv[index + 1] : '';",
+      "setTimeout(() => {",
+      "  if (output) fs.writeFileSync(output, 'FINAL_RESPONSE_FROM_TEST');",
+      "}, 80);"
+    ].join("\n"),
+    "utf8"
+  );
+  const config = {
+    ...getConfig(),
+    dryRun: false,
+    agentProvider: "codex" as const,
+    codexCliBin: process.execPath,
+    codexAgentArgs: [scriptPath],
+    codexProgressInitialMs: 10,
+    codexProgressIntervalMs: 10,
+    a2aBots: [],
+    a2aRelay: { enabled: false }
+  };
+  const fakeLark = {
+    setTypingStatus: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    sendText: async (_chatId: string, text: string) => {
+      sent.push(text);
+      return { ok: true, code: 0, stdout: "", stderr: "" };
+    },
+    sendPost: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    run: async () => {
+      throw new Error("single progress test should not run commands");
+    }
+  } as unknown as LarkCli;
+  const handler = new MessageHandler(config, fakeLark);
+  await handler.handleEvent({
+    chatId: "oc_chat",
+    messageId: "om_single_progress",
+    sender: { openId: "ou_user", senderType: "user" },
+    content: "",
+    plainText: "@Codex run FDTD slow task",
+    messageType: "text",
+    createTime: "1710000000000",
+    chatType: "group",
+    mentions: ["Codex"],
+    raw: {}
+  });
+  fs.rmSync(scriptPath, { force: true });
+
+  assert.equal(sent.length, 2);
+  assert.match(sent[0], /处理中/);
+  assert.equal(sent[1], "FINAL_RESPONSE_FROM_TEST");
+});
+
 test("A2A relay sends bot-to-bot mentions as rich text posts", async () => {
   const sent: Array<{ chatId: string; content?: unknown; text?: string; options?: unknown }> = [];
   const config = {
