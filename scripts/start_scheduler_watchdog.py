@@ -39,15 +39,17 @@ def write_json(path: Path, payload: dict) -> None:
 
 
 def lark_env() -> dict[str, str]:
-    env = os.environ.copy()
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key.upper() in {"PATH", "PATHEXT", "SYSTEMROOT", "WINDIR", "COMSPEC", "TEMP", "TMP"}
+    }
     home = str(AGENT_HOME)
     env["USERPROFILE"] = home
     env["HOME"] = home
     env["LARK_CLI_HOME"] = str(AGENT_HOME / ".lark-cli")
     env["LARK_CLI_CWD"] = str(REPO_ROOT)
     env["LARK_CLI_OUTPUT_ENCODING"] = "utf-8"
-    for name in ("OPENCLAW_HOME", "CLAW_HOME", "HERMES_HOME", "LARK_CHANNEL"):
-        env.pop(name, None)
     return env
 
 
