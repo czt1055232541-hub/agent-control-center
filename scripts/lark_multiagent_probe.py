@@ -168,6 +168,89 @@ def send_nudge(chat_id: str, text: str) -> int:
     return print_result(result)
 
 
+def send_mmi_3d_optimization_task(chat_id: str) -> int:
+    task_id = "TASK-MMI-3D-OPT-" + dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    body = f"""
+【{task_id}｜MMI 设计优化进入三维 FDTD 闭环】
+请以项目调度官身份组织群内 agents 继续推进 MMI 设计优化任务。上轮 2D 基线已归档，但 <0.5 dB 工程目标未达成，本轮不要直接开跑参数扫；必须先完成文献和方案闭环，再进入 2D/3D 仿真。
+
+硬性流程：
+1. 先派发给代码执行官与质量审计官做经典论文/文献调研：覆盖自成像 MMI 理论、低损耗 1x2 MMI splitter、SOI 220nm 平台、taper/多段锥形/形状优化、3D FDTD 验证做法。要求输出可追溯论文清单、关键公式/设计初值、可仿真参数范围。
+2. 组织集体讨论制定 Lumerical 方案：明确 2D 快速优化变量、目标函数、清理策略、停止条件、3D FDTD 边界/mesh/monitor/source/端口归一化设置，以及由 2D 过渡到 3D 的验收门槛。
+3. 再派发代码执行官实现自动化优化脚本。仿真扫描过程中必须像 FDTD optimize 一样及时清理中间仿真文件，只保留 manifest、核心目标参数、趋势图、最佳 fsp 和必要报告。
+4. 运维验证官负责验证脚本可运行、Lumerical GUI 可见、单实例串行、文件清理和结果 JSON 可解析。
+5. 质量审计官必须审计论文依据、优化方案、2D 收敛、3D 设置和最终指标；未达目标要给出下一轮返工项，而不是形式通过。
+6. 项目档案官最后归档论文调研、讨论纪要、优化脚本、2D/3D 结果、最佳 fsp、趋势图、审计结论。
+
+协作要求：
+- 每次向下游 agent 派发时，必须使用富文本 mention，并由项目调度官在派发动作中同步启动 scheduler watchdog；收到有效回复后关闭对应 watchdog。
+- 不要泄露任何 open_id/chat_id/app_secret。群内只按角色名汇报。
+- 本轮最终目标是得到三维 FDTD 仿真结果；如果物理目标 <0.5 dB 仍未达成，也必须给出有证据的原因和下一轮设计方向。
+""".strip()
+    content = {
+        "zh_cn": {
+            "content": [[
+                {"tag": "at", "user_id": coordinator_open_id(), "user_name": "项目调度官"},
+                {"tag": "text", "text": " " + body},
+            ]]
+        }
+    }
+    result = run_lark([
+        "im",
+        "+messages-send",
+        "--chat-id",
+        chat_id,
+        "--content",
+        json.dumps(content, ensure_ascii=True),
+        "--msg-type",
+        "post",
+        "--as",
+        "user",
+        "--format",
+        "json",
+    ])
+    print(f"TASK_ID={task_id}")
+    return print_result(result)
+
+
+def send_mmi_3d_dispatch_nudge(chat_id: str, task_id: str) -> int:
+    body = f"""
+【监督纠偏｜{task_id}】
+我已看到你启动了代码执行官的文献调研 watchdog，但最近群消息中还没有出现真正 `@代码执行官` 的富文本派发消息；watchdog 不能替代任务派发。
+
+请立即发送一条 `post` 富文本消息真实 @代码执行官，派发“经典论文/文献调研”阶段：
+- 调研自成像 MMI 理论、低损耗 1x2 MMI splitter、SOI 220nm 平台、taper/多段锥形/形状优化、3D FDTD 验证做法；
+- 输出可追溯论文清单、关键公式/设计初值、可仿真参数范围；
+- 不开跑仿真，不创建云资源；
+- 回报后由你关闭当前 watchdog，再交给质量审计官复审文献。
+
+请保持同一个 TASK-ID，不要新开任务。
+""".strip()
+    content = {
+        "zh_cn": {
+            "content": [[
+                {"tag": "at", "user_id": coordinator_open_id(), "user_name": "项目调度官"},
+                {"tag": "text", "text": " " + body},
+            ]]
+        }
+    }
+    result = run_lark([
+        "im",
+        "+messages-send",
+        "--chat-id",
+        chat_id,
+        "--content",
+        json.dumps(content, ensure_ascii=True),
+        "--msg-type",
+        "post",
+        "--as",
+        "user",
+        "--format",
+        "json",
+    ])
+    return print_result(result)
+
+
 def list_messages(chat_id: str, page_size: int) -> int:
     result = run_lark([
         "im",
@@ -312,6 +395,9 @@ def main() -> int:
     parser.add_argument("--chat-id", default=None)
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("send-calc-test")
+    subparsers.add_parser("send-mmi-3d-optimization-task")
+    dispatch_nudge_parser = subparsers.add_parser("send-mmi-3d-dispatch-nudge")
+    dispatch_nudge_parser.add_argument("task_id")
     nudge_parser = subparsers.add_parser("send-final-nudge")
     nudge_parser.add_argument("task_id")
     send_nudge_parser = subparsers.add_parser("send-nudge")
@@ -343,6 +429,10 @@ def main() -> int:
 
     if args.command == "send-calc-test":
         return send_calc_test(chat_id)
+    if args.command == "send-mmi-3d-optimization-task":
+        return send_mmi_3d_optimization_task(chat_id)
+    if args.command == "send-mmi-3d-dispatch-nudge":
+        return send_mmi_3d_dispatch_nudge(chat_id, args.task_id)
     if args.command == "send-final-nudge":
         return send_final_nudge(chat_id, args.task_id)
     if args.command == "send-nudge":

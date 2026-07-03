@@ -10,7 +10,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+from a2a_workflow_config import default_chat_id, require_role_open_id
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
+LARK_CLI = REPO_ROOT / ".npm-global" / "node_modules" / "@larksuite" / "cli" / "bin" / "lark-cli.exe"
+AGENT_HOME = REPO_ROOT / ".home"
 EXE = REPO_ROOT / "runtime" / "tools" / "scheduler-watchdog-current.exe"
 LEGACY_EXE = REPO_ROOT / "runtime" / "tools" / "scheduler-watchdog.exe"
 SCRIPT = REPO_ROOT / "scripts" / "scheduler_watchdog.py"
@@ -34,6 +38,71 @@ def write_json(path: Path, payload: dict) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     tmp.replace(path)
+
+
+def lark_env() -> dict[str, str]:
+    env = os.environ.copy()
+    home = str(AGENT_HOME)
+    env["USERPROFILE"] = home
+    env["HOME"] = home
+    env["LARK_CLI_HOME"] = str(AGENT_HOME / ".lark-cli")
+    env["LARK_CLI_CWD"] = str(REPO_ROOT)
+    env["LARK_CLI_OUTPUT_ENCODING"] = "utf-8"
+    for name in ("OPENCLAW_HOME", "CLAW_HOME", "HERMES_HOME", "LARK_CHANNEL"):
+        env.pop(name, None)
+    return env
+
+
+def send_dispatch_message(task_id: str, assignee: str, phase: str | None, task_text: str, dry_run: bool) -> dict:
+    content = {
+        "zh_cn": {
+            "content": [[
+                {"tag": "at", "user_id": require_role_open_id(assignee), "user_name": assignee},
+                {
+                    "tag": "text",
+                    "text": "\n".join([
+                        f" {task_id} 派发任务",
+                        f"阶段：{phase or '未命名阶段'}",
+                        "",
+                        task_text.strip(),
+                    ]),
+                },
+            ]]
+        }
+    }
+    command = [
+        str(LARK_CLI),
+        "im",
+        "+messages-send",
+        "--chat-id",
+        default_chat_id(),
+        "--content",
+        json.dumps(content, ensure_ascii=True),
+        "--msg-type",
+        "post",
+        "--as",
+        "user",
+        "--format",
+        "json",
+    ]
+    if dry_run:
+        command.append("--dry-run")
+    result = subprocess.run(
+        command,
+        cwd=REPO_ROOT,
+        env=lark_env(),
+        text=True,
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=60,
+    )
+    return {
+        "ok": result.returncode == 0,
+        "returncode": result.returncode,
+        "stdout_preview": (result.stdout or "")[:500],
+        "stderr_preview": (result.stderr or "")[:500],
+    }
 
 
 def terminate_pid(pid: int) -> dict:
@@ -143,6 +212,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--delay-minutes", type=float, default=None)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--keep-existing", action="store_true", help="Do not cancel earlier watchdogs for the same task.")
+    parser.add_argument("--no-dispatch", action="store_true", help="Only launch the watchdog; do not send the assignee mention dispatch.")
     args = parser.parse_args(argv)
 
     exe = EXE if EXE.exists() else LEGACY_EXE
@@ -173,6 +243,28 @@ def main(argv: list[str] | None = None) -> int:
     log_path = LOG_DIR / f"{safe_task}_{args.assignee}_{stamp}_watchdog.log"
     state_path = WATCHDOG_DIR / f"{safe_task}_{safe_assignee}_{stamp}.json"
     command.extend(["--state-file", str(state_path)])
+    dispatch_result = {"ok": True, "skipped": True, "reason": "no_dispatch"}
+    if not args.no_dispatch:
+        dispatch_result = send_dispatch_message(args.task_id, args.assignee, args.phase, args.task_text, args.dry_run)
+        if not dispatch_result.get("ok"):
+            state = {
+                "task_id": args.task_id,
+                "assignee": args.assignee,
+                "phase": args.phase,
+                "status": "dispatch_failed",
+                "dispatch_result": dispatch_result,
+                "started_at": dt.datetime.now().isoformat(timespec="seconds"),
+            }
+            write_json(state_path, state)
+            print(json.dumps({
+                "ok": False,
+                "task_id": args.task_id,
+                "assignee": args.assignee,
+                "phase": args.phase,
+                "state": str(state_path),
+                "dispatch_result": dispatch_result,
+            }, ensure_ascii=False))
+            return 2
     cancelled = [] if args.keep_existing else cancel_existing(args.task_id)
     log = log_path.open("a", encoding="utf-8")
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
@@ -188,6 +280,7 @@ def main(argv: list[str] | None = None) -> int:
         "launcher": "exe" if exe.exists() else "python",
         "started_at": dt.datetime.now().isoformat(timespec="seconds"),
         "cancelled_previous": cancelled,
+        "dispatch_result": dispatch_result,
     }
     write_json(state_path, state)
     print(json.dumps({
@@ -200,6 +293,7 @@ def main(argv: list[str] | None = None) -> int:
         "state": str(state_path),
         "launcher": "exe" if exe.exists() else "python",
         "cancelled_previous": cancelled,
+        "dispatch_sent": bool(dispatch_result.get("ok") and not dispatch_result.get("skipped")),
     }, ensure_ascii=False))
     return 0
 
