@@ -21,7 +21,7 @@ const statusBorder: Record<SkillStatus, string> = {
   error: 'var(--accent-red)',
   warning: 'var(--accent-gold)',
   available: 'var(--accent-blue)',
-  locked: '#b8a88a',
+  locked: '#1f1f1f',
 };
 
 export function SkillNode({ skill, selected, onClick }: {
@@ -50,20 +50,20 @@ export function SkillNode({ skill, selected, onClick }: {
         gap: 8,
         padding: '6px 10px',
         borderRadius: 10,
-        background: isLocked ? 'rgba(200,190,170,0.5)' : 'rgba(255, 247, 232, 0.96)',
+        background: isLocked ? 'rgba(31,31,31,0.88)' : 'rgba(255, 247, 232, 0.96)',
         border: selected ? `2px solid ${borderColor}` : `1px solid ${borderColor}`,
         boxShadow: selected
           ? `0 0 0 3px rgba(24,166,166,0.15), 0 2px 0 rgba(112,76,33,0.18)`
           : `0 2px 0 rgba(112,76,33,0.18)`,
         cursor: isLocked ? 'not-allowed' : 'pointer',
-        opacity: isLocked ? 0.5 : 1,
+        opacity: 1,
         zIndex: selected ? 10 : 1,
       }}
     >
       <span
         className={`skill-node-shape ${shape}`}
         style={{
-          background: isLocked ? '#b8a88a' : categoryColor,
+          background: isLocked ? '#050505' : categoryColor,
           width: 24, height: 24,
           display: 'grid', placeItems: 'center',
           color: '#fff', fontSize: 12,
@@ -73,11 +73,11 @@ export function SkillNode({ skill, selected, onClick }: {
         {iconMap[skill.category]}
       </span>
       <div className="min-w-0">
-        <div className="truncate text-xs font-medium" style={{color: isLocked ? 'var(--text-muted)' : 'var(--text-main)'}}>
+        <div className="truncate text-xs font-medium" style={{color: isLocked ? '#f6ead2' : 'var(--text-main)'}}>
           {skill.name}
         </div>
-        <div className="text-[10px]" style={{color:'var(--text-muted)'}}>
-          Lv.{skill.level} · {(skill.metrics.successRate * 100).toFixed(0)}%
+        <div className="text-[10px]" style={{color: isLocked ? '#caa875' : 'var(--text-muted)'}}>
+          {skill.tree === 'common' ? '通用' : '职业'} · {isLocked ? '规划中' : `Lv.${skill.level}`}
         </div>
       </div>
     </div>

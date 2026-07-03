@@ -66,7 +66,7 @@ export function AgentCard({ agent, selected, onSelect }: {
           <span className={`status-dot ${cfg.dotClass}`} />
           {cfg.label}
         </span>
-        <span>{agent.enabledSkills}/{agent.totalSkills} 技能</span>
+        <span>{agent.enabledSkills}/{agent.totalSkills} 点亮</span>
         <span>{agent.boundSessions} 绑定</span>
       </div>
 

@@ -7,6 +7,11 @@ const categoryLabels: Record<string, string> = {
   permission: '权限', advanced: '高阶', quality: '质量',
 };
 
+const treeLabels: Record<string, string> = {
+  common: '通用技能树',
+  profession: '职业技能树',
+};
+
 const statusLabels: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   enabled: { label: '已启用', color: 'var(--accent-green)', icon: <CheckCircle size={14} /> },
   disabled: { label: '已禁用', color: 'var(--accent-orange)', icon: <Ban size={14} /> },
@@ -40,7 +45,7 @@ export function SkillConfigInspector({ skill, onClose }: {
           </span>
           <div>
             <div className="text-sm font-semibold" style={{color:'var(--text-main)'}}>{skill.name}</div>
-            <div className="text-xs" style={{color:'var(--text-muted)'}}>{categoryLabels[skill.category] ?? skill.category}</div>
+            <div className="text-xs" style={{color:'var(--text-muted)'}}>{treeLabels[skill.tree]} · {categoryLabels[skill.category] ?? skill.category}</div>
           </div>
         </div>
         <button onClick={onClose} className="rounded p-1 hover:bg-black/5" style={{color:'var(--text-muted)'}}>
@@ -57,7 +62,7 @@ export function SkillConfigInspector({ skill, onClose }: {
         }}
       >
         {st.icon}
-        <span>{st.label} · Lv.{skill.level}</span>
+        <span>{st.label} · {skill.status === 'locked' ? '未来规划' : `Lv.${skill.level}`}</span>
       </div>
 
       {/* Description */}
@@ -121,9 +126,9 @@ export function SkillConfigInspector({ skill, onClose }: {
       <div className="mt-3">
         <div className="text-xs font-medium" style={{color:'var(--text-secondary)'}}>运行指标</div>
         <div className="mt-1 grid grid-cols-2 gap-2">
-          <MetricItem label="成功率" value={`${(skill.metrics.successRate * 100).toFixed(0)}%`} color={skill.metrics.successRate > 0.9 ? 'var(--accent-green)' : 'var(--accent-orange)'} />
-          <MetricItem label="平均延迟" value={`${skill.metrics.avgLatencyMs}ms`} color="var(--accent-blue)" />
-          <MetricItem label="调用次数" value={String(skill.metrics.usageCount)} color="var(--text-secondary)" />
+          <MetricItem label="成功率" value={skill.status === 'locked' ? '--' : `${(skill.metrics.successRate * 100).toFixed(0)}%`} color={skill.metrics.successRate > 0.9 ? 'var(--accent-green)' : 'var(--accent-orange)'} />
+          <MetricItem label="平均延迟" value={skill.status === 'locked' ? '--' : `${skill.metrics.avgLatencyMs}ms`} color="var(--accent-blue)" />
+          <MetricItem label="调用次数" value={skill.status === 'locked' ? '--' : String(skill.metrics.usageCount)} color="var(--text-secondary)" />
           {skill.metrics.lastError && (
             <div className="col-span-2 rounded px-2 py-1 text-[10px]"
               style={{ background: '#fff1eb', border: '1px solid #f5c6b8', color: 'var(--accent-red)' }}
@@ -135,7 +140,7 @@ export function SkillConfigInspector({ skill, onClose }: {
       </div>
 
       <div className="mt-4 rounded-md border px-3 py-2 text-xs" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-panel-soft)', color: 'var(--text-secondary)' }}>
-        技能树 v1 为只读视图；真实配置修改请从 Agent 详情抽屉的“可编辑配置”页签进入。
+        {skill.status === 'locked' ? '黑色节点代表未来规划能力：当前没有真实后端、配置源或测试入口，暂不允许操作。' : '技能树 v1 为只读视图；真实配置修改请从 Agent 详情抽屉的“可编辑配置”页签进入。'}
       </div>
     </div>
   );

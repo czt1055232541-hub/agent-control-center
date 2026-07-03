@@ -8,6 +8,11 @@ const categoryLabels: Record<string, string> = {
   permission: '权限', advanced: '高阶', quality: '质量',
 };
 
+const treeLabels: Record<string, string> = {
+  common: '通用技能树',
+  profession: '职业技能树',
+};
+
 function buildEdges(skills: AgentSkill[]) {
   const edges: { from: AgentSkill; to: AgentSkill }[] = [];
   const map = new Map(skills.map(s => [s.id, s]));
@@ -84,7 +89,7 @@ export function SkillTreeCanvas({ agent, selectedSkill, onSelectSkill }: {
             let strokeColor = 'var(--accent-teal)';
             let strokeDash = '';
             if (isError) { strokeColor = 'var(--accent-red)'; strokeDash = '6,3'; }
-            else if (isMissing) { strokeColor = '#b8a88a'; strokeDash = '4,3'; }
+            else if (isMissing) { strokeColor = '#1f1f1f'; strokeDash = '4,3'; }
             else if (!fromDepEnabled) { strokeColor = 'var(--accent-orange)'; strokeDash = '4,3'; }
 
             return (
@@ -102,6 +107,14 @@ export function SkillTreeCanvas({ agent, selectedSkill, onSelectSkill }: {
             );
           })}
         </svg>
+
+        <div className="absolute left-3 top-3 rounded-md px-3 py-2 text-xs font-semibold" style={{ background: 'rgba(255,247,232,0.9)', border: '1px solid var(--border-light)', color: 'var(--text-main)' }}>
+          通用技能树
+        </div>
+        <div className="absolute right-3 top-3 rounded-md px-3 py-2 text-xs font-semibold" style={{ background: 'rgba(255,247,232,0.9)', border: '1px solid var(--border-light)', color: 'var(--text-main)' }}>
+          职业技能树
+        </div>
+        <div className="absolute bottom-3 left-1/2 top-12 w-px -translate-x-1/2" style={{ background: 'linear-gradient(180deg, transparent, var(--border-stone), transparent)' }} />
 
         {/* Skill nodes */}
         {skills.map(skill => (
@@ -124,6 +137,18 @@ export function SkillTreeCanvas({ agent, selectedSkill, onSelectSkill }: {
               <span style={{color:'var(--text-muted)'}}>{label}</span>
             </div>
           ))}
+          <div className="mt-1 border-t pt-1" style={{ borderColor: 'var(--border-light)' }}>
+            {Object.entries(treeLabels).map(([key, label]) => (
+              <div key={key} className="flex items-center gap-1.5 py-0.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: key === 'common' ? 'var(--accent-blue)' : 'var(--accent-purple)' }} />
+                <span style={{color:'var(--text-muted)'}}>{label}</span>
+              </div>
+            ))}
+            <div className="flex items-center gap-1.5 py-0.5">
+              <span className="inline-block h-2.5 w-2.5 rounded" style={{ background: '#1f1f1f' }} />
+              <span style={{color:'var(--text-muted)'}}>黑色：未来规划</span>
+            </div>
+          </div>
         </div>
       </div>
 

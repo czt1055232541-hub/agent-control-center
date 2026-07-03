@@ -234,6 +234,7 @@ export interface AgentSkill {
   id: string;
   name: string;
   category: SkillCategory;
+  tree: 'common' | 'profession';
   level: number;
   status: SkillStatus;
   description: string;

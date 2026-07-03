@@ -2,6 +2,14 @@ import React from "react";
 import { readJson } from "../api";
 import type { AgentConfig, DashboardSummary, ExplainedDiagnosticItem } from "../types";
 
+async function readOptional<T>(path: string): Promise<T | null> {
+  try {
+    return await readJson<T>(path);
+  } catch {
+    return null;
+  }
+}
+
 export function useCommandDashboard() {
   const [summary, setSummary] = React.useState<DashboardSummary | null>(null);
   const [agents, setAgents] = React.useState<AgentConfig[]>([]);
@@ -10,13 +18,13 @@ export function useCommandDashboard() {
 
   const refreshDashboard = React.useCallback(async () => {
     const [nextSummary, nextAgents, nextInfrastructure] = await Promise.all([
-      readJson<DashboardSummary>("/api/dashboard/summary"),
-      readJson<{ agents: AgentConfig[] }>("/api/agents"),
-      readJson<{ agents: AgentConfig[] }>("/api/infrastructure"),
+      readOptional<DashboardSummary>("/api/dashboard/summary"),
+      readOptional<{ agents: AgentConfig[] }>("/api/agents"),
+      readOptional<{ agents: AgentConfig[] }>("/api/infrastructure"),
     ]);
-    setSummary(nextSummary);
-    setAgents(nextAgents.agents);
-    setInfrastructure(nextInfrastructure.agents);
+    if (nextSummary) setSummary(nextSummary);
+    if (nextAgents) setAgents(nextAgents.agents);
+    if (nextInfrastructure) setInfrastructure(nextInfrastructure.agents);
   }, []);
 
   const refreshExplainedDiagnostics = React.useCallback(async () => {
