@@ -635,6 +635,128 @@ test("known A2A bot sender can receive a rich text mention reply", async () => {
   );
 });
 
+test("A2A task replies without explicit mention are sent back to coordinator as post mentions", async () => {
+  const sent: Array<{ chatId: string; content?: unknown; text?: string }> = [];
+  const scriptPath = path.join(os.tmpdir(), `feishu-codex-agent-a2a-mention-fallback-${Date.now()}.js`);
+  fs.writeFileSync(
+    scriptPath,
+    [
+      "const fs = require('node:fs');",
+      "const index = process.argv.indexOf('--output-last-message');",
+      "const output = index >= 0 ? process.argv[index + 1] : '';",
+      "if (output) fs.writeFileSync(output, '验证完成，以下是完整报告：\\n任务ID：TASK-1');"
+    ].join("\n"),
+    "utf8"
+  );
+  const config = {
+    ...getConfig(),
+    dryRun: false,
+    agentProvider: "codex" as const,
+    codexCliBin: process.execPath,
+    codexAgentArgs: [scriptPath],
+    botOpenId: "ou_ops",
+    a2aBots: [
+      { name: "项目调度官", openId: "ou_coord" },
+      { name: "运维验证官", openId: "ou_ops" }
+    ],
+    a2aRelay: { enabled: false }
+  };
+  const fakeLark = {
+    setTypingStatus: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    sendText: async (chatId: string, text: string) => {
+      sent.push({ chatId, text });
+      return { ok: true, code: 0, stdout: "", stderr: "" };
+    },
+    sendPost: async (chatId: string, content: unknown) => {
+      sent.push({ chatId, content });
+      return { ok: true, code: 0, stdout: "", stderr: "" };
+    },
+    run: async () => ({ ok: true, code: 0, stdout: "", stderr: "" })
+  } as unknown as LarkCli;
+  const handler = new MessageHandler(config, fakeLark);
+  await handler.handleEvent({
+    chatId: "oc_group",
+    messageId: "om_ops",
+    sender: { openId: "ou_coord", senderType: "bot" },
+    content: "",
+    plainText: "@运维验证官 TASK-1 阶段：运维验证 验证脚本可运行",
+    messageType: "text",
+    createTime: "1710000000000",
+    chatType: "group",
+    mentions: ["运维验证官"],
+    raw: {}
+  });
+  fs.rmSync(scriptPath, { force: true });
+
+  const final = sent[sent.length - 1];
+  assert.equal(final.text, undefined);
+  assert.deepEqual(
+    (final.content as { zh_cn: { content: Array<Array<{ tag: string; user_id?: string }>> } }).zh_cn.content[0][0],
+    { tag: "at", user_id: "ou_coord", user_name: "项目调度官" }
+  );
+});
+
+test("handler converts only the first A2A mention in a final reply", async () => {
+  const sent: Array<{ chatId: string; content?: unknown; text?: string }> = [];
+  const scriptPath = path.join(os.tmpdir(), `feishu-codex-agent-single-mention-${Date.now()}.js`);
+  fs.writeFileSync(
+    scriptPath,
+    [
+      "const fs = require('node:fs');",
+      "const index = process.argv.indexOf('--output-last-message');",
+      "const output = index >= 0 ? process.argv[index + 1] : '';",
+      "if (output) fs.writeFileSync(output, '@项目调度官 已完成。建议下一步通知 @质量审计官。');"
+    ].join("\n"),
+    "utf8"
+  );
+  const config = {
+    ...getConfig(),
+    dryRun: false,
+    agentProvider: "codex" as const,
+    codexCliBin: process.execPath,
+    codexAgentArgs: [scriptPath],
+    botOpenId: "ou_ops",
+    a2aBots: [
+      { name: "项目调度官", openId: "ou_coord" },
+      { name: "质量审计官", openId: "ou_audit" },
+      { name: "运维验证官", openId: "ou_ops" }
+    ],
+    a2aRelay: { enabled: false }
+  };
+  const fakeLark = {
+    setTypingStatus: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    sendText: async (chatId: string, text: string) => {
+      sent.push({ chatId, text });
+      return { ok: true, code: 0, stdout: "", stderr: "" };
+    },
+    sendPost: async (chatId: string, content: unknown) => {
+      sent.push({ chatId, content });
+      return { ok: true, code: 0, stdout: "", stderr: "" };
+    },
+    run: async () => ({ ok: true, code: 0, stdout: "", stderr: "" })
+  } as unknown as LarkCli;
+  const handler = new MessageHandler(config, fakeLark);
+  await handler.handleEvent({
+    chatId: "oc_group",
+    messageId: "om_ops_two_mentions",
+    sender: { openId: "ou_coord", senderType: "bot" },
+    content: "",
+    plainText: "@运维验证官 TASK-1 阶段：运维验证 验证脚本可运行",
+    messageType: "text",
+    createTime: "1710000000000",
+    chatType: "group",
+    mentions: ["运维验证官"],
+    raw: {}
+  });
+  fs.rmSync(scriptPath, { force: true });
+
+  const content = sent[sent.length - 1].content as { zh_cn: { content: Array<Array<{ tag: string; user_id?: string; text?: string }>> } };
+  const elements = content.zh_cn.content[0];
+  assert.equal(elements.filter((item) => item.tag === "at").length, 1);
+  assert.deepEqual(elements[0], { tag: "at", user_id: "ou_coord", user_name: "项目调度官" });
+  assert.ok(elements.some((item) => item.text?.includes("＠质量审计官")));
+});
+
 test("A2A result handoff does not trigger a second bot mention", async () => {
   const sent: Array<{ chatId: string; content?: unknown; text?: string }> = [];
   const config = {

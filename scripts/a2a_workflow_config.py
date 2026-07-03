@@ -117,6 +117,8 @@ def collaboration_block() -> str:
             "- 仓库和 OpenClaw prompt 不保存真实 open_id；需要修改角色映射时只改上述本地配置，然后运行 `python scripts/sync_a2a_workflow_files.py`。",
             "- 飞书群内向指定对象交接或提醒时，正文必须写规范角色名：" + mention_names_text() + "。",
             "- 每次交接最多 @ 一个 agent；不要一次 @ 多人，不要绕过项目调度官。",
+            "- 派发或催促下游 agent 时，只能真实 @ 当前 assignee；如需说明回报对象，写“完成后回报项目调度官”，不要在同一条派发消息里再写 `@项目调度官`。",
+            "- 下游 agent 完成任务、验证、审计或归档时，最终报告第一行必须以 `@项目调度官` 开头；不要只在“建议下一步”里写项目调度官。",
             "- 真实发送必须由 Feishu sender 转成 `msg_type=post` 富文本 `at` 标签；不得把 `<at user_id=\"...\">名称</at>` 当作交接格式。",
             "- 如果 Feishu 已发送消息的 `mentions` 为空，该次交接视为失败，必须修复映射/发送层后补发。",
             "- 项目调度官每次派发必须调用 `python scripts/start_scheduler_watchdog.py --task-id ... --assignee ... --phase ... --task-text ...`；该入口会先发送富文本 @assignee 派发消息，再启动 watchdog。不要手写“Watchdog 已就绪”来替代派发。",

@@ -146,7 +146,7 @@ export class MessageHandler {
         infoLog(`suppressed stale reply chat_id=${chatId} generation=${generation}`);
         return response;
       }
-      const sendResult = await this.sendResponse(chatId, response);
+      const sendResult = await this.sendResponse(chatId, response, route);
       if (!sendResult.ok) {
         console.error(`[agent] failed to reply chat_id=${chatId} code=${sendResult.code} stderr=${preview(sendResult.stderr || sendResult.stdout, 1000)}`);
       } else {
@@ -228,8 +228,9 @@ export class MessageHandler {
     };
   }
 
-  private async sendResponse(chatId: string, response: string): Promise<CliResult> {
-    const chunks = splitResponseForFeishu(response, this.config.a2aBots);
+  private async sendResponse(chatId: string, response: string, route: RouteResult): Promise<CliResult> {
+    const outbound = ensureCoordinatorMentionForA2AReply(response, route, this.config.a2aBots);
+    const chunks = splitResponseForFeishu(outbound, this.config.a2aBots);
     let lastResult: CliResult = { ok: true, code: 0, stdout: "", stderr: "" };
     for (let index = 0; index < chunks.length; index += 1) {
       const isLast = index === chunks.length - 1;
@@ -260,9 +261,11 @@ export class MessageHandler {
         elements.push({ tag: "text", text: value.slice(cursor, index) });
       }
       const bot = resolveMentionBot(matchText, this.config.a2aBots);
-      if (bot) {
+      if (bot && !hasMention) {
         elements.push({ tag: "at", user_id: bot.openId, user_name: bot.name });
         hasMention = true;
+      } else if (bot) {
+        elements.push({ tag: "text", text: neutralizedMentionText(matchText, bot) });
       } else {
         elements.push({ tag: "text", text: matchText });
       }
@@ -290,6 +293,28 @@ function resolveMentionBot(matchText: string, bots: Array<{ name: string; openId
     return bots.find((item) => item.openId === tagMatch[1]);
   }
   return bots.find((item) => matchText === `@${item.name}`);
+}
+
+function neutralizedMentionText(matchText: string, bot: { name: string; openId: string }): string {
+  if (matchText.startsWith("@")) {
+    return `＠${bot.name}`;
+  }
+  return bot.name;
+}
+
+function ensureCoordinatorMentionForA2AReply(value: string, route: RouteResult, bots: Array<{ name: string; openId: string }>): string {
+  if (route.context?.isPrivate || !route.context?.senderIsA2ABot || bots.length === 0) {
+    return value;
+  }
+  const mentionPattern = buildMentionPattern(bots);
+  if (mentionPattern.test(value)) {
+    return value;
+  }
+  const coordinator = bots.find((bot) => bot.name === "项目调度官");
+  if (!coordinator) {
+    return value;
+  }
+  return `@${coordinator.name} ${value}`;
 }
 
 function escapeRegExp(value: string): string {
