@@ -175,6 +175,68 @@ def test_dashboard_summary_counts_real_agents_only(tmp_path: Path, monkeypatch) 
     assert summary.onlineAgents == 5
 
 
+def test_codex_agent_draft_log_marks_agent_executing(tmp_path: Path) -> None:
+    cfg = _config(tmp_path)
+    logs = cfg.runtime_dir / "logs"
+    logs.mkdir(parents=True)
+    (logs / "codex-agent-err.log").write_text(
+        '\n'.join(
+            [
+                '[agent] event message_id=om_secret chat_id=oc_secret respond=true text="执行 Step 1.2 MODE 连通性验证"',
+                "[agent] draft provider=codex",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    code_agent = next(agent for agent in list_agents(cfg, _status()) if agent.id == "codex-code-agent")
+
+    assert code_agent.status == "executing"
+    assert "MODE 连通性验证" in code_agent.currentTask
+
+
+def test_codex_agent_completed_log_marks_agent_idle(tmp_path: Path) -> None:
+    cfg = _config(tmp_path)
+    logs = cfg.runtime_dir / "logs"
+    logs.mkdir(parents=True)
+    (logs / "codex-agent-err.log").write_text(
+        '\n'.join(
+            [
+                '[agent] event message_id=om_secret chat_id=oc_secret respond=true text="执行 Step 1.2"',
+                "[agent] draft provider=codex",
+                "[agent] draft provider=codex completed",
+                "[agent] replied chat_id=oc_secret",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    code_agent = next(agent for agent in list_agents(cfg, _status()) if agent.id == "codex-code-agent")
+
+    assert code_agent.status == "running"
+    assert code_agent.currentTask == "--"
+
+
+def test_openclaw_dispatch_log_marks_role_executing(tmp_path: Path) -> None:
+    cfg = _config(tmp_path)
+    logs = cfg.runtime_dir / "logs"
+    logs.mkdir(parents=True)
+    (logs / "openclaw-gateway-out.log").write_text(
+        "\n".join(
+            [
+                "2026-07-01 [feishu] feishu[coordinator]: Feishu[coordinator] message in group oc_secret: 继续拆解 Phase 1",
+                "2026-07-01 [feishu] feishu[coordinator]: dispatching to agent (session=agent:coordinator:feishu:group:oc_secret)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    coordinator = next(agent for agent in list_agents(cfg, _status()) if agent.id == "openclaw-coordinator")
+
+    assert coordinator.status == "executing"
+    assert "Phase 1" in coordinator.currentTask
+
+
 def test_infrastructure_stays_separate_from_real_agents(tmp_path: Path) -> None:
     infra = list_infrastructure(_config(tmp_path), _status())
 

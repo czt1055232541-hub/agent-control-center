@@ -42,7 +42,7 @@ def _ensure_feishu_send_patch(cfg: StackConfig) -> None:
     if not send_file.exists():
         return
     text = send_file.read_text(encoding="utf-8")
-    if "function resolveA2AMentionTargets()" in text:
+    if "function resolveA2AMentionTargets()" in text and "function shouldAutoMentionCoordinator(" in text:
         return
     needle = """function buildFeishuPostMessagePayload(params) {
 \tconst { messageText } = params;
@@ -95,6 +95,11 @@ function resolveA2AMentionTargets() {
 function buildA2APostElements(messageText) {
 \tconst targets = resolveA2AMentionTargets();
 \tif (targets.length === 0) return null;
+\tlet text = messageText;
+\tif (!hasA2AMentionSyntax(text, targets) && shouldAutoMentionCoordinator(text)) {
+\t\tconst coordinator = targets.find((target) => target.name === "项目调度官");
+\t\tif (coordinator) text = `@${coordinator.name} ${text}`;
+\t}
 \tconst aliases = [];
 \tfor (const target of targets) for (const alias of target.aliases) aliases.push({
 \t\talias,
@@ -104,34 +109,52 @@ function buildA2APostElements(messageText) {
 \tconst elements = [];
 \tlet cursor = 0;
 \tlet matched = false;
-\twhile (cursor < messageText.length) {
+\twhile (cursor < text.length) {
 \t\tlet hit;
 \t\tfor (const candidate of aliases) {
-\t\t\tconst prefix = messageText[cursor];
+\t\t\tconst prefix = text[cursor];
 \t\t\tif (prefix !== "@" && prefix !== "＠") continue;
 \t\t\tconst start = cursor + 1;
-\t\t\tconst slice = messageText.slice(start, start + candidate.alias.length);
+\t\t\tconst slice = text.slice(start, start + candidate.alias.length);
 \t\t\tif (slice.toLowerCase() === candidate.alias.toLowerCase()) {
 \t\t\t\thit = candidate;
 \t\t\t\tbreak;
 \t\t\t}
 \t\t}
 \t\tif (!hit) {
-\t\t\tconst nextAt = findNextAt(messageText, cursor + 1);
-\t\t\tconst end = nextAt === -1 ? messageText.length : nextAt;
-\t\t\telements.push({ tag: "text", text: messageText.slice(cursor, end) });
+\t\t\tconst nextAt = findNextAt(text, cursor + 1);
+\t\t\tconst end = nextAt === -1 ? text.length : nextAt;
+\t\t\telements.push({ tag: "text", text: text.slice(cursor, end) });
 \t\t\tcursor = end;
 \t\t\tcontinue;
 \t\t}
-\t\telements.push({
-\t\t\ttag: "at",
-\t\t\tuser_id: hit.target.openId,
-\t\t\tuser_name: hit.target.name
-\t\t});
+\t\tif (!matched) {
+\t\t\telements.push({
+\t\t\t\ttag: "at",
+\t\t\t\tuser_id: hit.target.openId,
+\t\t\t\tuser_name: hit.target.name
+\t\t\t});
+\t\t} else {
+\t\t\telements.push({ tag: "text", text: `＠${hit.target.name}` });
+\t\t}
 \t\tcursor += 1 + hit.alias.length;
 \t\tmatched = true;
 \t}
 \treturn matched ? elements.filter((element) => element.tag !== "text" || element.text) : null;
+}
+function hasA2AMentionSyntax(value, targets) {
+\tconst lower = value.toLowerCase();
+\tfor (const target of targets) {
+\t\tfor (const alias of target.aliases) {
+\t\t\tconst normalized = alias.toLowerCase();
+\t\t\tif (lower.includes(`@${normalized}`) || lower.includes(`＠${normalized}`)) return true;
+\t\t}
+\t}
+\treturn false;
+}
+function shouldAutoMentionCoordinator(value) {
+\tif (/派发完成|watchdog\\s*倒计时|看护倒计时|轻推一下|催促/i.test(value)) return false;
+\treturn /审计报告|验证完成|归档完成|任务完成|审计结论|验证结论|不通过|通过/.test(value);
 }
 function findNextAt(value, start) {
 \tconst normal = value.indexOf("@", start);
@@ -231,13 +254,7 @@ def open_ui(config: StackConfig | None = None) -> OperationResult:
     cfg = config or load_config()
     started = time.monotonic()
     url = ui_url(cfg)
-    from .process import CREATE_NO_WINDOW
-
-    subprocess.Popen(
-        ["cmd.exe", "/d", "/c", "start", "", url],
-        cwd=str(cfg.openclaw_home),
-        creationflags=CREATE_NO_WINDOW,
-    )
+    os.startfile(url)
     return OperationResult(
         ok=True,
         component="openclaw",

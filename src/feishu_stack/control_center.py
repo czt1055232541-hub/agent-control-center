@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -107,9 +108,9 @@ def install_shortcut(config: StackConfig | None = None) -> OperationResult:
     started = time.monotonic()
     desktop = Path.home() / "Desktop"
     cmd_path = desktop / "Agent Control Center.cmd"
-    script = cfg.stack_root / "scripts" / "start-control-center.ps1"
+    script = cfg.stack_root / "scripts" / "stack.py"
     cmd_path.write_text(
-        f'@echo off\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "{script}"\r\n',
+        f'@echo off\r\n"{sys.executable}" -X utf8 "{script}" serve-control-center --open\r\n',
         encoding="ascii",
     )
     return OperationResult(True, "control-center", "install-shortcut", f"Created shortcut command: {cmd_path}", duration_ms=int((time.monotonic() - started) * 1000))

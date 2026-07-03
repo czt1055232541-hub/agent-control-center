@@ -1,26 +1,42 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 from .config import StackConfig, load_config
 from .logs import tail
 from .models import LogTail, OperationResult
-from .process import CREATE_NO_WINDOW, run_capture
+from .process import CREATE_NO_WINDOW
 from .status import codex_desktop_status, is_codex_desktop_running
 
 
+def _install_location_from_registry() -> str | None:
+    try:
+        import winreg
+    except ImportError:
+        return None
+    roots = [
+        (winreg.HKEY_CURRENT_USER, r"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages"),
+        (winreg.HKEY_LOCAL_MACHINE, r"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages"),
+    ]
+    for hive, key_name in roots:
+        try:
+            with winreg.OpenKey(hive, key_name) as key:
+                for index in range(winreg.QueryInfoKey(key)[0]):
+                    package_name = winreg.EnumKey(key, index)
+                    if not package_name.startswith("OpenAI.Codex"):
+                        continue
+                    with winreg.OpenKey(key, package_name) as package_key:
+                        value, _ = winreg.QueryValueEx(package_key, "Path")
+                        if value:
+                            return str(value)
+        except OSError:
+            continue
+    return None
+
+
 def _install_location() -> str | None:
-    completed = run_capture(
-        [
-            "powershell.exe",
-            "-NoProfile",
-            "-Command",
-            "(Get-AppxPackage OpenAI.Codex | Select-Object -First 1 -ExpandProperty InstallLocation)",
-        ],
-        timeout=30,
-    )
-    text = completed.stdout.strip()
-    return text or None
+    return _install_location_from_registry()
 
 
 def _executable_path() -> str | None:
@@ -29,8 +45,6 @@ def _executable_path() -> str | None:
         return status.executable
     install = _install_location()
     if install:
-        from pathlib import Path
-
         candidate = Path(install) / "app" / "Codex.exe"
         if candidate.exists():
             return str(candidate)

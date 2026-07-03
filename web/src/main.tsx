@@ -1,8 +1,16 @@
-﻿import React from "react";
+import React from "react";
 import ReactDOM from "react-dom/client";
-import { AlertTriangle, FileText, PauseCircle, Play, RefreshCcw, ShieldCheck, Wrench } from "lucide-react";
+import { AlertTriangle, ChevronRight, FileText, PauseCircle, Play, RefreshCcw, ShieldCheck, Wrench } from "lucide-react";
 import "./styles.css";
 import { logOptions } from "./types";
+import type { AgentProfile, AgentSkill } from "./types";
+import { TopStatusBar } from "./components/adventure/TopStatusBar";
+import { AgentCard as AdventureAgentCard } from "./components/adventure/AgentCard";
+import { AgentDetailPanel } from "./components/adventure/AgentDetailPanel";
+import { SkillTreeCanvas } from "./components/adventure/SkillTreeCanvas";
+import { RecentRunsTable } from "./components/adventure/RecentRunsTable";
+import { TaskTraceMap } from "./components/adventure/TaskTraceMap";
+import { recentRunsFromOperations, taskTraceFromAgents, toAgentProfiles } from "./components/adventure/viewModels";
 import { ActionButton } from "./components/ActionButton";
 import { StatusPill } from "./components/StatusPill";
 import { DiagnosticCard } from "./components/DiagnosticCard";
@@ -262,6 +270,9 @@ function App() {
   const { summary, agents, infrastructure, explainedDiagnostics, refreshDashboard } = useCommandDashboard();
   const [selectedAgent, setSelectedAgent] = React.useState<AgentConfig | null>(null);
   const [activePage, setActivePage] = React.useState<CommandPage>("dashboard");
+  const [adventureSelectedAgent, setAdventureSelectedAgent] = React.useState<AgentProfile | null>(null);
+  const [selectedSkill, setSelectedSkill] = React.useState<AgentSkill | null>(null);
+  const [activeDetailTab, setActiveDetailTab] = React.useState<string>("概览");
 
   const wrappedSwitchModel = React.useCallback(
     (model: string) => mig.switchModel(model, setError, setResult),
@@ -278,6 +289,22 @@ function App() {
     (path: string) => run(path, refreshDashboard),
     [run, refreshDashboard],
   );
+  const adventureAgents = React.useMemo(() => toAgentProfiles(agents), [agents]);
+  const recentRuns = React.useMemo(() => recentRunsFromOperations(operations), [operations]);
+  const currentTrace = React.useMemo(() => taskTraceFromAgents(agents), [agents]);
+
+  React.useEffect(() => {
+    if (!adventureAgents.length) {
+      setAdventureSelectedAgent(null);
+      setSelectedSkill(null);
+      return;
+    }
+    setAdventureSelectedAgent((current) => {
+      const next = adventureAgents.find((agent) => agent.id === current?.id) ?? adventureAgents[0];
+      if (selectedSkill && !next.skills.some((skill) => skill.id === selectedSkill.id)) setSelectedSkill(null);
+      return next;
+    });
+  }, [adventureAgents]);
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
@@ -321,26 +348,80 @@ function App() {
           ) : null}
 
           {activePage === "agents" ? (
-            <section>
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold text-slate-950">Agent 管理</h2>
-                  <p className="mt-1 text-sm text-slate-600">只展示本机真实 5 个角色；OpenClaw 子 Agent 不显示独立进程控制。</p>
+            <div className="flex flex-col gap-4">
+              <TopStatusBar
+                totalAgents={adventureAgents.length}
+                onlineAgents={adventureAgents.filter(a => a.status === "online" || a.status === "running").length}
+                runningAgents={adventureAgents.filter(a => a.status === "running").length}
+                taskQueue={adventureAgents.filter(a => a.status === "running").length}
+                dailyTokens={0}
+                tokenBudget={0}
+                tokensPercent={0}
+              />
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <h2 className="text-base font-semibold" style={{color:'var(--text-main)'}}>Agent 阵容</h2>
+                  <span className="rounded px-2 py-0.5 text-xs" style={{background:'var(--bg-panel-soft)',color:'var(--text-muted)',border:'1px solid var(--border-light)'}}>
+                    {adventureAgents.length} 个真实角色
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {adventureAgents.map((agent) => (
+                    <AdventureAgentCard
+                      key={agent.id}
+                      agent={agent}
+                      selected={adventureSelectedAgent?.id === agent.id}
+                      onSelect={(a) => {
+                        setAdventureSelectedAgent(a);
+                        setSelectedSkill(null);
+                      }}
+                    />
+                  ))}
                 </div>
               </div>
-              <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-                {agents.map((agent) => (
-                  <AgentCard
-                    key={agent.id}
-                    agent={agent}
-                    busy={busy}
-                    onRun={runAndRefresh}
-                    onLogs={(component) => loadLogs(component)}
-                    onSelect={setSelectedAgent}
-                  />
-                ))}
+              <AgentDetailPanel
+                agent={adventureSelectedAgent}
+                activeTab={activeDetailTab as any}
+                onTabChange={(tab) => setActiveDetailTab(tab)}
+              />
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold" style={{color:'var(--text-main)'}}>技能树工坊</h3>
+                  <ChevronRight size={14} style={{color:'var(--text-muted)'}} />
+                </div>
+                <SkillTreeCanvas
+                  agent={adventureSelectedAgent}
+                  selectedSkill={selectedSkill}
+                  onSelectSkill={setSelectedSkill}
+                />
               </div>
-            </section>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <RecentRunsTable runs={recentRuns} onSelectRun={() => {}} />
+                <TaskTraceMap trace={currentTrace} />
+              </div>
+            </div>
+          ) : null}
+
+          {activePage === "tasks" ? (
+            <div className="flex flex-col gap-4">
+              <div className="parchment-panel p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold" style={{ color: "var(--text-main)" }}>任务战场</h2>
+                    <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
+                      第一版使用真实执行态和 Operation Log：当前任务来自 `/api/agents` 的 `executing/currentTask`，最近运行来自 `/api/operations`。
+                    </p>
+                  </div>
+                  <span className="rounded px-2 py-1 text-xs" style={{ background: "var(--bg-panel-soft)", color: "var(--text-muted)", border: "1px solid var(--border-light)" }}>
+                    {currentTrace ? "有任务执行中" : "当前空闲"}
+                  </span>
+                </div>
+              </div>
+              <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+                <TaskTraceMap trace={currentTrace} />
+                <RecentRunsTable runs={recentRuns} onSelectRun={() => {}} />
+              </section>
+            </div>
           ) : null}
 
           {activePage === "provider" ? (
@@ -403,7 +484,7 @@ function App() {
             </>
           ) : null}
 
-          {["tasks", "feishu", "routing", "config", "backup"].includes(activePage) ? <PlannedPage page={activePage} /> : null}
+          {["feishu", "routing", "config", "backup"].includes(activePage) ? <PlannedPage page={activePage} /> : null}
 
           <footer className="flex items-center gap-2 pb-2 text-xs text-slate-500">
             <ShieldCheck size={14} />

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import csv
+import io
 
 from .config import StackConfig, load_config
 from .models import CodexDesktopStatus, ProviderStatus, StackStatus
@@ -27,12 +29,7 @@ def codex_desktop_status() -> CodexDesktopStatus:
 
     try:
         completed = subprocess.run(
-            [
-                "powershell.exe",
-                "-NoProfile",
-                "-Command",
-                "Get-Process -Name Codex -ErrorAction SilentlyContinue | Select-Object Id,Path | ConvertTo-Json -Compress",
-            ],
+            ["wmic", "process", "where", "name='Codex.exe'", "get", "ProcessId,ExecutablePath", "/format:csv"],
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -41,24 +38,20 @@ def codex_desktop_status() -> CodexDesktopStatus:
         )
     except OSError:
         return CodexDesktopStatus(False, None, 0, None)
-    output = completed.stdout.strip()
-    if not output:
+    if completed.returncode != 0 or not completed.stdout.strip():
         return CodexDesktopStatus(False, None, 0, None)
-    try:
-        import json
-
-        data = json.loads(output)
-        rows = data if isinstance(data, list) else [data]
-        rows = [row for row in rows if isinstance(row, dict)]
-        main = next((row for row in rows if row.get("Path")), rows[0] if rows else {})
-        return CodexDesktopStatus(
-            running=bool(rows),
-            pid=int(main["Id"]) if main.get("Id") is not None else None,
-            process_count=len(rows),
-            executable=main.get("Path"),
-        )
-    except Exception:
-        return CodexDesktopStatus(True, None, 1, None)
+    rows = []
+    for row in csv.DictReader(io.StringIO(completed.stdout)):
+        try:
+            pid = int(row.get("ProcessId") or 0)
+        except ValueError:
+            continue
+        if pid > 0:
+            rows.append({"pid": pid, "path": row.get("ExecutablePath") or None})
+    if not rows:
+        return CodexDesktopStatus(False, None, 0, None)
+    main = next((row for row in rows if row.get("path")), rows[0])
+    return CodexDesktopStatus(True, main["pid"], len(rows), main.get("path"))
 
 
 def get_status(config: StackConfig | None = None) -> StackStatus:

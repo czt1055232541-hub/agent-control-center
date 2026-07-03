@@ -29,7 +29,7 @@ export function useCommandDashboard() {
     refreshExplainedDiagnostics().catch(() => {});
     const timer = window.setInterval(() => {
       refreshDashboard().catch(() => {});
-    }, 5000);
+    }, 2000);
     const diagnosticsTimer = window.setInterval(() => {
       refreshExplainedDiagnostics().catch(() => {});
     }, 30000);

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from . import diagnostics as diagnostics_module
@@ -63,6 +65,69 @@ def _today_stats(component: str) -> tuple[int, float | None]:
     return total, round(ok / total, 2) if total else None
 
 
+def _tail_text(path: Path, max_bytes: int = 128_000) -> str:
+    if not path.exists() or not path.is_file():
+        return ""
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, 2)
+            size = handle.tell()
+            handle.seek(max(0, size - max_bytes))
+            return handle.read().decode("utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def _short_task(text: str, fallback: str) -> str:
+    clean = re.sub(r"\s+", " ", text).strip()
+    if not clean:
+        return fallback
+    return clean[:120] + ("..." if len(clean) > 120 else "")
+
+
+def _codex_agent_activity(cfg: StackConfig) -> tuple[bool, str]:
+    text = "\n".join(
+        _tail_text(cfg.runtime_dir / "logs" / name)
+        for name in ["codex-agent-err.log", "codex-agent-out.log"]
+    )
+    if not text:
+        return False, "--"
+
+    task = "--"
+    last_event = -1
+    for match in re.finditer(r'\[agent\] event .*? text="(?P<text>.*)"', text):
+        last_event = match.start()
+        task = _short_task(match.group("text"), "Codex Agent 正在生成回复")
+
+    last_start = max((match.start() for match in re.finditer(r"\[agent\] draft provider=.*$", text, re.MULTILINE) if " completed" not in match.group(0) and " failed" not in match.group(0)), default=-1)
+    last_end = max((match.start() for match in re.finditer(r"\[agent\] draft provider=.* (completed|failed)|\[agent\] replied", text)), default=-1)
+    if last_start > last_end:
+        return True, task if last_event <= last_start else "Codex Agent 正在生成回复"
+    return False, "--"
+
+
+def _openclaw_agent_activity(cfg: StackConfig, agent_id: str) -> tuple[bool, str]:
+    text = "\n".join(
+        _tail_text(cfg.runtime_dir / "logs" / name)
+        for name in ["openclaw-gateway-out.log", "openclaw-gateway-err.log"]
+    )
+    if not text:
+        return False, "--"
+
+    prefix = re.escape(f"feishu[{agent_id}]")
+    last_dispatch = max((match.start() for match in re.finditer(prefix + r": dispatching to agent", text)), default=-1)
+    last_complete = max((match.start() for match in re.finditer(prefix + r": dispatch complete", text)), default=-1)
+    if last_dispatch <= last_complete:
+        return False, "--"
+
+    task = "OpenClaw 正在生成回复"
+    message_matches = list(re.finditer(prefix + r": Feishu\[" + re.escape(agent_id) + r"\] message .*?: (?P<text>.*)$", text, re.MULTILINE))
+    previous_messages = [match for match in message_matches if match.start() < last_dispatch]
+    if previous_messages:
+        task = _short_task(previous_messages[-1].group("text"), task)
+    return True, task
+
+
 def _backend_action(
     key: str,
     label: str,
@@ -103,12 +168,19 @@ def _component_actions(component: str | None, logs_component: str | None, *, ope
     return actions
 
 
-def _registry_agent_to_config(agent: RegistryAgent) -> AgentConfig:
+def _registry_agent_to_config(agent: RegistryAgent, cfg: StackConfig) -> AgentConfig:
+    if agent.source == "codex-agent":
+        executing, current_task = _codex_agent_activity(cfg)
+    elif agent.source == "openclaw":
+        executing, current_task = _openclaw_agent_activity(cfg, agent.agent_id)
+    else:
+        executing, current_task = False, "--"
+    display_status = "executing" if executing and agent.status == "running" else agent.status
     return AgentConfig(
         id=agent.id,
         name=agent.display_name,
         role=agent.role,
-        status=agent.status,
+        status=display_status,
         provider=agent.provider,
         model=agent.model,
         pid=None,
@@ -120,7 +192,7 @@ def _registry_agent_to_config(agent: RegistryAgent) -> AgentConfig:
         permissionLevel=agent.permission_level,
         promptVersion="--",
         configPath=agent.config_path,
-        currentTask="--",
+        currentTask=current_task,
         lastCalledAt=agent.last_interaction_at,
         lastLatencyMs=None,
         lastError="",
@@ -210,7 +282,7 @@ def list_agents(config: StackConfig | None = None, status: StackStatus | None = 
     cfg = config or load_config()
     stack = status or get_status(cfg)
     return [
-        _registry_agent_to_config(agent)
+        _registry_agent_to_config(agent, cfg)
         for agent in load_registry(cfg, openclaw_status=stack.openclaw, codex_agent_status=stack.codex_agent)
     ]
 
@@ -325,7 +397,7 @@ def dashboard_summary(config: StackConfig | None = None, status: StackStatus | N
     stack = status or get_status(cfg)
     agents = list_agents(cfg, stack)
     failed = sum(1 for operation in recent_operations() if not operation.ok)
-    online = sum(1 for agent in agents if agent.status == "running")
+    online = sum(1 for agent in agents if agent.status in {"running", "executing"})
     core_problem = any(
         agent.status in {"warning", "error", "stopped"}
         for agent in agents

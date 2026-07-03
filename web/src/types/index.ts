@@ -221,3 +221,90 @@ export const logOptions = [
   { value: "control-center-api", label: "Control API" },
   { value: "operations", label: "Operations" },
 ];
+
+/* ===================================================
+   Adventure Theme Types
+   =================================================== */
+
+export type SkillCategory = 'basic' | 'tool' | 'workflow' | 'permission' | 'advanced' | 'quality';
+
+export type SkillStatus = 'locked' | 'available' | 'enabled' | 'disabled' | 'warning' | 'error';
+
+export interface AgentSkill {
+  id: string;
+  name: string;
+  category: SkillCategory;
+  level: number;
+  status: SkillStatus;
+  description: string;
+  dependencies: string[];
+  permissions: string[];
+  position: { x: number; y: number };
+  config: Record<string, unknown>;
+  metrics: {
+    successRate: number;
+    avgLatencyMs: number;
+    usageCount: number;
+    lastError?: string;
+  };
+}
+
+export type AdventureAgentStatus = 'online' | 'running' | 'idle' | 'error' | 'offline';
+
+export interface AgentEquipment {
+  modelSlot: string;
+  workspaceSlot: string;
+  toolSlots: string[];
+  knowledgeSlots: string[];
+  permissionSlots: string[];
+  workflowSlot: string;
+  evalSlot: string;
+}
+
+export interface AgentProfile {
+  id: string;
+  name: string;
+  title: string;
+  role: string;
+  status: AdventureAgentStatus;
+  model: string;
+  workspace: string;
+  provider: string;
+  boundSessions: number;
+  enabledSkills: number;
+  totalSkills: number;
+  successRate: number;
+  stability: number;
+  avgLatencyMs: number;
+  dailyTokenUsed: number;
+  dailyTokenBudget: number;
+  lastInteraction: string;
+  skills: AgentSkill[];
+  equipment: AgentEquipment;
+  classIcon: string;
+  color: string;
+  currentTask?: string;
+  backendActions?: BackendAction[];
+}
+
+export interface TaskTraceNode {
+  id: string;
+  type: 'user' | 'agent' | 'tool' | 'summary' | 'complete';
+  label: string;
+  agentId?: string;
+  status: 'pending' | 'running' | 'success' | 'error';
+  latencyMs?: number;
+  children?: TaskTraceNode[];
+}
+
+export interface RecentRun {
+  id: string;
+  taskId: string;
+  agentName: string;
+  agentRole: string;
+  status: 'success' | 'error' | 'running';
+  durationMs: number;
+  timestamp: string;
+  model: string;
+  tokensUsed: number;
+}

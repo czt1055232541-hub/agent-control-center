@@ -13,3 +13,56 @@ body {
 button span {
   line-height: 1.1;
 }
+/* ===================================================
+   Adventure Theme - OpenClaw Agent Control Center
+   =================================================== */
+:root {
+  --bg-page: #f6ead2;
+  --bg-panel: #fff7e8;
+  --bg-panel-soft: #f9efd9;
+  --bg-sidebar: #ead7b4;
+  --text-main: #3b2a18;
+  --text-secondary: #6d5638;
+  --text-muted: #9a815c;
+  --border-stone: #caa875;
+  --border-light: #ead3a4;
+  --border-active: #20a6a6;
+  --accent-teal: #18a6a6;
+  --accent-blue: #2f80c9;
+  --accent-green: #3ba85a;
+  --accent-orange: #d88a1d;
+  --accent-red: #c9543f;
+  --accent-purple: #8e5bbf;
+  --accent-gold: #d8a72e;
+  --skill-basic: #2f80c9;
+  --skill-tool: #18a6a6;
+  --skill-workflow: #3ba85a;
+  --skill-permission: #d88a1d;
+  --skill-advanced: #8e5bbf;
+  --skill-quality: #d8a72e;
+}
+
+.parchment-panel {
+  background: rgba(255,247,232,0.94);
+  border: 1px solid var(--border-stone);
+  box-shadow: 0 2px 0 rgba(120,84,42,0.16), 0 10px 24px rgba(92,60,24,0.08);
+  border-radius: 12px;
+}
+
+.stone-frame {
+  border: 2px solid #caa875;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.45), 0 2px 4px rgba(91,63,28,0.12);
+  border-radius: 12px;
+}
+
+.status-dot {
+  width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+}
+.status-dot.online { background: var(--accent-green); box-shadow: 0 0 0 3px rgba(59,168,90,0.2); }
+.status-dot.running { background: var(--accent-orange); box-shadow: 0 0 0 3px rgba(216,138,29,0.2); }
+.status-dot.idle { background: var(--accent-blue); box-shadow: 0 0 0 3px rgba(47,128,201,0.2); }
+.status-dot.error { background: var(--accent-red); box-shadow: 0 0 0 3px rgba(201,84,63,0.2); }
+.status-dot.offline { background: #b8a88a; box-shadow: 0 0 0 3px rgba(184,168,138,0.2); }
+
+.progress-bar { height: 6px; border-radius: 3px; background: #e8dcc8; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }

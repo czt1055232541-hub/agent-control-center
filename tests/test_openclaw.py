@@ -57,7 +57,7 @@ def test_openclaw_ui_url_without_token_falls_back_to_plain_url(tmp_path) -> None
     assert openclaw.ui_url(cfg) == "http://127.0.0.1:18789/"
 
 
-def test_openclaw_open_ui_uses_windows_start(monkeypatch, tmp_path) -> None:
+def test_openclaw_open_ui_uses_python_startfile(monkeypatch, tmp_path) -> None:
     cfg = _config(tmp_path)
     config_path = cfg.openclaw_home / ".openclaw" / "openclaw.json"
     config_path.parent.mkdir(parents=True)
@@ -67,22 +67,14 @@ def test_openclaw_open_ui_uses_windows_start(monkeypatch, tmp_path) -> None:
     )
     calls = []
 
-    def fake_popen(args, cwd=None, creationflags=0):
-        calls.append({"args": args, "cwd": cwd, "creationflags": creationflags})
+    def fake_startfile(url):
+        calls.append(url)
 
-    monkeypatch.setattr(openclaw.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(openclaw.os, "startfile", fake_startfile)
 
     result = openclaw.open_ui(cfg)
 
     assert result.ok is True
     assert result.component == "openclaw"
     assert result.action == "open-ui"
-    assert calls[0]["args"] == [
-        "cmd.exe",
-        "/d",
-        "/c",
-        "start",
-        "",
-        "http://127.0.0.1:18789/#token=secret-token",
-    ]
-    assert calls[0]["cwd"] == str(cfg.openclaw_home)
+    assert calls == ["http://127.0.0.1:18789/#token=secret-token"]

@@ -21,17 +21,13 @@ def _fake_config(**overrides):
 
 class CodexDesktopInstallLocationTests(unittest.TestCase):
     def test_found(self):
-        import subprocess
-        completed = subprocess.CompletedProcess([], 0, r'C:\Program Files\OpenAI.Codex\n', '')
-        with patch('feishu_stack.codex_desktop.run_capture', return_value=completed):
+        with patch('feishu_stack.codex_desktop._install_location_from_registry', return_value=r'C:\Program Files\OpenAI.Codex'):
             from feishu_stack.codex_desktop import _install_location
             loc = _install_location()
-            self.assertEqual(loc, r'C:\Program Files\OpenAI.Codex\n')
+            self.assertEqual(loc, r'C:\Program Files\OpenAI.Codex')
 
     def test_not_found(self):
-        import subprocess
-        completed = subprocess.CompletedProcess([], 0, '', '')
-        with patch('feishu_stack.codex_desktop.run_capture', return_value=completed):
+        with patch('feishu_stack.codex_desktop._install_location_from_registry', return_value=None):
             from feishu_stack.codex_desktop import _install_location
             loc = _install_location()
             self.assertIsNone(loc)
