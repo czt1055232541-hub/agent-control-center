@@ -15,8 +15,6 @@ from a2a_workflow_config import default_chat_id, require_role_open_id
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LARK_CLI = REPO_ROOT / ".npm-global" / "node_modules" / "@larksuite" / "cli" / "bin" / "lark-cli.exe"
 AGENT_HOME = REPO_ROOT / ".home"
-EXE = REPO_ROOT / "runtime" / "tools" / "scheduler-watchdog-current.exe"
-LEGACY_EXE = REPO_ROOT / "runtime" / "tools" / "scheduler-watchdog.exe"
 SCRIPT = REPO_ROOT / "scripts" / "scheduler_watchdog.py"
 LOG_DIR = REPO_ROOT / "runtime" / "logs"
 WATCHDOG_DIR = REPO_ROOT / "runtime" / "watchdogs"
@@ -215,8 +213,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-dispatch", action="store_true", help="Only launch the watchdog; do not send the assignee mention dispatch.")
     args = parser.parse_args(argv)
 
-    exe = EXE if EXE.exists() else LEGACY_EXE
-    command = [str(exe)] if exe.exists() else [sys.executable, "-X", "utf8", str(SCRIPT)]
+    command = [sys.executable, "-X", "utf8", str(SCRIPT)]
     command.extend([
         "--task-id",
         args.task_id,
@@ -277,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
         "launcher_pid": proc.pid,
         "status": "launched",
         "log": str(log_path),
-        "launcher": "exe" if exe.exists() else "python",
+        "launcher": "python",
         "started_at": dt.datetime.now().isoformat(timespec="seconds"),
         "cancelled_previous": cancelled,
         "dispatch_result": dispatch_result,
@@ -291,7 +288,7 @@ def main(argv: list[str] | None = None) -> int:
         "phase": args.phase,
         "log": str(log_path),
         "state": str(state_path),
-        "launcher": "exe" if exe.exists() else "python",
+        "launcher": "python",
         "cancelled_previous": cancelled,
         "dispatch_sent": bool(dispatch_result.get("ok") and not dispatch_result.get("skipped")),
     }, ensure_ascii=False))
