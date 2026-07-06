@@ -1,4 +1,4 @@
-﻿# Agent Control Center — API 接口文档
+# Agent Control Center — API 接口文档
 
 ## 概述
 

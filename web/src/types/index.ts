@@ -13,6 +13,7 @@ export type ProviderStatus = {
   provider: string;
   mode: string;
   config: string;
+  reasoning_effort: string;
 };
 
 export type StackStatus = {

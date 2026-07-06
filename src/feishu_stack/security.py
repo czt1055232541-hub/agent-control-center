@@ -1,33 +1,17 @@
-from __future__ import annotations
-
-import secrets
-from pathlib import Path
-
-from fastapi import Header, HTTPException
-
-from .config import StackConfig, load_config
-
-
-def token_path(config: StackConfig | None = None) -> Path:
-    cfg = config or load_config()
-    return cfg.runtime_dir / "control-token.txt"
-
-
-def get_or_create_token(config: StackConfig | None = None) -> str:
-    path = token_path(config)
-    if path.exists():
-        token = path.read_text(encoding="ascii").strip()
-        if token:
-            return token
-    path.parent.mkdir(parents=True, exist_ok=True)
-    token = secrets.token_urlsafe(32)
-    path.write_text(token, encoding="ascii")
-    return token
-
-
-def require_control_token(x_control_token: str | None = Header(default=None)) -> None:
-    expected = get_or_create_token()
-    if not x_control_token:
-        raise HTTPException(status_code=401, detail="Missing X-Control-Token header.")
-    if not secrets.compare_digest(x_control_token, expected):
-        raise HTTPException(status_code=403, detail="Invalid X-Control-Token header.")
+from importlib import import_module as _import_module
+import sys as _sys
+import types as _types
+_target_module = _import_module('feishu_stack.api.security')
+class _CompatModule(_types.ModuleType):
+    def __getattribute__(self, name):
+        if name in {'_target_module', '_CompatModule', '__class__', '__dict__', '__name__', '__loader__', '__package__', '__spec__', '__file__', '__cached__'}:
+            return _types.ModuleType.__getattribute__(self, name)
+        return getattr(_target_module, name)
+    def __setattr__(self, name, value):
+        if name.startswith('__') or name in {'_target_module', '_CompatModule'}:
+            _types.ModuleType.__setattr__(self, name, value)
+            return
+        setattr(_target_module, name, value)
+    def __delattr__(self, name):
+        delattr(_target_module, name)
+_sys.modules[__name__].__class__ = _CompatModule

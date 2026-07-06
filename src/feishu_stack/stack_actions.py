@@ -1,56 +1,17 @@
-from __future__ import annotations
-
-import time
-
-from . import codex_agent, codex_provider, moonbridge, openclaw, typing_indicator
-from .config import StackConfig, load_config
-from .models import OperationResult
-
-
-def _combine(action: str, results: list[OperationResult], started: float) -> OperationResult:
-    ok = all(result.ok for result in results)
-    message = " | ".join(f"{result.component}: {result.message}" for result in results)
-    return OperationResult(
-        ok=ok,
-        component="stack",
-        action=action,
-        message=message,
-        duration_ms=int((time.monotonic() - started) * 1000),
-    )
-
-
-def start_native(config: StackConfig | None = None) -> OperationResult:
-    cfg = config or load_config()
-    started = time.monotonic()
-    results = [
-        codex_provider.switch_provider("native", cfg),
-        openclaw.start(cfg),
-        codex_agent.start(cfg),
-        typing_indicator.start(cfg),
-    ]
-    return _combine("start-native", results, started)
-
-
-def start_moonbridge(config: StackConfig | None = None) -> OperationResult:
-    cfg = config or load_config()
-    started = time.monotonic()
-    results = [
-        moonbridge.start(cfg),
-        codex_provider.switch_provider("moonbridge", cfg),
-        openclaw.start(cfg),
-        codex_agent.start(cfg),
-        typing_indicator.start(cfg),
-    ]
-    return _combine("start-moonbridge", results, started)
-
-
-def stop(config: StackConfig | None = None) -> OperationResult:
-    cfg = config or load_config()
-    started = time.monotonic()
-    results = [
-        typing_indicator.stop(cfg),
-        codex_agent.stop(cfg),
-        moonbridge.stop(cfg),
-        openclaw.stop(cfg),
-    ]
-    return _combine("stop", results, started)
+from importlib import import_module as _import_module
+import sys as _sys
+import types as _types
+_target_module = _import_module('feishu_stack.services.stack_actions')
+class _CompatModule(_types.ModuleType):
+    def __getattribute__(self, name):
+        if name in {'_target_module', '_CompatModule', '__class__', '__dict__', '__name__', '__loader__', '__package__', '__spec__', '__file__', '__cached__'}:
+            return _types.ModuleType.__getattribute__(self, name)
+        return getattr(_target_module, name)
+    def __setattr__(self, name, value):
+        if name.startswith('__') or name in {'_target_module', '_CompatModule'}:
+            _types.ModuleType.__setattr__(self, name, value)
+            return
+        setattr(_target_module, name, value)
+    def __delattr__(self, name):
+        delattr(_target_module, name)
+_sys.modules[__name__].__class__ = _CompatModule

@@ -1,0 +1,63 @@
+{
+  "repository": "your-github-org-or-user/agent-control-center",
+  "stackRoot": "C:\\path\\to\\agent-control-center",
+  "pythonExe": "C:\\path\\to\\python.exe",
+  "nodeExe": "C:\\path\\to\\node.exe",
+  "npmExe": "C:\\path\\to\\npm.cmd",
+  "codexHome": "C:\\path\\to\\.codex",
+  "codexBin": "C:\\path\\to\\codex.exe",
+  "codexConfig": "C:\\path\\to\\.codex\\config.toml",
+  "codexNativeModel": "your-native-model",
+  "codexNativeReasoningEffort": "high",
+  "codexMoonBridgeModel": "your-moonbridge-model",
+  "codexMoonBridgeReasoningEffort": "high",
+  "codexSwitchScript": "C:\\path\\to\\switch-provider-script",
+  "moonBridgeBaseUrl": "http://127.0.0.1:38440/v1",
+  "moonbridge": {
+    "dir": "C:\\path\\to\\moonbridge",
+    "exe": "C:\\path\\to\\moonbridge.exe",
+    "config": "C:\\path\\to\\moonbridge\\config.yml",
+    "port": 38440
+  },
+  "openclaw": {
+    "home": "C:\\path\\to\\openclaw",
+    "gatewayCmd": "C:\\path\\to\\openclaw\\.openclaw\\gateway.cmd",
+    "port": 18789,
+    "a2aBots": [
+      {
+        "name": "Agent display name",
+        "openId": "<LARK_OPEN_ID>"
+      }
+    ]
+  },
+  "agent": {
+    "dir": "C:\\path\\to\\feishu-codex-agent",
+    "entry": "dist\\src\\index.js",
+    "provider": "codex",
+    "codexAgentArgs": "exec --skip-git-repo-check",
+    "larkCliBin": "C:\\path\\to\\lark-cli.exe",
+    "larkCliHome": "C:\\path\\to\\lark-cli-home",
+    "larkCliProfile": "",
+    "larkBotOpenId": "<LARK_OPEN_ID>",
+    "a2aBots": [
+      {
+        "name": "Agent display name",
+        "openId": "<LARK_OPEN_ID>",
+        "description": "role"
+      }
+    ],
+    "a2aRelay": {
+      "enabled": false,
+      "groupChatId": "<LARK_CHAT_ID>",
+      "peerName": "Peer display name",
+      "peerOpenId": "<LARK_OPEN_ID>",
+      "peerCliHome": "C:\\path\\to\\peer-cli-home"
+    }
+  },
+  "runtime": {
+    "dir": "C:\\path\\to\\agent-control-center\\runtime",
+    "logs": "C:\\path\\to\\agent-control-center\\runtime\\logs",
+    "pids": "C:\\path\\to\\agent-control-center\\runtime\\pids",
+    "summaries": "C:\\path\\to\\agent-control-center\\runtime\\summaries"
+  }
+}

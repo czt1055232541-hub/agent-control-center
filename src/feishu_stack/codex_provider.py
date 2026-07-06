@@ -1,15 +1,17 @@
-from __future__ import annotations
-
-import time
-
-from . import codex_config
-from .config import StackConfig, load_config
-from .models import OperationResult
-
-
-def switch_provider(mode: str, config: StackConfig | None = None) -> OperationResult:
-    cfg = config or load_config()
-    started = time.monotonic()
-    result = codex_config.switch_provider(mode, cfg)
-    result.duration_ms = result.duration_ms or int((time.monotonic() - started) * 1000)
-    return result
+from importlib import import_module as _import_module
+import sys as _sys
+import types as _types
+_target_module = _import_module('feishu_stack.integrations.codex.codex_provider')
+class _CompatModule(_types.ModuleType):
+    def __getattribute__(self, name):
+        if name in {'_target_module', '_CompatModule', '__class__', '__dict__', '__name__', '__loader__', '__package__', '__spec__', '__file__', '__cached__'}:
+            return _types.ModuleType.__getattribute__(self, name)
+        return getattr(_target_module, name)
+    def __setattr__(self, name, value):
+        if name.startswith('__') or name in {'_target_module', '_CompatModule'}:
+            _types.ModuleType.__setattr__(self, name, value)
+            return
+        setattr(_target_module, name, value)
+    def __delattr__(self, name):
+        delattr(_target_module, name)
+_sys.modules[__name__].__class__ = _CompatModule

@@ -1,70 +1,36 @@
-﻿# Agent Control Center — 运维手册
+# Agent Control Center — 运维手册
 
 ## 一、目录结构
 
 ```
 C:\agent-control-center\
-├── API.md                          # API 接口文档（本文档）
-├── OPS.md                          # 运维手册（本文档）
-├── README.md                       # 项目简介
-├── pyproject.toml                  # Python 项目配置
-├── .gitignore
+├── API.md / OPS.md / README.md
 ├── config/
-│   └── stack.settings.json         # 栈配置文件
-├── runtime/
-│   ├── logs/                       # 运行时日志
-│   ├── pids/                       # 组件 PID 文件
-│   ├── summaries/                  # 线程迁移摘要缓存
-│   └── .gitkeep
-├── scripts/
-│   ├── start-all.ps1               # 启动全栈
-│   ├── stop-all.ps1                # 停止全栈
-│   ├── status-all.ps1              # 查看全栈状态
-│   ├── start-control-center.ps1    # 仅启动 Control Center API
-│   ├── stop-control-center.ps1     # 仅停止 Control Center API
-│   ├── status-control-center.ps1   # 查看 Control Center 状态
-│   └── install-control-center-shortcut.ps1  # 安装桌面快捷方式
-├── src/
-│   └── feishu_stack/               # Python 源码包
-│       ├── __init__.py
-│       ├── app.py                  # FastAPI 应用入口
-│       ├── cli.py                  # 命令行入口
-│       ├── config.py               # 配置加载
-│       ├── control_center.py       # 入口点
-│       ├── metrics.py              # Prometheus 指标定义
-│       ├── status.py               # 栈状态聚合
-│       ├── openclaw.py             # OpenClaw 管理
-│       ├── moonbridge.py           # MoonBridge 管理
-│       ├── codex_agent.py          # Codex Agent 管理
-│       ├── codex_desktop.py        # Codex Desktop 检测
-│       ├── codex_config.py         # Codex 配置管理
-│       ├── codex_provider.py       # Provider 切换
-│       ├── stack_actions.py        # 全栈编排动作
-│       ├── backups.py              # 备份清理
-│       ├── diagnostics.py          # 诊断模块
-│       ├── logs.py / log_manager.py# 日志管理
-│       ├── models.py               # 数据模型
-│       ├── operations.py           # 操作锁/调度
-│       ├── process.py              # 进程管理工具
-│       ├── security.py             # Token 鉴权
-│       ├── thread_migration.py     # 线程迁移
-│       └── typing_indicator.py     # 打字指示器
-├── tests/                          # 测试套件
-│   ├── test_app.py
-│   ├── test_cli.py
-│   └── ...（每个模块对应一个测试文件）
-├── typing-indicator/               # 打字指示器独立服务
-│   ├── launcher.py
-│   ├── typing-indicator.py
-│   └── INTEGRATION.md
-├── web/                            # 前端界面
-│   ├── src/                        # TypeScript 源码
-│   ├── dist/                       # 构建产物（静态文件）
-│   └── package.json
-└── docs/                           # 设计文档
+│   ├── stack.settings.example.json  # 可提交脱敏模板
+│   └── stack.settings.local.json    # 本机真实配置，已被 .gitignore 排除
+├── runtime/                         # 日志、PID、控制 token、迁移摘要等运行产物，不提交
+├── scripts/                         # Python 入口，仅保留 stack.py
+├── src/feishu_stack/
+│   ├── api/                         # FastAPI 应用、路由、鉴权
+│   ├── core/                        # settings、models、process、logs、status
+│   ├── services/                    # cli、control_center、operations、diagnostics、metrics、backups、stack_actions
+│   ├── integrations/                # codex、moonbridge、openclaw、typing_indicator
+│   ├── features/                    # agents、thread_migration 等功能域
+│   └── *.py                         # 旧导入路径兼容 wrapper
+├── tests/                           # api/core/services/integrations/features 分类测试
+├── typing-indicator/                # 打字指示器独立服务
+├── web/src/
+│   ├── app/
+│   ├── api/
+│   ├── components/common/
+│   ├── features/command/
+│   ├── features/adventure/
+│   ├── hooks/
+│   └── types/
+└── docs/
 ```
 
----
+
 
 ## 二、依赖安装
 
@@ -75,7 +41,7 @@ C:\agent-control-center\
 
 ### 2.2 安装项目依赖
 
-```powershell
+```bash
 # 进入项目根目录
 cd C:\agent-control-center
 
@@ -98,7 +64,7 @@ python -m pip install pytest httpx
 
 ### 2.3 前端构建（可选）
 
-```powershell
+```bash
 cd C:\agent-control-center\web
 npm install
 npm run build
@@ -110,45 +76,38 @@ npm run build
 
 ### 3.1 启动全栈
 
-```powershell
-# 方法一：使用脚本（推荐）
-C:\agent-control-center\scripts\start-all.ps1
-
-# 方法二：使用脚本并指定模式
-C:\agent-control-center\scripts\start-all.ps1 -CodexMode moonbridge  # MoonBridge 模式
-C:\agent-control-center\scripts\start-all.ps1 -CodexMode native     # Native 模式
-
-# 方法三：使用 CLI 命令
+```bash
+# 使用 Python 入口启动 MoonBridge 模式
 cd C:\agent-control-center
-$env:PYTHONPATH="src"
-python -m feishu_stack.cli stack start-moonbridge
+python scripts/stack.py stack start-moonbridge
+
+# 使用 Python 入口启动 Native 模式
+python scripts/stack.py stack start-native
 ```
 
 启动后，Control Center API 默认监听 `http://127.0.0.1:8765`。
 
 ### 3.2 停止全栈
 
-```powershell
-# 方法一：使用脚本
-C:\agent-control-center\scripts\stop-all.ps1
-
-# 方法二：使用 CLI
+```bash
+# 使用 Python 入口停止受管组件
 cd C:\agent-control-center
-$env:PYTHONPATH="src"
-python -m feishu_stack.cli stack stop
+python scripts/stack.py stack stop
 ```
 
 ### 3.3 仅启动 Control Center API
 
-```powershell
-C:\agent-control-center\scripts\start-control-center.ps1
+```bash
+cd C:\agent-control-center
+python scripts/stack.py serve-control-center --open
 ```
 
 ### 3.4 查看状态
 
-```powershell
+```bash
 # 查看全栈状态
-C:\agent-control-center\scripts\status-all.ps1
+cd C:\agent-control-center
+python scripts/stack.py status --json
 
 # 通过 API 查看
 curl http://127.0.0.1:8765/api/status
@@ -164,42 +123,23 @@ Control Center API 使用 `uvicorn` 运行，进程管理逻辑：
 
 ---
 
+## Codex Desktop 关闭保护
+
+`codex-desktop stop` 会关闭当前机器上的 Codex App。为避免运维或测试误杀正在工作的 Codex，控制中心默认拒绝真实关闭动作；只有显式设置 `AGENT_CONTROL_CENTER_ALLOW_CODEX_DESKTOP_STOP=1` 时才允许执行系统关闭命令。`stack stop` 不包含 Codex Desktop 关闭动作。
+
 ## 四、配置文件说明
 
-### 4.1 `config/stack.settings.json`
+### 4.1 配置入口
 
-栈全局配置，JSON 格式：
+真实配置只放在 `config/stack.settings.local.json`，该文件已被 `.gitignore` 排除。仓库只提交 `config/stack.settings.example.json` 作为脱敏模板。
 
-```json
-{
-  "stackRoot": "F:\\1AI\\Agent control center",
-  "pythonExe": "E:\\Python\\python.exe",
-  "codexHome": "E:\\codeX",
-  "codexBin": "E:\\codeX\\bin\\codex.exe",
-  "codexConfig": "E:\\codeX\\config.toml",
-  "codexNativeModel": "gpt-5.5",
-  "codexNativeReasoningEffort": "high",
-  "codexMoonBridgeModel": "deepseek-v4-flash",
-  "moonBridgeBaseUrl": "http://127.0.0.1:38440/v1",
-  "moonbridge": {
-    "dir": "E:\\codeX\\moon-bridge",
-    "exe": "E:\\codeX\\moon-bridge\\.cache\\moonbridge.exe",
-    "port": 38440
-  },
-  "openclaw": {
-    "home": "E:\\openclaw\\clawclaw",
-    "port": 18789
-  },
-  "agent": {
-    "dir": "F:\\1AI\\feishu_agent\\agents\\feishu-codex-agent"
-  },
-  "runtime": {
-    "dir": "runtime",
-    "logs": "runtime/logs",
-    "pids": "runtime/pids"
-  }
-}
-```
+配置读取优先级固定为：
+
+1. `STACK_SETTINGS_PATH` 环境变量指定的文件
+2. `config/stack.settings.local.json`
+3. `config/stack.settings.example.json`
+
+本机路径、OpenID、chat ID、CLI home、token 路径、agent relay 信息等隐私内容都必须归入 local 配置，不写入模板、文档、脚本或源码。代码统一通过 `feishu_stack.core.settings.load_config()` 读取结构化配置。
 
 **关键字段：**
 
@@ -211,6 +151,7 @@ Control Center API 使用 `uvicorn` 运行，进程管理逻辑：
 | `codexConfig` | Codex 配置路径（config.toml） |
 | `codexNativeModel` | Native 模式默认模型 |
 | `codexMoonBridgeModel` | MoonBridge 模式默认模型 |
+| `codexMoonBridgeReasoningEffort` | MoonBridge 模式默认推理强度：`minimal` / `low` / `medium` / `high` / `xhigh` |
 | `moonbridge.port` | MoonBridge 代理端口（38440） |
 | `openclaw.port` | OpenClaw 网关端口（18789） |
 
@@ -237,19 +178,17 @@ Python 项目元数据和打包配置。定义依赖、构建系统和 pytest �
 **现象：** `curl http://127.0.0.1:8765/api/health` 无响应或拒绝连接
 
 **排查步骤：**
-```powershell
-# 1. 检查端口是否被占用
-netstat -ano | findstr :8765
+```bash
+# 1. 查看 Control Center 状态
+cd C:\agent-control-center
+python scripts/stack.py status-control-center
 
-# 2. 检查进程是否在运行
-Get-Process -Name python -ErrorAction SilentlyContinue
+# 2. 查看 API 错误日志
+python -c "from pathlib import Path; p=Path('runtime/logs/control-center-api-err.log'); print('\n'.join(p.read_text(encoding='utf-8', errors='replace').splitlines()[-30:]) if p.exists() else 'missing log')"
 
-# 3. 查看 API 错误日志
-Get-Content "C:\agent-control-center\runtime\logs\control-center-api-err.log" -Tail 30
-
-# 4. 重启 API
-C:\agent-control-center\scripts\stop-control-center.ps1
-C:\agent-control-center\scripts\start-control-center.ps1
+# 3. 重启 API
+python scripts/stack.py stop-control-center
+python scripts/stack.py serve-control-center --open
 ```
 
 ### 5.2 Token 校验失败
@@ -274,14 +213,12 @@ C:\agent-control-center\scripts\start-control-center.ps1
 **现象：** `runtime/logs/` 下日志文件占用大量磁盘空间
 
 **解决：**
-```powershell
+```bash
 # 查看日志大小
-Get-ChildItem "C:\agent-control-center\runtime\logs" | Select-Object Name, Length
+python -c "from pathlib import Path; [print(p.name, p.stat().st_size) for p in Path('runtime/logs').glob('*') if p.is_file()]"
 
 # 清理日志（保留最近 7 天）
-Get-ChildItem "C:\agent-control-center\runtime\logs" -Filter *.log |
-  Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) } |
-  Remove-Item
+python -c "from pathlib import Path; import time; cutoff=time.time()-7*86400; [p.unlink() for p in Path('runtime/logs').glob('*.log') if p.stat().st_mtime < cutoff]"
 ```
 
 ### 5.5 Python 模块找不到
@@ -291,9 +228,9 @@ Get-ChildItem "C:\agent-control-center\runtime\logs" -Filter *.log |
 **原因：** `PYTHONPATH` 环境变量未正确设置
 
 **解决：**
-```powershell
-# 运行前设置 PYTHONPATH
-$env:PYTHONPATH="C:\agent-control-center\src"
+```bash
+# 推荐使用 scripts/stack.py，它会自动从仓库根目录加载 src
+python scripts/stack.py status --json
 ```
 
 ### 5.6 Metrics 指标异常
@@ -326,16 +263,15 @@ $env:PYTHONPATH="C:\agent-control-center\src"
 
 ## 六、测试
 
-```powershell
+```bash
 # 运行全部测试
 cd C:\agent-control-center
-$env:PYTHONPATH="src"
 python -m pytest tests/ -v
 
 # 运行特定测试文件
-python -m pytest tests/test_app.py -v
+python -m pytest tests/api/test_app.py -v
 
 # 运行单个测试
-python -m pytest tests/test_app.py::test_status_is_read_only_without_token -v
+python -m pytest tests/api/test_app.py::test_status_is_read_only_without_token -v
 ```
 

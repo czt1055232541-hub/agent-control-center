@@ -30,6 +30,7 @@ export function useMigration(token: string, refresh: () => Promise<void>) {
   const switchModel = React.useCallback(
     async (
       model: string,
+      reasoningEffort: string,
       setError: (msg: string) => void,
       setResult: React.Dispatch<React.SetStateAction<OperationResult | null>>,
     ) => {
@@ -39,13 +40,13 @@ export function useMigration(token: string, refresh: () => Promise<void>) {
       }
       setSwitchingMoonbridgeModel(true);
       try {
-        const next = await readJson<OperationResult>("/api/moonbridge/model/switch", {
+        const next = await readJson<OperationResult>("/api/codex-provider/moonbridge", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "X-Control-Token": token,
           },
-          body: JSON.stringify({ model }),
+          body: JSON.stringify({ model, reasoning_effort: reasoningEffort }),
         });
         setResult(next);
         await refresh();

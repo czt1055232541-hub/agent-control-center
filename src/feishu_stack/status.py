@@ -1,72 +1,17 @@
-from __future__ import annotations
-
-import re
-import csv
-import io
-
-from .config import StackConfig, load_config
-from .models import CodexDesktopStatus, ProviderStatus, StackStatus
-from .process import component_status, process_info, read_pid
-
-
-def read_provider_status(config: StackConfig) -> ProviderStatus:
-    text = config.codex_config.read_text(encoding="utf-8", errors="replace") if config.codex_config.exists() else ""
-    model_match = re.search(r'(?m)^\s*model\s*=\s*"([^"]+)"', text)
-    provider_match = re.search(r'(?m)^\s*model_provider\s*=\s*"([^"]+)"', text)
-    model = model_match.group(1) if model_match else "unknown"
-    provider = provider_match.group(1) if provider_match else "openai/default"
-    mode = "moonbridge" if provider == "moonbridge" else "native"
-    return ProviderStatus(model=model, provider=provider, mode=mode, config=str(config.codex_config))
-
-
-def is_codex_desktop_running() -> bool:
-    return codex_desktop_status().running
-
-
-def codex_desktop_status() -> CodexDesktopStatus:
-    import subprocess
-    from .process import CREATE_NO_WINDOW
-
-    try:
-        completed = subprocess.run(
-            ["wmic", "process", "where", "name='Codex.exe'", "get", "ProcessId,ExecutablePath", "/format:csv"],
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            capture_output=True,
-            creationflags=CREATE_NO_WINDOW,
-        )
-    except OSError:
-        return CodexDesktopStatus(False, None, 0, None)
-    if completed.returncode != 0 or not completed.stdout.strip():
-        return CodexDesktopStatus(False, None, 0, None)
-    rows = []
-    for row in csv.DictReader(io.StringIO(completed.stdout)):
-        try:
-            pid = int(row.get("ProcessId") or 0)
-        except ValueError:
-            continue
-        if pid > 0:
-            rows.append({"pid": pid, "path": row.get("ExecutablePath") or None})
-    if not rows:
-        return CodexDesktopStatus(False, None, 0, None)
-    main = next((row for row in rows if row.get("path")), rows[0])
-    return CodexDesktopStatus(True, main["pid"], len(rows), main.get("path"))
-
-
-def get_status(config: StackConfig | None = None) -> StackStatus:
-    cfg = config or load_config()
-    desktop = codex_desktop_status()
-    agent_settings = cfg.raw.get("agent", {})
-    codex_agent_args = str(agent_settings.get("codexAgentArgs") or "exec --skip-git-repo-check")
-    return StackStatus(
-        codex=read_provider_status(cfg),
-        openclaw=component_status("openclaw", cfg.openclaw_port, cfg.pid_openclaw),
-        moonbridge=component_status("moonbridge", cfg.moonbridge_port, cfg.pid_moonbridge),
-        codex_agent=component_status("codex-agent", None, cfg.pid_codex_agent),
-        codex_agent_args=codex_agent_args,
-        codex_agent_follows_global_config="--profile" not in codex_agent_args,
-        codex_desktop_running=desktop.running,
-        codex_desktop=desktop,
-        stack_root=str(cfg.stack_root),
-    )
+from importlib import import_module as _import_module
+import sys as _sys
+import types as _types
+_target_module = _import_module('feishu_stack.core.status')
+class _CompatModule(_types.ModuleType):
+    def __getattribute__(self, name):
+        if name in {'_target_module', '_CompatModule', '__class__', '__dict__', '__name__', '__loader__', '__package__', '__spec__', '__file__', '__cached__'}:
+            return _types.ModuleType.__getattribute__(self, name)
+        return getattr(_target_module, name)
+    def __setattr__(self, name, value):
+        if name.startswith('__') or name in {'_target_module', '_CompatModule'}:
+            _types.ModuleType.__setattr__(self, name, value)
+            return
+        setattr(_target_module, name, value)
+    def __delattr__(self, name):
+        delattr(_target_module, name)
+_sys.modules[__name__].__class__ = _CompatModule

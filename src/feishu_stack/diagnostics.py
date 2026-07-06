@@ -1,99 +1,17 @@
-from __future__ import annotations
-
-import json
-import os
-import time
-import urllib.error
-import urllib.request
-from typing import Any
-
-from .config import StackConfig, load_config
-from .process import run_capture
-from .status import get_status
-
-
-def _completed_result(name: str, started: float, returncode: int, stdout: str, stderr: str) -> dict[str, Any]:
-    return {
-        "name": name,
-        "ok": returncode == 0,
-        "returncode": returncode,
-        "stdout": stdout,
-        "stderr": stderr,
-        "duration_ms": int((time.monotonic() - started) * 1000),
-    }
-
-
-def codex_doctor(config: StackConfig | None = None) -> dict[str, Any]:
-    cfg = config or load_config()
-    started = time.monotonic()
-    try:
-        completed = run_capture([str(cfg.codex_bin), "doctor", "--summary"], cwd=cfg.codex_home, timeout=90)
-        return _completed_result("codex-doctor", started, completed.returncode, completed.stdout, completed.stderr)
-    except Exception as exc:
-        return _completed_result("codex-doctor", started, 1, "", str(exc))
-
-
-def moonbridge_models(config: StackConfig | None = None) -> dict[str, Any]:
-    cfg = config or load_config()
-    started = time.monotonic()
-    url = str(cfg.raw.get("moonBridgeBaseUrl") or f"http://127.0.0.1:{cfg.moonbridge_port}/v1").rstrip("/") + "/models"
-    try:
-        with urllib.request.urlopen(url, timeout=8) as response:
-            raw = response.read().decode("utf-8", errors="replace")
-            data = json.loads(raw) if raw else {}
-            models = [item.get("id", item) for item in data.get("data", [])] if isinstance(data, dict) else []
-            return {
-                "name": "moonbridge-models",
-                "ok": 200 <= response.status < 300,
-                "reachable": True,
-                "status": response.status,
-                "models": models,
-                "raw": data,
-                "error": "",
-                "duration_ms": int((time.monotonic() - started) * 1000),
-            }
-    except urllib.error.HTTPError as exc:
-        return {
-            "name": "moonbridge-models",
-            "ok": False,
-            "reachable": True,
-            "status": exc.code,
-            "models": [],
-            "raw": {},
-            "error": str(exc),
-            "duration_ms": int((time.monotonic() - started) * 1000),
-        }
-    except Exception as exc:
-        return {
-            "name": "moonbridge-models",
-            "ok": False,
-            "reachable": False,
-            "status": None,
-            "models": [],
-            "raw": {},
-            "error": str(exc),
-            "duration_ms": int((time.monotonic() - started) * 1000),
-        }
-
-
-def lark_auth_status(config: StackConfig | None = None) -> dict[str, Any]:
-    cfg = config or load_config()
-    started = time.monotonic()
-    env = os.environ.copy()
-    env["OPENCLAW_HOME"] = ""
-    env["CLAW_HOME"] = ""
-    try:
-        completed = run_capture([str(cfg.lark_cli_bin), "auth", "status"], cwd=cfg.stack_root, env=env, timeout=45)
-        return _completed_result("lark-auth-status", started, completed.returncode, completed.stdout, completed.stderr)
-    except Exception as exc:
-        return _completed_result("lark-auth-status", started, 1, "", str(exc))
-
-
-def diagnostics(config: StackConfig | None = None) -> dict[str, Any]:
-    cfg = config or load_config()
-    return {
-        "status": get_status(cfg),
-        "codex_doctor": codex_doctor(cfg),
-        "moonbridge_models": moonbridge_models(cfg),
-        "lark_auth_status": lark_auth_status(cfg),
-    }
+from importlib import import_module as _import_module
+import sys as _sys
+import types as _types
+_target_module = _import_module('feishu_stack.services.diagnostics')
+class _CompatModule(_types.ModuleType):
+    def __getattribute__(self, name):
+        if name in {'_target_module', '_CompatModule', '__class__', '__dict__', '__name__', '__loader__', '__package__', '__spec__', '__file__', '__cached__'}:
+            return _types.ModuleType.__getattribute__(self, name)
+        return getattr(_target_module, name)
+    def __setattr__(self, name, value):
+        if name.startswith('__') or name in {'_target_module', '_CompatModule'}:
+            _types.ModuleType.__setattr__(self, name, value)
+            return
+        setattr(_target_module, name, value)
+    def __delattr__(self, name):
+        delattr(_target_module, name)
+_sys.modules[__name__].__class__ = _CompatModule

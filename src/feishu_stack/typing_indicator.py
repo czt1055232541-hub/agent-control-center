@@ -1,78 +1,17 @@
-from __future__ import annotations
-
-import os
-import time
-
-from .config import StackConfig, load_config
-from .models import OperationResult
-from .process import (
-    CREATE_NO_WINDOW,
-    read_pid,
-    start_process,
-    stop_component,
-    write_pid,
-)
-
-
-def start(config: StackConfig | None = None) -> OperationResult:
-    cfg = config or load_config()
-    started = time.monotonic()
-    pid = read_pid(cfg.pid_typing_indicator)
-    running = False
-    if pid:
-        import psutil
-        try:
-            p = psutil.Process(pid)
-            running = p.is_running()
-        except psutil.NoSuchProcess:
-            pass
-    if running:
-        return OperationResult(True, "typing-indicator", "start", "Typing Indicator is already running.", pid=pid)
-    env = os.environ.copy()
-    for key in list(env):
-        if key.startswith("OPENCLAW_") or key in ("CODEX_HOME", "CLAW_HOME"):
-            env.pop(key, None)
-    agent_settings = cfg.raw.get("agent", {})
-    env["PYTHON_EXE"] = str(cfg.python_exe)
-    env["LARK_CLI_BIN"] = str(cfg.lark_cli_bin)
-    if agent_settings.get("larkCliProfile"):
-        env["LARK_CLI_PROFILE"] = str(agent_settings["larkCliProfile"])
-    proc = start_process(
-        [cfg.python_exe, str(cfg.typing_indicator_launcher)],
-        cwd=cfg.typing_indicator_dir,
-        stdout_log=cfg.typing_indicator_stdout_log,
-        stderr_log=cfg.typing_indicator_stderr_log,
-        env=env,
-    )
-    write_pid(cfg.pid_typing_indicator, proc.pid)
-    time.sleep(2)
-    import psutil
-    try:
-        p = psutil.Process(proc.pid)
-        running = p.is_running()
-    except psutil.NoSuchProcess:
-        running = False
-    duration = int((time.monotonic() - started) * 1000)
-    return OperationResult(
-        ok=running,
-        component="typing-indicator",
-        action="start",
-        message="Typing Indicator started." if running else "Typing Indicator exited during startup.",
-        pid=proc.pid,
-        stdout_log=str(cfg.typing_indicator_stdout_log),
-        stderr_log=str(cfg.typing_indicator_stderr_log),
-        duration_ms=duration,
-    )
-
-
-def stop(config: StackConfig | None = None) -> OperationResult:
-    cfg = config or load_config()
-    return stop_component("typing-indicator", cfg.pid_typing_indicator, None)
-
-
-def restart(config: StackConfig | None = None) -> OperationResult:
-    cfg = config or load_config()
-    stop(cfg)
-    result = start(cfg)
-    result.action = "restart"
-    return result
+from importlib import import_module as _import_module
+import sys as _sys
+import types as _types
+_target_module = _import_module('feishu_stack.integrations.typing_indicator.typing_indicator')
+class _CompatModule(_types.ModuleType):
+    def __getattribute__(self, name):
+        if name in {'_target_module', '_CompatModule', '__class__', '__dict__', '__name__', '__loader__', '__package__', '__spec__', '__file__', '__cached__'}:
+            return _types.ModuleType.__getattribute__(self, name)
+        return getattr(_target_module, name)
+    def __setattr__(self, name, value):
+        if name.startswith('__') or name in {'_target_module', '_CompatModule'}:
+            _types.ModuleType.__setattr__(self, name, value)
+            return
+        setattr(_target_module, name, value)
+    def __delattr__(self, name):
+        delattr(_target_module, name)
+_sys.modules[__name__].__class__ = _CompatModule
