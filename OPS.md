@@ -8,27 +8,36 @@ C:\agent-control-center\
 ├── config/
 │   ├── stack.settings.example.json  # 可提交脱敏模板
 │   └── stack.settings.local.json    # 本机真实配置，已被 .gitignore 排除
+├── database/                         # 未来 schema、migration、seed 预留目录
 ├── runtime/                         # 日志、PID、控制 token、迁移摘要等运行产物，不提交
 ├── scripts/                         # Python 入口，仅保留 stack.py
 ├── src/feishu_stack/
 │   ├── api/                         # FastAPI 应用、路由、鉴权
 │   ├── core/                        # settings、models、process、logs、status
-│   ├── services/                    # cli、control_center、operations、diagnostics、metrics、backups、stack_actions
-│   ├── integrations/                # codex、moonbridge、openclaw、typing_indicator
-│   ├── features/                    # agents、thread_migration 等功能域
+│   ├── modules/                     # 与网页侧边栏一致的后端功能域
+│   │   ├── agent_array/skill_tree/  # Agent 阵列、技能树、配置编辑、registry
+│   │   ├── model_provider/          # OpenClaw Gateway、MoonBridge、Codex Agent、Provider 切换
+│   │   ├── logs_diagnostics/        # 日志、诊断、指标
+│   │   ├── backup_migration/        # 备份、线程迁移
+│   │   ├── operations/              # CLI、Control Center、操作锁、stack 编排
+│   │   └── */                       # dashboard、飞书连接、路由规则、任务战场、配置中心等功能域入口
 │   └── *.py                         # 旧导入路径兼容 wrapper
-├── tests/                           # api/core/services/integrations/features 分类测试
+├── tests/                           # api/core/modules 分类测试
 ├── typing-indicator/                # 打字指示器独立服务
 ├── web/src/
 │   ├── app/
 │   ├── api/
 │   ├── components/common/
-│   ├── features/command/
-│   ├── features/adventure/
+│   ├── modules/
+│   │   ├── agent-array/
+│   │   ├── dashboard/
+│   │   └── logs-diagnostics/
 │   ├── hooks/
 │   └── types/
 └── docs/
 ```
+
+目录约定：页面功能域和后端 `modules/` 保持同名语义映射；前端目录使用 kebab-case，后端目录使用 snake_case。旧顶层 Python 模块只用于兼容历史 import，新代码优先引用 `feishu_stack.modules.*`。
 
 
 

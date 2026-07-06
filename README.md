@@ -176,17 +176,24 @@ http://127.0.0.1:8765/docs
 
 - `src/feishu_stack/api/`：FastAPI 应用、路由和鉴权入口
 - `src/feishu_stack/core/`：配置、模型、进程、日志、状态等基础设施
-- `src/feishu_stack/services/`：CLI、诊断、操作锁、备份、指标和栈编排
-- `src/feishu_stack/integrations/`：Codex、MoonBridge、OpenClaw、Typing Indicator 适配
-- `src/feishu_stack/features/`：Agent 面板、配置编辑、线程迁移等功能域
+- `src/feishu_stack/modules/`：按页面功能域分类的后端业务代码
+  - `agent_array/skill_tree/`：Agent 阵列、技能树、配置编辑、registry、dashboard 数据
+  - `model_provider/`：OpenClaw Gateway、MoonBridge、Codex Agent、Codex Desktop、Provider 切换
+  - `logs_diagnostics/`：诊断和指标
+  - `backup_migration/`：备份和线程迁移
+  - `operations/`：CLI、Control Center 启动、操作锁、stack 编排、Typing Indicator
+  - `dashboard/`、`feishu_connection/`、`routing_rules/`、`task_battlefield/`、`config_center/`：与 UI 侧边栏对齐的功能域入口
 - `src/feishu_stack/*.py`：旧导入路径兼容 wrapper
-- `web/`：React/Tailwind GUI，按 `app/`、`features/`、`components/common/` 分类
+- `web/`：React/Tailwind GUI，按 `app/`、`modules/`、`components/common/` 分类
 - `scripts/`：Python 启动入口，桌面启动器由 `install-shortcut` 生成 `.pyw` 文件
 - `config/`：脱敏配置模板和本机 local 配置位置
+- `database/`：未来数据库 schema、migration、seed 的预留目录
 - `docs/`：规划、迁移和运维说明
 - `runtime/`：本机运行态目录，只保留 `.gitkeep`
-- `tests/`：按 api/core/services/integrations/features 分类的 Python 测试
+- `tests/`：按 `api/`、`core/`、`modules/` 分类的 Python 测试
 - `typing-indicator/`：飞书输入状态辅助组件
+
+新开发优先写入 `src/feishu_stack/modules/<功能域>/`。页面侧边栏看到的功能域应能在后端 `modules/` 中找到对应目录；顶层 `src/feishu_stack/*.py` 仅作为旧导入路径兼容层。
 
 ## 下一步规划
 

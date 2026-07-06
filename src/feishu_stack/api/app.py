@@ -15,17 +15,19 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 from pydantic import BaseModel
 
-from feishu_stack.features.agents import agent_config_editor, agent_dashboard
-from feishu_stack.features.thread_migration import thread_migration
-from feishu_stack.integrations.codex import codex_agent, codex_desktop, codex_provider
-from feishu_stack.integrations.moonbridge import moonbridge
-from feishu_stack.integrations.openclaw import openclaw
-from feishu_stack.services import backups, metrics, stack_actions
-from feishu_stack.services import diagnostics as diagnostics_module
+from feishu_stack.modules.agent_array.skill_tree import agent_config_editor, agent_dashboard
+from feishu_stack.modules.backup_migration import thread_migration
+from feishu_stack.modules.model_provider import codex_agent, codex_desktop, provider_switch
+from feishu_stack.modules.model_provider import moonbridge
+from feishu_stack.modules.model_provider import openclaw_gateway as openclaw
+from feishu_stack.modules.backup_migration import backups
+from feishu_stack.modules.logs_diagnostics import metrics
+from feishu_stack.modules.operations import stack_actions
+from feishu_stack.modules.logs_diagnostics import diagnostics as diagnostics_module
 from feishu_stack.core.settings import StackConfig, find_stack_root, load_config
 from feishu_stack.core.logs import tail
 from feishu_stack.core.models import ErrorResponse, OperationResult, ThreadMigrationResult, to_dict
-from feishu_stack.services.operations import recent_operations, run_exclusive
+from feishu_stack.modules.operations.operations import recent_operations, run_exclusive
 from .security import get_or_create_token, require_control_token
 from feishu_stack.core.status import get_status
 from feishu_stack import __version__  # noqa: F401
@@ -626,14 +628,14 @@ def restart_codex_desktop() -> dict:
 
 @app.post("/api/codex-provider/native", summary="Switch to native provider", description="Switch the codex provider to the native OpenAI backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
 def switch_native() -> dict:
-    return _run("codex-provider", "switch-native", lambda cfg: codex_provider.switch_provider("native", cfg))
+    return _run("codex-provider", "switch-native", lambda cfg: provider_switch.switch_provider("native", cfg))
 
 @app.post("/api/codex-provider/moonbridge", summary="Switch to MoonBridge provider", description="Switch the codex provider to the MoonBridge proxy backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
 def switch_moonbridge(request: MoonBridgeModelSwitchRequest | None = Body(default=None)) -> dict:
     return _run(
         "codex-provider",
         "switch-moonbridge",
-        lambda cfg: codex_provider.switch_provider(
+        lambda cfg: provider_switch.switch_provider(
             "moonbridge",
             cfg,
             moonbridge_model=request.model if request else None,

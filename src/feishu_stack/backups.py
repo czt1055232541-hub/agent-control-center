@@ -1,7 +1,7 @@
 from importlib import import_module as _import_module
 import sys as _sys
 import types as _types
-_target_module = _import_module('feishu_stack.services.backups')
+_target_module = _import_module('feishu_stack.modules.backup_migration.backups')
 class _CompatModule(_types.ModuleType):
     def __getattribute__(self, name):
         if name in {'_target_module', '_CompatModule', '__class__', '__dict__', '__name__', '__loader__', '__package__', '__spec__', '__file__', '__cached__'}:
