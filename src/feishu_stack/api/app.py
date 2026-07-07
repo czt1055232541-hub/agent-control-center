@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 from pydantic import BaseModel
 
-from feishu_stack.modules.agent_array.skill_tree import agent_config_editor, agent_dashboard
+from feishu_stack.modules.agent_array.skill_tree import agent_config_editor, agent_dashboard, skill_baseline, skill_registry, skill_drift
 from feishu_stack.modules.backup_migration import thread_migration
 from feishu_stack.modules.model_provider import codex_agent, codex_desktop, provider_switch
 from feishu_stack.modules.model_provider import moonbridge
@@ -43,6 +43,7 @@ METRICS_TAG = "Metrics"
 DIAGNOSTICS_TAG = "Diagnostics"
 THREAD_MIGRATION_TAG = "Thread Migration"
 DASHBOARD_TAG = "Dashboard"
+SKILL_WORKSHOP_TAG = "Skill Workshop"
 
 
 _main_loop: asyncio.AbstractEventLoop | None = None
@@ -68,6 +69,7 @@ app = FastAPI(
         {"name": DIAGNOSTICS_TAG, "description": "Debugging and diagnostics tools"},
         {"name": DASHBOARD_TAG, "description": "Read-only command dashboard aggregates"},
         {"name": THREAD_MIGRATION_TAG, "description": "Cross-provider thread migration"},
+        {"name": SKILL_WORKSHOP_TAG, "description": "Skill tree workshop — scan, drift, and compare skills"},
     ],
 )
 
@@ -98,6 +100,16 @@ class MoonBridgeModelSwitchRequest(BaseModel):
 
 class AgentEditableConfigUpdateRequest(BaseModel):
     values: dict
+
+
+class SkillBaselineConfirmRequest(BaseModel):
+    confirmText: str
+    confirmedBy: str = "manual"
+
+
+class SkillSnapshotRequest(BaseModel):
+    confirmText: str
+    createdBy: str = "manual"
 
 
 # ---------------------------------------------------------------------------
@@ -495,6 +507,291 @@ def diagnostics() -> dict:
 )
 def explained_diagnostics() -> dict:
     return {"items": to_dict(agent_dashboard.explained_diagnostics())}
+
+# ---------------------------------------------------------------------------
+# Skill Workshop helpers
+# ---------------------------------------------------------------------------
+
+
+def _to_workshop_skill(entry: skill_registry.SkillEntry, report: skill_drift.DriftReport | None = None) -> dict:
+    """Transform a SkillEntry into the frontend SkillWorkshopSkill shape."""
+    drift_status: str = "ok"
+    drift_severity: str = "normal"
+    drift_reasons: list[str] = []
+    baseline_sha: str | None = None
+    baseline_dir_sha: str | None = None
+    baseline_version: str | None = None
+    confirmed_at: str | None = None
+    confirmed_by: str | None = None
+
+    if report is not None:
+        for d in report.drifts:
+            raw = d.to_dict()
+            if raw.get("details", {}).get("skillId") == entry.skill_id:
+                drift_status = "drift" if d.severity in ("P0", "P1", "P2") else "no_baseline"
+                drift_severity = {"P0": "critical", "P1": "warning", "P2": "warning", "info": "info"}.get(d.severity, "normal")
+                drift_reasons.append(d.message)
+
+    baseline_entry = _baseline_for_skill(entry.skill_id)
+    if baseline_entry:
+        baseline_info = baseline_entry.get("baseline", {})
+        baseline_sha = baseline_info.get("skillMdSha256") or baseline_entry.get("version")
+        baseline_dir_sha = baseline_info.get("directorySha256") or baseline_entry.get("dirHash")
+        baseline_version = baseline_info.get("version") or baseline_entry.get("version")
+        confirmed_at = baseline_info.get("confirmedAt")
+        confirmed_by = baseline_info.get("confirmedBy")
+
+    return {
+        "skillId": entry.skill_id,
+        "displayName": entry.name,
+        "sourceAlias": entry.source_alias,
+        "runtime": entry.source,
+        "agentIds": entry.agent_visibility,
+        "relativePath": entry.path,
+        "loadPriority": 0,
+        "updateMechanism": "manual",
+        "actual": {
+            "skillMdSha256": entry.version,
+            "directorySha256": entry.dir_hash or "",
+            "mtime": entry.mtime or "",
+            "version": entry.version,
+        },
+        "baseline": {
+            "skillMdSha256": baseline_sha or "",
+            "directorySha256": baseline_dir_sha or "",
+            "version": baseline_version or "",
+            "confirmedAt": confirmed_at,
+            "confirmedBy": confirmed_by,
+        },
+        "drift": {
+            "status": drift_status,
+            "severity": drift_severity,
+            "reasons": drift_reasons,
+        },
+    }
+
+
+def _baseline_for_skill(skill_id: str) -> dict | None:
+    baseline = skill_baseline.load_baseline()
+    if not baseline:
+        return None
+    for entry in baseline.get("skills", []):
+        if isinstance(entry, dict) and entry.get("skillId") == skill_id:
+            return entry
+    return None
+
+
+def _to_drift_report_dict(report: skill_drift.DriftReport, inventory: skill_registry.SkillInventory) -> dict:
+    """Transform a DriftReport into the frontend SkillDriftReport shape."""
+    items: list[dict] = []
+    for d in report.drifts:
+        raw = d.to_dict()
+        sev = d.severity
+        drift_status = "drift" if sev in ("P0", "P1", "P2") else "no_baseline"
+        drift_severity = {"P0": "critical", "P1": "warning", "P2": "warning", "info": "info"}.get(sev, "normal")
+        details = raw.get("details", {})
+        actual_hash = details.get("actualVersion", details.get("version", ""))
+        baseline_hash = details.get("baselineVersion")
+        suggestion = details.get("recommendation", d.message)
+        items.append({
+            "skillId": raw.get("skillId", details.get("skillId", "")),
+            "displayName": d.skill_name,
+            "sourceAlias": d.source_alias,
+            "runtime": d.source,
+            "drift": {
+                "status": drift_status,
+                "severity": drift_severity,
+                "reasons": [d.message],
+            },
+            "actualHash": actual_hash,
+            "baselineHash": baseline_hash,
+            "suggestion": suggestion,
+        })
+    return {
+        "generatedAt": report.generated_at,
+        "summary": {
+            "totalSkills": inventory.total,
+            "driftCount": report.total_drifts,
+            "noBaselineCount": report.info_count,
+            "p0Count": report.p0_count,
+            "p1Count": report.p1_count,
+            "p2Count": report.p2_count,
+        },
+        "items": items,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Skill Workshop
+# ---------------------------------------------------------------------------
+
+
+@app.get(
+    "/api/skill-workshop/summary",
+    summary="Skill workshop summary",
+    description="Return skill counts, drift counts, P0/P1/P2, and last scan time.",
+    tags=[SKILL_WORKSHOP_TAG],
+)
+def skill_workshop_summary() -> dict:
+    inventory = skill_registry.get_inventory()
+    report = skill_drift.detect_drift(inventory, baseline=skill_baseline.load_baseline())
+    affected_agents = sorted(inventory.by_agent.keys()) if inventory.by_agent else []
+    affected_runtimes = sorted(inventory.by_source.keys()) if inventory.by_source else []
+    return {
+        "totalSkills": inventory.total,
+        "driftCount": report.total_drifts,
+        "p0Count": report.p0_count,
+        "p1Count": report.p1_count,
+        "p2Count": report.p2_count,
+        "lastScanTime": inventory.scan_metadata.scanned_at if inventory.scan_metadata else None,
+        "affectedAgents": len(affected_agents),
+        "affectedRuntimes": affected_runtimes,
+    }
+
+
+@app.get(
+    "/api/skill-workshop/skills",
+    summary="Skill inventory",
+    description="Return the full skill inventory. Supports filtering by "
+    "?agent_id=, ?runtime=, ?source=, ?status=.",
+    tags=[SKILL_WORKSHOP_TAG],
+)
+def skill_workshop_skills(
+    agent_id: str | None = None,
+    runtime: str | None = None,
+    source: str | None = None,
+    status: str | None = None,
+) -> dict:
+    inventory = skill_registry.get_inventory()
+    report = skill_drift.detect_drift(inventory, baseline=skill_baseline.load_baseline())
+    skills = inventory.skills
+
+    if agent_id:
+        skills = [s for s in skills if agent_id in s.agent_visibility]
+    if runtime:
+        skills = [s for s in skills if s.source == runtime]
+    if source:
+        skills = [s for s in skills if s.source == source]
+    if status:
+        skills = [s for s in skills if s.status == status]
+
+    return {
+        "skills": [_to_workshop_skill(s, report) for s in skills],
+        "total": len(skills),
+        "totalInventory": inventory.total,
+        "scanMetadata": inventory.scan_metadata.to_dict() if inventory.scan_metadata else None,
+    }
+
+
+@app.get(
+    "/api/skill-workshop/skills/{skill_id}",
+    summary="Skill detail",
+    description="Return a single skill's details.",
+    tags=[SKILL_WORKSHOP_TAG],
+)
+def skill_workshop_skill_detail(skill_id: str) -> dict:
+    skill = skill_registry.get_skill_by_id(skill_id)
+    if skill is None:
+        raise HTTPException(status_code=404, detail=f"Unknown skill: {skill_id}")
+    report = skill_drift.detect_drift(baseline=skill_baseline.load_baseline())
+    return _to_workshop_skill(skill, report)
+
+
+@app.get(
+    "/api/skill-workshop/agents/{agent_id}/skills",
+    summary="Agent skills",
+    description="Return skills visible to a specific agent.",
+    tags=[SKILL_WORKSHOP_TAG],
+)
+def skill_workshop_agent_skills(agent_id: str) -> dict:
+    skills = skill_registry.get_agent_skills(agent_id)
+    report = skill_drift.detect_drift(baseline=skill_baseline.load_baseline())
+    return {"agentId": agent_id, "skills": [_to_workshop_skill(s, report) for s in skills], "total": len(skills)}
+
+
+@app.get(
+    "/api/skill-workshop/drift-report",
+    summary="Drift report",
+    description="Return the current skill drift report.",
+    tags=[SKILL_WORKSHOP_TAG],
+)
+def skill_workshop_drift_report() -> dict:
+    inventory = skill_registry.get_inventory()
+    report = skill_drift.detect_drift(inventory, baseline=skill_baseline.load_baseline())
+    return _to_drift_report_dict(report, inventory)
+
+
+@app.get(
+    "/api/skill-workshop/baseline/preview",
+    summary="Baseline diff preview",
+    description="Preview the changes that confirming the current scan as baseline would make.",
+    tags=[SKILL_WORKSHOP_TAG],
+)
+def skill_workshop_baseline_preview() -> dict:
+    return skill_baseline.preview_baseline_diff()
+
+
+@app.post(
+    "/api/skill-workshop/baseline/confirm",
+    summary="Confirm skill baseline",
+    description="Persist the current skill inventory as the manual baseline. Requires control token and confirmText.",
+    tags=[SKILL_WORKSHOP_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def skill_workshop_baseline_confirm(request: SkillBaselineConfirmRequest) -> dict:
+    try:
+        return skill_baseline.confirm_baseline(
+            confirm_text=request.confirmText,
+            confirmed_by=request.confirmedBy,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post(
+    "/api/skill-workshop/snapshot",
+    summary="Create skill snapshot",
+    description="Create a skill inventory snapshot without changing baseline. Requires control token and confirmText.",
+    tags=[SKILL_WORKSHOP_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def skill_workshop_snapshot(request: SkillSnapshotRequest) -> dict:
+    try:
+        return skill_baseline.create_snapshot(
+            confirm_text=request.confirmText,
+            created_by=request.createdBy,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get(
+    "/api/skill-workshop/comparison",
+    summary="Cross-runtime comparison",
+    description="Compare a skill's versions across different runtimes.",
+    tags=[SKILL_WORKSHOP_TAG],
+)
+def skill_workshop_comparison(skillId: str = "") -> dict:
+    if not skillId:
+        raise HTTPException(status_code=400, detail="Query parameter 'skillId' is required.")
+    return skill_drift.build_comparison(skillId)
+
+
+@app.post(
+    "/api/skill-workshop/scan",
+    summary="Trigger skill scan",
+    description="Trigger a read-only skill scan. Requires control token.",
+    tags=[SKILL_WORKSHOP_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def skill_workshop_scan() -> dict:
+    inventory = skill_registry.scan_skills(force_full=True)
+    return {
+        "ok": True,
+        "totalSkills": inventory.total,
+        "scanMetadata": inventory.scan_metadata.to_dict() if inventory.scan_metadata else None,
+    }
+
 
 # ---------------------------------------------------------------------------
 # Thread migration

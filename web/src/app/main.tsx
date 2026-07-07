@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { AlertTriangle, ChevronRight, FileText, PauseCircle, Play, RefreshCcw, ShieldCheck, Wrench } from "lucide-react";
+import { AlertTriangle, FileText, PauseCircle, Play, RefreshCcw, ShieldCheck, Wrench } from "lucide-react";
 import "./styles.css";
 import { logOptions } from "../types";
 import type { AgentProfile, AgentSkill } from "../types";
@@ -8,6 +8,7 @@ import { TopStatusBar } from "../modules/agent-array/skill-tree/TopStatusBar";
 import { AgentCard as AdventureAgentCard } from "../modules/agent-array/skill-tree/AgentCard";
 import { AgentDetailPanel } from "../modules/agent-array/skill-tree/AgentDetailPanel";
 import { SkillTreeCanvas } from "../modules/agent-array/skill-tree/SkillTreeCanvas";
+import { SkillWorkshopPage } from "../modules/agent-array/skill-tree/SkillWorkshopPage";
 import { RecentRunsTable } from "../modules/agent-array/skill-tree/RecentRunsTable";
 import { TaskTraceMap } from "../modules/agent-array/skill-tree/TaskTraceMap";
 import { recentRunsFromOperations, taskTraceFromAgents, toAgentProfiles } from "../modules/agent-array/skill-tree/viewModels";
@@ -290,6 +291,10 @@ function App() {
     [run, refreshDashboard],
   );
   const adventureAgents = React.useMemo(() => toAgentProfiles(agents), [agents]);
+  const providerInfrastructure = React.useMemo(
+    () => infrastructure.filter((agent) => agent.id !== "codex-runtime"),
+    [infrastructure],
+  );
   const recentRuns = React.useMemo(() => recentRunsFromOperations(operations), [operations]);
   const currentTrace = React.useMemo(() => taskTraceFromAgents(agents), [agents]);
 
@@ -385,12 +390,9 @@ function App() {
                 onTabChange={(tab) => setActiveDetailTab(tab)}
               />
               <div>
-                <div className="mb-2 flex items-center gap-2">
-                  <h3 className="text-sm font-semibold" style={{color:'var(--text-main)'}}>技能树工坊</h3>
-                  <ChevronRight size={14} style={{color:'var(--text-muted)'}} />
-                </div>
-                <SkillTreeCanvas
-                  agent={adventureSelectedAgent}
+                <SkillWorkshopPage
+                  agents={agents}
+                  adventureSelectedAgent={adventureSelectedAgent}
                   selectedSkill={selectedSkill}
                   onSelectSkill={setSelectedSkill}
                 />
@@ -427,7 +429,7 @@ function App() {
           {activePage === "provider" ? (
             <>
               <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-4">
-                {infrastructure.map((agent) => (
+                {providerInfrastructure.map((agent) => (
                   <AgentCard
                     key={agent.id}
                     agent={agent}

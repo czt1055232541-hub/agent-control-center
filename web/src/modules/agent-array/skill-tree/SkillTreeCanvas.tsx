@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from 'react';
+﻿import React, { useMemo, useRef, useState } from 'react';
 import type { AgentSkill, AgentProfile } from '../../types';
 import { SkillNode } from './SkillNode';
 import { SkillConfigInspector } from './SkillConfigInspector';
@@ -31,6 +31,60 @@ export function SkillTreeCanvas({ agent, selectedSkill, onSelectSkill }: {
   onSelectSkill: (skill: AgentSkill | null) => void;
 }) {
   const edges = useMemo(() => agent ? buildEdges(agent.skills) : [], [agent]);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const dragRef = useRef({
+    pointerId: -1,
+    startX: 0,
+    startY: 0,
+    originX: 0,
+    originY: 0,
+    moved: false,
+  });
+
+  const beginPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('.skill-node')) return;
+
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: panOffset.x,
+      originY: panOffset.y,
+      moved: false,
+    };
+    setIsPanning(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const updatePan = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!isPanning || dragRef.current.pointerId !== event.pointerId) return;
+
+    const dx = event.clientX - dragRef.current.startX;
+    const dy = event.clientY - dragRef.current.startY;
+    if (!dragRef.current.moved && Math.hypot(dx, dy) < 3) {
+      return;
+    }
+    if (!dragRef.current.moved) {
+      dragRef.current.moved = true;
+    }
+    setPanOffset({
+      x: dragRef.current.originX + dx,
+      y: dragRef.current.originY + dy,
+    });
+  };
+
+  const endPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (dragRef.current.pointerId !== event.pointerId) return;
+
+    setIsPanning(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragRef.current.pointerId = -1;
+  };
 
   if (!agent) {
     return (
@@ -50,10 +104,16 @@ export function SkillTreeCanvas({ agent, selectedSkill, onSelectSkill }: {
     <div className="relative" style={{ display: 'flex', minHeight: 420 }}>
       {/* Canvas area */}
       <div className="relative flex-1 overflow-hidden rounded-lg"
+        onPointerDown={beginPan}
+        onPointerMove={updatePan}
+        onPointerUp={endPan}
+        onPointerCancel={endPan}
         style={{
           background: `radial-gradient(circle at top left, rgba(255,255,255,0.55), transparent 26rem), linear-gradient(135deg, #f8ecd3 0%, #f1dfbd 100%)`,
           border: '1px solid var(--border-stone)',
           boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.45), 0 2px 4px rgba(91,63,28,0.12)',
+          cursor: isPanning ? 'grabbing' : 'grab',
+          touchAction: 'none',
         }}
       >
         {/* Map line pattern overlay */}
@@ -70,6 +130,13 @@ export function SkillTreeCanvas({ agent, selectedSkill, onSelectSkill }: {
           <rect width="100%" height="100%" fill={`url(#diag-${agent.id})`} />
         </svg>
 
+        <div
+          className="absolute inset-0"
+          style={{
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+            willChange: isPanning ? 'transform' : undefined,
+          }}
+        >
         {/* SVG Edges */}
         <svg className="pointer-events-none absolute inset-0 h-full w-full" style={{ overflow: 'visible' }}>
           {edges.map((edge, i) => {
@@ -149,6 +216,7 @@ export function SkillTreeCanvas({ agent, selectedSkill, onSelectSkill }: {
               <span style={{color:'var(--text-muted)'}}>黑色：未来规划</span>
             </div>
           </div>
+        </div>
         </div>
       </div>
 

@@ -249,6 +249,18 @@ export interface AgentSkill {
     usageCount: number;
     lastError?: string;
   };
+  // Phase B workspace fields (driven by skill-workshop API)
+  version?: string;
+  sourceRuntime?: string;
+  sourceAlias?: string;
+  sourcePathAlias?: string;
+  sha256?: string;
+  baselineSha256?: string;
+  actualSha256?: string;
+  driftStatus?: DriftStatus;
+  loadPriority?: number;
+  updateMechanism?: string;
+  agentIds?: string[];
 }
 
 export type AdventureAgentStatus = 'online' | 'running' | 'idle' | 'error' | 'offline';
@@ -309,4 +321,126 @@ export interface RecentRun {
   timestamp: string;
   model: string;
   tokensUsed: number;
+}
+
+/* ===================================================
+   Skill Workshop Types (Phase B)
+   =================================================== */
+
+export type DriftStatus = 'ok' | 'no_baseline' | 'drift' | 'missing_priority' | 'stale_version';
+
+export type DriftSeverity = 'normal' | 'info' | 'warning' | 'error' | 'critical';
+
+export interface SkillWorkshopSummary {
+  totalSkills: number;
+  driftCount: number;
+  p0Count: number;
+  p1Count: number;
+  p2Count: number;
+  lastScanTime: string | null;
+  affectedAgents: number;
+  affectedRuntimes: string[];
+}
+
+export interface SkillActualInfo {
+  skillMdSha256: string;
+  directorySha256: string;
+  mtime: string;
+  version: string;
+}
+
+export interface SkillBaselineInfo {
+  skillMdSha256: string;
+  directorySha256: string;
+  version: string;
+  confirmedAt: string | null;
+  confirmedBy: string | null;
+}
+
+export interface SkillDriftInfo {
+  status: DriftStatus;
+  severity: DriftSeverity;
+  reasons: string[];
+}
+
+export interface SkillWorkshopSkill {
+  skillId: string;
+  displayName: string;
+  sourceAlias: string;
+  runtime: string;
+  agentIds: string[];
+  relativePath: string;
+  loadPriority: number;
+  updateMechanism: string;
+  actual: SkillActualInfo;
+  baseline: SkillBaselineInfo;
+  drift: SkillDriftInfo;
+}
+
+export interface SkillDriftReport {
+  generatedAt: string;
+  summary: {
+    totalSkills: number;
+    driftCount: number;
+    noBaselineCount: number;
+    p0Count: number;
+    p1Count: number;
+    p2Count: number;
+  };
+  items: SkillDriftReportItem[];
+}
+
+export interface SkillDriftReportItem {
+  skillId: string;
+  displayName: string;
+  sourceAlias: string;
+  runtime: string;
+  drift: SkillDriftInfo;
+  actualHash: string;
+  baselineHash: string | null;
+  suggestion: string;
+}
+
+export interface SkillRuntimeComparisonItem {
+  skillId: string;
+  displayName: string;
+  instances: SkillWorkshopSkill[];
+  hasDrift: boolean;
+  runtimeCount: number;
+}
+
+export type SkillWorkshopTab = 'overview' | 'skill-tree' | 'comparison' | 'drift-report';
+
+export interface SkillBaselinePreview {
+  hasBaseline: boolean;
+  actualSkillCount: number;
+  baselineSkillCount: number;
+  addedSkillIds: string[];
+  removedSkillIds: string[];
+  changed: Array<{
+    skillId: string;
+    displayName: string;
+    sourceAlias: string;
+    runtime: string;
+    baselineVersion: string | null;
+    actualVersion: string;
+  }>;
+  confirmText: string;
+}
+
+export interface SkillBaselineConfirmResult {
+  ok: boolean;
+  baselineFile: string;
+  previousBaselineSnapshot: string | null;
+  skillCount: number;
+  confirmedAt: string;
+  confirmedBy: string;
+}
+
+export interface SkillSnapshotResult {
+  ok: boolean;
+  snapshotFile: string;
+  skillCount: number;
+  createdAt: string;
+  createdBy: string;
 }
