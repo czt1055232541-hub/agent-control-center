@@ -31,6 +31,23 @@ def _ensure_feishu_raw_post_config(cfg: StackConfig) -> None:
     if feishu.get("streaming") is not False:
         feishu["streaming"] = False
         changed = True
+    if "blockStreaming" in feishu:
+        feishu.pop("blockStreaming", None)
+        changed = True
+    accounts = feishu.get("accounts")
+    account_iter = accounts if isinstance(accounts, list) else accounts.values() if isinstance(accounts, dict) else []
+    for account in account_iter:
+        if not isinstance(account, dict):
+            continue
+        if account.get("renderMode") != "raw":
+            account["renderMode"] = "raw"
+            changed = True
+        if account.get("streaming") is not False:
+            account["streaming"] = False
+            changed = True
+        if "blockStreaming" in account:
+            account.pop("blockStreaming", None)
+            changed = True
     if changed:
         config_path.write_text(json.dumps(data, ensure_ascii=False, indent=4), encoding="utf-8")
 
@@ -166,7 +183,6 @@ function findNextAt(value, start) {
     if needle not in text:
         raise RuntimeError("OpenClaw Feishu send patch target not found; package version may have changed.")
     send_file.write_text(text.replace(needle, replacement), encoding="utf-8")
-
 
 def _gateway_command(cfg: StackConfig) -> list[str]:
     return ["cmd.exe", "/d", "/c", str(cfg.openclaw_gateway_cmd)]

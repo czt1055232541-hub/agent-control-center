@@ -36,31 +36,112 @@ def _install_location_from_registry() -> str | None:
     return None
 
 
+def _install_location_from_appx_package() -> str | None:
+    import subprocess
+
+    try:
+        completed = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                "Get-AppxPackage -Name OpenAI.Codex "
+                "| Sort-Object Version -Descending "
+                "| Select-Object -First 1 -ExpandProperty InstallLocation",
+            ],
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            creationflags=CREATE_NO_WINDOW,
+        )
+    except OSError:
+        return None
+    if completed.returncode != 0:
+        return None
+    value = completed.stdout.strip()
+    return value or None
+
+
+def _install_location_from_windowsapps() -> str | None:
+    root = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "WindowsApps"
+    try:
+        candidates = sorted(
+            (path for path in root.glob("OpenAI.Codex_*") if (path / "app" / "Codex.exe").exists()),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+    except OSError:
+        return None
+    return str(candidates[0]) if candidates else None
+
+
 def _install_location() -> str | None:
-    return _install_location_from_registry()
+    return (
+        _install_location_from_registry()
+        or _install_location_from_appx_package()
+        or _install_location_from_windowsapps()
+    )
 
 
-def _executable_path() -> str | None:
+def _cached_executable_file(config: StackConfig | None = None) -> Path | None:
+    runtime_dir = getattr(config, "runtime_dir", None)
+    if runtime_dir is None:
+        return None
+    return Path(runtime_dir) / "codex-desktop-executable.txt"
+
+
+def _read_cached_executable(config: StackConfig | None = None) -> str | None:
+    cache = _cached_executable_file(config)
+    if not cache or not cache.exists():
+        return None
+    try:
+        value = cache.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return None
+    if value and Path(value).exists():
+        return value
+    return None
+
+
+def _write_cached_executable(executable: str | None, config: StackConfig | None = None) -> None:
+    if not executable or not Path(executable).exists():
+        return
+    cache = _cached_executable_file(config)
+    if not cache:
+        return
+    try:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(str(executable) + "\n", encoding="utf-8")
+    except OSError:
+        return
+
+
+def _executable_from_install_location(install: str | None) -> str | None:
+    if not install:
+        return None
+    candidate = Path(install) / "app" / "Codex.exe"
+    return str(candidate) if candidate.exists() else None
+
+
+def _executable_path(config: StackConfig | None = None) -> str | None:
     status = codex_desktop_status()
     if status.executable:
+        _write_cached_executable(status.executable, config)
         return status.executable
-    install = _install_location()
-    if install:
-        candidate = Path(install) / "app" / "Codex.exe"
-        if candidate.exists():
-            return str(candidate)
-    return None
+    return _executable_from_install_location(_install_location()) or _read_cached_executable(config)
 
 
 def start(config: StackConfig | None = None) -> OperationResult:
     import subprocess
 
-    config or load_config()
+    cfg = config or load_config()
     started = time.monotonic()
     status = codex_desktop_status()
     if status.running:
+        _write_cached_executable(status.executable, cfg)
         return OperationResult(True, "codex-desktop", "start", "Codex Desktop is already running.", pid=status.pid, duration_ms=int((time.monotonic() - started) * 1000))
-    executable = _executable_path()
+    executable = _executable_path(cfg)
     if not executable:
         return OperationResult(False, "codex-desktop", "start", "Could not locate Codex Desktop executable.", duration_ms=int((time.monotonic() - started) * 1000))
     subprocess.Popen([executable], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
@@ -123,6 +204,7 @@ def restart(config: StackConfig | None = None) -> OperationResult:
 def log(config: StackConfig | None = None) -> LogTail:
     cfg = config or load_config()
     status = codex_desktop_status()
+    _write_cached_executable(status.executable, cfg)
     lines = [
         f"running={status.running}",
         f"pid={status.pid}",

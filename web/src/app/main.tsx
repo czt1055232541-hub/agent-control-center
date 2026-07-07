@@ -395,6 +395,7 @@ function App() {
                   adventureSelectedAgent={adventureSelectedAgent}
                   selectedSkill={selectedSkill}
                   onSelectSkill={setSelectedSkill}
+                  token={token}
                 />
               </div>
               <div className="grid gap-4 lg:grid-cols-2">

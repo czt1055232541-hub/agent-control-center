@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -110,6 +110,11 @@ class SkillBaselineConfirmRequest(BaseModel):
 class SkillSnapshotRequest(BaseModel):
     confirmText: str
     createdBy: str = "manual"
+
+
+class SkillRollbackRequest(BaseModel):
+    confirmText: str
+    confirmedBy: str = "manual"
 
 
 # ---------------------------------------------------------------------------
@@ -761,6 +766,70 @@ def skill_workshop_snapshot(request: SkillSnapshotRequest) -> dict:
             confirm_text=request.confirmText,
             created_by=request.createdBy,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get(
+    "/api/skill-workshop/history",
+    summary="Skill workshop version history",
+    description="List baseline changes and skill inventory snapshots.",
+    tags=[SKILL_WORKSHOP_TAG],
+)
+def skill_workshop_history() -> dict:
+    return skill_baseline.list_history()
+
+
+@app.get(
+    "/api/skill-workshop/history/{version_id}",
+    summary="Skill workshop version detail",
+    description="Return the stored skill state for a baseline or snapshot version.",
+    tags=[SKILL_WORKSHOP_TAG],
+)
+def skill_workshop_history_detail(version_id: str) -> dict:
+    try:
+        return skill_baseline.get_version(version_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get(
+    "/api/skill-workshop/compare",
+    summary="Skill workshop version diff",
+    description="Compare two stored skill workshop versions.",
+    tags=[SKILL_WORKSHOP_TAG],
+)
+def skill_workshop_compare(from_: str = Query(default="", alias="from"), to: str = "") -> dict:
+    if not from_:
+        raise HTTPException(status_code=400, detail="Query parameter 'from' is required.")
+    if not to:
+        raise HTTPException(status_code=400, detail="Query parameter 'to' is required.")
+    try:
+        return skill_baseline.compare_versions(from_, to)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post(
+    "/api/skill-workshop/rollback/{version_id}",
+    summary="Rollback skill workshop baseline",
+    description="Rollback workshop baseline state to a stored version. Requires control token and confirmText.",
+    tags=[SKILL_WORKSHOP_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def skill_workshop_rollback(version_id: str, request: SkillRollbackRequest) -> dict:
+    try:
+        return skill_baseline.rollback_to_version(
+            version_id,
+            confirm_text=request.confirmText,
+            confirmed_by=request.confirmedBy,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

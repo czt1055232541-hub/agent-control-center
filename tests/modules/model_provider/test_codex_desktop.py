@@ -14,6 +14,7 @@ def _fake_config(**overrides):
     c.codex_bin = Path('codex.exe')
     c.stack_root = Path(tempfile.gettempdir()) / 'stack'
     c.log_dir = Path(tempfile.gettempdir()) / 'log'
+    c.runtime_dir = Path(tempfile.gettempdir()) / 'runtime'
     for k, v in overrides.items():
         setattr(c, k, v)
     return c
@@ -27,10 +28,23 @@ class CodexDesktopInstallLocationTests(unittest.TestCase):
             self.assertEqual(loc, r'C:\Program Files\OpenAI.Codex')
 
     def test_not_found(self):
-        with patch('feishu_stack.modules.model_provider.codex_desktop._install_location_from_registry', return_value=None):
+        with (
+            patch('feishu_stack.modules.model_provider.codex_desktop._install_location_from_registry', return_value=None),
+            patch('feishu_stack.modules.model_provider.codex_desktop._install_location_from_appx_package', return_value=None),
+            patch('feishu_stack.modules.model_provider.codex_desktop._install_location_from_windowsapps', return_value=None),
+        ):
             from feishu_stack.modules.model_provider.codex_desktop import _install_location
             loc = _install_location()
             self.assertIsNone(loc)
+
+    def test_appx_fallback(self):
+        with (
+            patch('feishu_stack.modules.model_provider.codex_desktop._install_location_from_registry', return_value=None),
+            patch('feishu_stack.modules.model_provider.codex_desktop._install_location_from_appx_package', return_value=r'C:\Program Files\WindowsApps\OpenAI.Codex_1'),
+        ):
+            from feishu_stack.modules.model_provider.codex_desktop import _install_location
+            loc = _install_location()
+            self.assertEqual(loc, r'C:\Program Files\WindowsApps\OpenAI.Codex_1')
 
 
 class CodexDesktopExecutablePathTests(unittest.TestCase):
@@ -50,6 +64,22 @@ class CodexDesktopExecutablePathTests(unittest.TestCase):
             from feishu_stack.modules.model_provider.codex_desktop import _executable_path
             exe = _executable_path()
             self.assertIsNone(exe)
+
+    def test_fallback_cached_executable(self):
+        status = CodexDesktopStatus(running=False, pid=None, process_count=0, executable=None)
+        with tempfile.TemporaryDirectory() as tmp:
+            exe_path = Path(tmp) / 'Codex.exe'
+            exe_path.write_text('stub', encoding='utf-8')
+            cache_path = Path(tmp) / 'codex-desktop-executable.txt'
+            cache_path.write_text(str(exe_path), encoding='utf-8')
+            cfg = _fake_config(runtime_dir=Path(tmp))
+            with (
+                patch('feishu_stack.modules.model_provider.codex_desktop.codex_desktop_status', return_value=status),
+                patch('feishu_stack.modules.model_provider.codex_desktop._install_location', return_value=None),
+            ):
+                from feishu_stack.modules.model_provider.codex_desktop import _executable_path
+                exe = _executable_path(cfg)
+                self.assertEqual(exe, str(exe_path))
 
 
 class CodexDesktopStartTests(unittest.TestCase):
@@ -82,7 +112,8 @@ class CodexDesktopStartTests(unittest.TestCase):
             patch('feishu_stack.modules.model_provider.codex_desktop.time.sleep'),
         ):
             from feishu_stack.modules.model_provider.codex_desktop import start
-            result = start(_fake_config())
+            cfg = _fake_config()
+            result = start(cfg)
             self.assertTrue(result.ok)
             self.assertEqual(result.pid, 200)
             mock_popen.assert_called_once()

@@ -515,6 +515,123 @@ def test_skill_workshop_snapshot_with_token(monkeypatch) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Phase D version history and rollback
+# ---------------------------------------------------------------------------
+
+
+def test_skill_workshop_history(monkeypatch) -> None:
+    result = {
+        "versions": [
+            {
+                "versionId": "baseline-current",
+                "type": "baseline-current",
+                "sourceFile": "baseline.json",
+                "timestamp": "2026-07-01T00:00:00",
+                "createdBy": "tester",
+                "skillCount": 3,
+                "summary": "Current baseline",
+            }
+        ],
+        "total": 1,
+    }
+    monkeypatch.setattr(app_module.skill_baseline, "list_history", lambda: result)
+
+    response = client.get("/api/skill-workshop/history")
+    assert response.status_code == 200
+    assert response.json()["versions"][0]["versionId"] == "baseline-current"
+
+
+def test_skill_workshop_history_detail(monkeypatch) -> None:
+    result = {
+        "versionId": "skill-snapshot-20260707T000000000000Z",
+        "type": "snapshot",
+        "sourceFile": "skill-snapshot-20260707T000000000000Z.json",
+        "timestamp": "2026-07-07T00:00:00",
+        "createdBy": "tester",
+        "skillCount": 1,
+        "summary": "Skill inventory snapshot",
+        "skills": [_mock_inventory(1).skills[0].to_dict()],
+    }
+    monkeypatch.setattr(app_module.skill_baseline, "get_version", lambda version_id: result)
+
+    response = client.get("/api/skill-workshop/history/skill-snapshot-20260707T000000000000Z")
+    assert response.status_code == 200
+    assert response.json()["skills"][0]["skillId"] == "codeX:skill-0"
+
+
+def test_skill_workshop_compare_requires_params() -> None:
+    response = client.get("/api/skill-workshop/compare")
+    assert response.status_code == 400
+
+
+def test_skill_workshop_compare(monkeypatch) -> None:
+    result = {
+        "fromVersion": "baseline-current",
+        "toVersion": "skill-snapshot-1",
+        "addedSkillIds": ["codeX:skill-1"],
+        "removedSkillIds": [],
+        "changed": [],
+        "summary": {"added": 1, "removed": 0, "changed": 0},
+    }
+    monkeypatch.setattr(app_module.skill_baseline, "compare_versions", lambda from_, to: result)
+
+    response = client.get("/api/skill-workshop/compare?from=baseline-current&to=skill-snapshot-1")
+    assert response.status_code == 200
+    assert response.json()["summary"]["added"] == 1
+
+
+def test_skill_workshop_rollback_requires_token() -> None:
+    response = client.post(
+        "/api/skill-workshop/rollback/baseline-current",
+        json={"confirmText": skill_baseline.CONFIRM_ROLLBACK_TEXT},
+    )
+    assert response.status_code == 401
+
+
+def test_skill_workshop_rollback_rejects_bad_confirm_text() -> None:
+    token = _token()
+    response = client.post(
+        "/api/skill-workshop/rollback/baseline-current",
+        headers={"X-Control-Token": token},
+        json={"confirmText": "wrong"},
+    )
+    assert response.status_code == 400
+
+
+def test_skill_workshop_rollback_with_token(monkeypatch) -> None:
+    token = _token()
+    result = {
+        "ok": True,
+        "rolledBackTo": "skill-snapshot-1",
+        "sourceFile": "skill-snapshot-1.json",
+        "baselineFile": "baseline.json",
+        "previousBaselineSnapshot": "baseline-backup.json",
+        "skillCount": 1,
+        "confirmedAt": "2026-07-07T00:00:00",
+        "confirmedBy": "tester",
+    }
+    called = {"rollback": False}
+
+    def fake_rollback(version_id, confirm_text, confirmed_by="manual", config=None):
+        called["rollback"] = True
+        assert version_id == "skill-snapshot-1"
+        assert confirm_text == skill_baseline.CONFIRM_ROLLBACK_TEXT
+        assert confirmed_by == "tester"
+        return result
+
+    monkeypatch.setattr(app_module.skill_baseline, "rollback_to_version", fake_rollback)
+
+    response = client.post(
+        "/api/skill-workshop/rollback/skill-snapshot-1",
+        headers={"X-Control-Token": token},
+        json={"confirmText": skill_baseline.CONFIRM_ROLLBACK_TEXT, "confirmedBy": "tester"},
+    )
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert called["rollback"] is True
+
+
+# ---------------------------------------------------------------------------
 # Schema validation
 # ---------------------------------------------------------------------------
 

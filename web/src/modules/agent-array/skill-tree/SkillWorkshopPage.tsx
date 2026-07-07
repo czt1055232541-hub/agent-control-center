@@ -1,7 +1,7 @@
 import React from "react";
 import {
   BarChart3, GitBranch, AlertTriangle, FileText,
-  CheckCircle, Info, AlertOctagon, ShieldAlert, RotateCw,
+  CheckCircle, Info, AlertOctagon, ShieldAlert, RotateCw, History, Undo2,
 } from "lucide-react";
 import type { AgentSkill, AgentProfile, SkillWorkshopTab } from "../../../types";
 import { SkillTreeCanvas } from "./SkillTreeCanvas";
@@ -17,6 +17,7 @@ const tabs: { key: SkillWorkshopTab; label: string; icon: React.ReactNode }[] = 
   { key: "skill-tree", label: "\u6280\u80fd\u6811", icon: <GitBranch size={14} /> },
   { key: "comparison", label: "\u7248\u672c\u5bf9\u6bd4", icon: <FileText size={14} /> },
   { key: "drift-report", label: "\u6f02\u79fb\u62a5\u544a", icon: <AlertTriangle size={14} /> },
+  { key: "history", label: "\u7248\u672c\u7ba1\u7406", icon: <History size={14} /> },
 ];
 
 interface SkillWorkshopPageProps {
@@ -24,6 +25,7 @@ interface SkillWorkshopPageProps {
   adventureSelectedAgent: AgentProfile | null;
   selectedSkill: AgentSkill | null;
   onSelectSkill: (skill: AgentSkill | null) => void;
+  token: string;
 }
 
 export function SkillWorkshopPage({
@@ -31,6 +33,7 @@ export function SkillWorkshopPage({
   adventureSelectedAgent,
   selectedSkill,
   onSelectSkill,
+  token,
 }: SkillWorkshopPageProps) {
   const [activeTab, setActiveTab] = React.useState<SkillWorkshopTab>("overview");
   const ws = useSkillWorkshop();
@@ -132,7 +135,139 @@ export function SkillWorkshopPage({
             <SkillDriftReportPanel report={ws.driftReport} loading={ws.loading} />
           )
         )}
+        {activeTab === "history" && (
+          <WorkshopHistory ws={ws} token={token} />
+        )}
       </div>
+    </div>
+  );
+}
+
+function WorkshopHistory({ ws, token }: { ws: ReturnType<typeof useSkillWorkshop>; token: string }) {
+  const [selectedVersion, setSelectedVersion] = React.useState("");
+  const [confirmText, setConfirmText] = React.useState("");
+
+  React.useEffect(() => {
+    ws.loadHistory().catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    const current = ws.history.find((item) => item.type === "baseline-current")?.versionId;
+    const target = selectedVersion || ws.history.find((item) => item.type !== "baseline-current")?.versionId;
+    if (current && target && current !== target) {
+      ws.compareVersions(current, target).catch(() => {});
+    }
+  }, [ws.history, selectedVersion]);
+
+  const targetVersion = selectedVersion || ws.history.find((item) => item.type !== "baseline-current")?.versionId || "";
+  const canRollback = Boolean(token && targetVersion && confirmText === "ROLLBACK WORKSHOP" && !ws.writeBusy);
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="rounded-lg p-4" style={{ background: "var(--bg-panel)", border: "1px solid var(--border-stone)" }}>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <History size={15} style={{ color: "var(--accent-teal)" }} />
+            <span className="text-xs font-semibold" style={{ color: "var(--text-main)" }}>版本时间轴</span>
+          </div>
+          <button
+            type="button"
+            className="rounded-md px-2 py-1 text-xs"
+            style={{ border: "1px solid var(--border-light)", color: "var(--text-secondary)" }}
+            onClick={() => ws.loadHistory()}
+          >
+            刷新
+          </button>
+        </div>
+        <div className="flex flex-col gap-2">
+          {ws.history.length ? ws.history.map((version) => (
+            <button
+              key={version.versionId}
+              type="button"
+              onClick={() => {
+                setSelectedVersion(version.versionId);
+                setConfirmText("");
+              }}
+              className="rounded-md p-3 text-left"
+              style={{
+                background: selectedVersion === version.versionId ? "rgba(24,166,166,0.08)" : "var(--bg-panel-soft)",
+                border: selectedVersion === version.versionId ? "1px solid var(--accent-teal)" : "1px solid var(--border-light)",
+              }}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold" style={{ color: "var(--text-main)" }}>{version.versionId}</span>
+                <span className="rounded px-2 py-0.5 text-[10px]" style={{ background: "var(--bg-panel)", color: "var(--text-muted)", border: "1px solid var(--border-light)" }}>
+                  {version.type}
+                </span>
+              </div>
+              <div className="mt-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+                {version.timestamp ? new Date(version.timestamp).toLocaleString() : "无时间戳"} · {version.skillCount} skills
+              </div>
+              <div className="mt-1 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{version.sourceFile}</div>
+            </button>
+          )) : (
+            <div className="rounded-md p-6 text-center text-sm" style={{ background: "var(--bg-panel-soft)", color: "var(--text-muted)", border: "1px solid var(--border-light)" }}>
+              暂无 baseline 或 snapshot 版本
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-lg p-4" style={{ background: "var(--bg-panel)", border: "1px solid var(--border-stone)" }}>
+        <div className="mb-3 flex items-center gap-2">
+          <Undo2 size={15} style={{ color: "var(--accent-orange)" }} />
+          <span className="text-xs font-semibold" style={{ color: "var(--text-main)" }}>回滚确认</span>
+        </div>
+        {ws.selectedDiff ? (
+          <div className="mb-3 grid grid-cols-3 gap-2">
+            <DiffMetric label="新增" value={ws.selectedDiff.summary.added} />
+            <DiffMetric label="移除" value={ws.selectedDiff.summary.removed} />
+            <DiffMetric label="变更" value={ws.selectedDiff.summary.changed} />
+          </div>
+        ) : null}
+        {ws.selectedDiff && ws.selectedDiff.changed.length ? (
+          <div className="mb-3 max-h-44 overflow-auto rounded-md p-2 text-xs" style={{ background: "var(--bg-panel-soft)", border: "1px solid var(--border-light)" }}>
+            {ws.selectedDiff.changed.slice(0, 8).map((item) => (
+              <div key={item.skillId} className="border-b py-1 last:border-0" style={{ borderColor: "var(--border-light)", color: "var(--text-secondary)" }}>
+                <div className="font-medium" style={{ color: "var(--text-main)" }}>{item.displayName}</div>
+                <div>{String(item.fromVersion || "").slice(0, 8)} → {String(item.toVersion || "").slice(0, 8)}</div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <label className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>
+          输入 ROLLBACK WORKSHOP
+          <input
+            className="mt-1 w-full rounded-md px-3 py-2 text-xs"
+            style={{ background: "var(--bg-panel-soft)", border: "1px solid var(--border-light)", color: "var(--text-main)" }}
+            value={confirmText}
+            onChange={(event) => setConfirmText(event.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          disabled={!canRollback}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+          style={{ background: "var(--accent-red)", color: "white" }}
+          onClick={() => ws.rollbackVersion(token, targetVersion, confirmText)}
+        >
+          <Undo2 size={13} />
+          回滚到所选版本
+        </button>
+        {ws.writeError && <div className="mt-2 text-xs" style={{ color: "var(--accent-red)" }}>{ws.writeError}</div>}
+        {ws.lastWriteResult && "ok" in ws.lastWriteResult && (
+          <div className="mt-2 text-xs" style={{ color: "var(--accent-green)" }}>写入完成</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DiffMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md p-2 text-center" style={{ background: "var(--bg-panel-soft)", border: "1px solid var(--border-light)" }}>
+      <div className="text-lg font-bold" style={{ color: "var(--accent-teal)" }}>{value}</div>
+      <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{label}</div>
     </div>
   );
 }

@@ -1,13 +1,15 @@
-# Frontend Modules
+﻿# modules
 
-Frontend modules mirror the Control Center sidebar domains.
+这个目录按页面功能域来拆前端代码。
 
-- `agent-array/`: Agent 阵列 and skill tree UI
-- `dashboard/`: Dashboard 总览 UI
-- `model-provider/`: 模型与 Provider UI
-- `logs-diagnostics/`: 日志与诊断 UI
-- `backup-migration/`: 备份与迁移 UI
-- `feishu-connection/`: 飞书连接 UI
-- `routing-rules/`: 路由规则 UI
-- `task-battlefield/`: 任务战场 UI
-- `config-center/`: 配置中心 UI
+子目录说明：
+
+- `agent-array/`：Agent 阵列相关界面。
+- `dashboard/`：总览界面。
+- `logs-diagnostics/`：日志与诊断界面。
+- `model-provider/`、`backup-migration/`、`feishu-connection/`、`routing-rules/`、`task-battlefield/`、`config-center/`：已预留目录，方便以后继续扩展。
+
+学习建议：
+
+- 改哪个页面功能，就先找同名目录。
+- 这个目录和后端 `src/feishu_stack/modules/` 是一一对应的。

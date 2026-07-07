@@ -409,7 +409,7 @@ export interface SkillRuntimeComparisonItem {
   runtimeCount: number;
 }
 
-export type SkillWorkshopTab = 'overview' | 'skill-tree' | 'comparison' | 'drift-report';
+export type SkillWorkshopTab = 'overview' | 'skill-tree' | 'comparison' | 'drift-report' | 'history';
 
 export interface SkillBaselinePreview {
   hasBaseline: boolean;
@@ -443,4 +443,59 @@ export interface SkillSnapshotResult {
   skillCount: number;
   createdAt: string;
   createdBy: string;
+}
+
+export type SkillHistoryVersionType = 'baseline-current' | 'baseline-backup' | 'snapshot';
+
+export interface SkillHistoryVersion {
+  versionId: string;
+  type: SkillHistoryVersionType;
+  sourceFile: string;
+  timestamp: string | null;
+  createdBy: string | null;
+  skillCount: number;
+  summary: string;
+}
+
+export interface SkillHistoryList {
+  versions: SkillHistoryVersion[];
+  total: number;
+}
+
+export interface SkillHistoryDetail extends SkillHistoryVersion {
+  skills: Array<Record<string, unknown>>;
+  rawType: string;
+}
+
+export interface SkillVersionDiff {
+  fromVersion: string;
+  toVersion: string;
+  addedSkillIds: string[];
+  removedSkillIds: string[];
+  changed: Array<{
+    skillId: string;
+    displayName: string;
+    sourceAlias: string;
+    runtime: string;
+    fromVersion: string | null;
+    toVersion: string | null;
+    fromDirectorySha256: string | null;
+    toDirectorySha256: string | null;
+  }>;
+  summary: {
+    added: number;
+    removed: number;
+    changed: number;
+  };
+}
+
+export interface SkillRollbackResult {
+  ok: boolean;
+  rolledBackTo: string;
+  sourceFile: string;
+  baselineFile: string;
+  previousBaselineSnapshot: string | null;
+  skillCount: number;
+  confirmedAt: string;
+  confirmedBy: string;
 }

@@ -9,6 +9,9 @@ import type {
   SkillBaselinePreview,
   SkillBaselineConfirmResult,
   SkillSnapshotResult,
+  SkillHistoryVersion,
+  SkillVersionDiff,
+  SkillRollbackResult,
 } from "../types";
 
 const FALLBACK_TIMEOUT_MS = 8000;
@@ -33,9 +36,11 @@ export interface SkillWorkshopState {
   backendAvailable: boolean;
   consecutiveFailures: number;
   baselinePreview: SkillBaselinePreview | null;
+  history: SkillHistoryVersion[];
+  selectedDiff: SkillVersionDiff | null;
   writeBusy: boolean;
   writeError: string | null;
-  lastWriteResult: SkillBaselineConfirmResult | SkillSnapshotResult | null;
+  lastWriteResult: SkillBaselineConfirmResult | SkillSnapshotResult | SkillRollbackResult | null;
 }
 
 export function useSkillWorkshop() {
@@ -49,6 +54,8 @@ export function useSkillWorkshop() {
     backendAvailable: true,
     consecutiveFailures: 0,
     baselinePreview: null,
+    history: [],
+    selectedDiff: null,
     writeBusy: false,
     writeError: null,
     lastWriteResult: null,
@@ -101,7 +108,8 @@ export function useSkillWorkshop() {
         });
 
         failureRef.current = 0;
-        setState({
+        setState((prev) => ({
+          ...prev,
           summary,
           skills,
           driftReport,
@@ -110,7 +118,7 @@ export function useSkillWorkshop() {
           error: null,
           backendAvailable: true,
           consecutiveFailures: 0,
-        });
+        }));
       } else {
         throw new Error("No workshop data returned");
       }
@@ -141,6 +149,19 @@ export function useSkillWorkshop() {
     const preview = await readJson<SkillBaselinePreview>("/api/skill-workshop/baseline/preview");
     setState((prev) => ({ ...prev, baselinePreview: preview }));
     return preview;
+  }, []);
+
+  const loadHistory = React.useCallback(async () => {
+    const result = await readJson<{ versions: SkillHistoryVersion[] }>("/api/skill-workshop/history");
+    setState((prev) => ({ ...prev, history: result.versions ?? [] }));
+    return result.versions ?? [];
+  }, []);
+
+  const compareVersions = React.useCallback(async (fromVersion: string, toVersion: string) => {
+    const params = new URLSearchParams({ from: fromVersion, to: toVersion });
+    const diff = await readJson<SkillVersionDiff>(`/api/skill-workshop/compare?${params.toString()}`);
+    setState((prev) => ({ ...prev, selectedDiff: diff }));
+    return diff;
   }, []);
 
   const confirmBaseline = React.useCallback(async (token: string, confirmText: string, confirmedBy = "manual") => {
@@ -187,6 +208,7 @@ export function useSkillWorkshop() {
         body: JSON.stringify({ confirmText, createdBy }),
       });
       setState((prev) => ({ ...prev, writeBusy: false, lastWriteResult: result }));
+      await loadHistory();
       return result;
     } catch (err) {
       setState((prev) => ({
@@ -196,7 +218,35 @@ export function useSkillWorkshop() {
       }));
       return null;
     }
-  }, []);
+  }, [loadHistory]);
 
-  return { ...state, refresh, loadBaselinePreview, confirmBaseline, createSnapshot };
+  const rollbackVersion = React.useCallback(async (token: string, versionId: string, confirmText: string, confirmedBy = "manual") => {
+    if (!token) {
+      setState((prev) => ({ ...prev, writeError: "Control token is not ready." }));
+      return null;
+    }
+    setState((prev) => ({ ...prev, writeBusy: true, writeError: null }));
+    try {
+      const result = await readJson<SkillRollbackResult>(`/api/skill-workshop/rollback/${encodeURIComponent(versionId)}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Control-Token": token,
+        },
+        body: JSON.stringify({ confirmText, confirmedBy }),
+      });
+      setState((prev) => ({ ...prev, writeBusy: false, lastWriteResult: result }));
+      await Promise.all([refresh(), loadHistory()]);
+      return result;
+    } catch (err) {
+      setState((prev) => ({
+        ...prev,
+        writeBusy: false,
+        writeError: err instanceof Error ? err.message : "回滚版本失败",
+      }));
+      return null;
+    }
+  }, [loadHistory, refresh]);
+
+  return { ...state, refresh, loadBaselinePreview, loadHistory, compareVersions, confirmBaseline, createSnapshot, rollbackVersion };
 }
