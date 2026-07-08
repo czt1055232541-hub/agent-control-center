@@ -6,11 +6,11 @@ import {
 import type { SkillDriftReport, SkillDriftReportItem, DriftSeverity } from "../../../types";
 
 const severityMeta: Record<DriftSeverity, { label: string; color: string; bg: string; icon: React.ReactNode; order: number }> = {
-  critical: { label: "P0 \u4e25\u91cd", color: "var(--accent-red)", bg: "rgba(216,60,46,0.08)", icon: <ShieldAlert size={14} />, order: 0 },
-  error: { label: "P1 \u9519\u8bef", color: "var(--accent-orange)", bg: "rgba(232,138,40,0.08)", icon: <AlertOctagon size={14} />, order: 1 },
-  warning: { label: "P2 \u8b66\u544a", color: "var(--accent-gold)", bg: "rgba(216,167,46,0.08)", icon: <AlertTriangle size={14} />, order: 2 },
-  info: { label: "\u4fe1\u606f", color: "var(--accent-blue)", bg: "rgba(47,128,201,0.08)", icon: <Info size={14} />, order: 3 },
-  normal: { label: "\u6b63\u5e38", color: "var(--accent-green)", bg: "rgba(59,168,90,0.08)", icon: <Info size={14} />, order: 4 },
+  critical: { label: "P0 严重", color: "var(--accent-red)", bg: "rgba(216,60,46,0.08)", icon: <ShieldAlert size={14} />, order: 0 },
+  error: { label: "P1 错误", color: "var(--accent-orange)", bg: "rgba(232,138,40,0.08)", icon: <AlertOctagon size={14} />, order: 1 },
+  warning: { label: "P2 警告", color: "var(--accent-gold)", bg: "rgba(216,167,46,0.08)", icon: <AlertTriangle size={14} />, order: 2 },
+  info: { label: "信息", color: "var(--accent-blue)", bg: "rgba(47,128,201,0.08)", icon: <Info size={14} />, order: 3 },
+  normal: { label: "正常", color: "var(--accent-green)", bg: "rgba(59,168,90,0.08)", icon: <Info size={14} />, order: 4 },
 };
 
 interface SkillDriftReportPanelProps {
@@ -32,7 +32,7 @@ export function SkillDriftReportPanel({ report, loading }: SkillDriftReportPanel
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12 text-sm" style={{ color: "var(--text-muted)" }}>
-        \u52a0\u8f7d\u6f02\u79fb\u62a5\u544a...
+        加载漂移报告...
       </div>
     );
   }
@@ -45,10 +45,10 @@ export function SkillDriftReportPanel({ report, loading }: SkillDriftReportPanel
       >
         <CheckCircleIcon />
         <p className="text-sm font-medium" style={{ color: "var(--accent-green)" }}>
-          \u672a\u68c0\u6d4b\u5230\u6280\u80fd\u6f02\u79fb
+          未检测到技能漂移
         </p>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          {report ? `\u751f\u6210\u65f6\u95f4: ${new Date(report.generatedAt).toLocaleString()}` : "\u5c1a\u672a\u751f\u6210\u62a5\u544a"}
+          {report ? `生成时间: ${new Date(report.generatedAt).toLocaleString()}` : "尚未生成报告"}
         </p>
       </div>
     );
@@ -66,11 +66,11 @@ export function SkillDriftReportPanel({ report, loading }: SkillDriftReportPanel
         <div className="flex items-center gap-2">
           <AlertTriangle size={16} style={{ color: report.summary.driftCount > 0 ? "var(--accent-red)" : "var(--accent-green)" }} />
           <span className="text-sm font-semibold" style={{ color: "var(--text-main)" }}>
-            \u6f02\u79fb\u62a5\u544a
+            漂移报告
           </span>
         </div>
         <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-          \u5171 {report.summary.totalSkills} \u6280\u80fd \u00b7 {report.summary.driftCount} \u6f02\u79fb \u00b7 {report.summary.noBaselineCount} \u65e0\u57fa\u7ebf
+          共 {report.summary.totalSkills} 技能 · {report.summary.driftCount} 漂移 · {report.summary.noBaselineCount} 无基线
         </span>
         <div className="ml-auto flex flex-wrap gap-1.5">
           {report.summary.p0Count > 0 && (
@@ -102,7 +102,7 @@ export function SkillDriftReportPanel({ report, loading }: SkillDriftReportPanel
           }}
         >
           <Download size={10} />
-          \u5bfc\u51fa JSON
+          导出 JSON
         </button>
       </div>
 
@@ -128,7 +128,7 @@ export function SkillDriftReportPanel({ report, loading }: SkillDriftReportPanel
                   {item.displayName}
                 </span>
                 <span className="rounded px-2 py-0.5 text-[10px]" style={{ background: "var(--bg-panel-soft)", color: "var(--text-secondary)", border: "1px solid var(--border-light)" }}>
-                  {item.sourceAlias} \u00b7 {item.runtime}
+                  {item.sourceAlias} · {item.runtime}
                 </span>
                 {isExpanded ? <ChevronDown size={14} style={{ color: "var(--text-muted)" }} /> : <ChevronRight size={14} style={{ color: "var(--text-muted)" }} />}
               </button>
@@ -137,19 +137,19 @@ export function SkillDriftReportPanel({ report, loading }: SkillDriftReportPanel
                 <div className="border-t px-4 py-3" style={{ borderColor: "var(--border-light)", background: "var(--bg-panel-soft)" }}>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <div className="text-[10px] font-medium mb-1" style={{ color: "var(--text-secondary)" }}>\u5b9e\u9645 Hash</div>
+                      <div className="text-[10px] font-medium mb-1" style={{ color: "var(--text-secondary)" }}>实际 Hash</div>
                       <code className="text-[10px] break-all" style={{ color: "var(--text-main)" }}>{item.actualHash}</code>
                     </div>
                     <div>
-                      <div className="text-[10px] font-medium mb-1" style={{ color: "var(--text-secondary)" }}>\u57fa\u7ebf Hash</div>
+                      <div className="text-[10px] font-medium mb-1" style={{ color: "var(--text-secondary)" }}>基线 Hash</div>
                       <code className="text-[10px] break-all" style={{ color: item.baselineHash ? "var(--text-main)" : "var(--text-muted)" }}>
-                        {item.baselineHash ?? "\u672a\u5efa\u7acb\u57fa\u7ebf"}
+                        {item.baselineHash ?? "未建立基线"}
                       </code>
                     </div>
                   </div>
                   {item.drift.reasons.length > 0 && (
                     <div className="mt-3">
-                      <div className="text-[10px] font-medium mb-1" style={{ color: "var(--text-secondary)" }}>\u6f02\u79fb\u539f\u56e0</div>
+                      <div className="text-[10px] font-medium mb-1" style={{ color: "var(--text-secondary)" }}>漂移原因</div>
                       <ul className="space-y-1">
                         {item.drift.reasons.map((reason, ri) => (
                           <li key={ri} className="flex items-start gap-1 text-[10px]" style={{ color: sev.color }}>
@@ -162,7 +162,7 @@ export function SkillDriftReportPanel({ report, loading }: SkillDriftReportPanel
                   )}
                   {item.suggestion && (
                     <div className="mt-3 rounded p-2 text-[10px]" style={{ background: `${sev.color}10`, color: sev.color, border: `1px solid ${sev.color}20` }}>
-                      <span className="font-semibold">\u5efa\u8bae: </span>
+                      <span className="font-semibold">建议: </span>
                       {item.suggestion}
                     </div>
                   )}
@@ -174,7 +174,7 @@ export function SkillDriftReportPanel({ report, loading }: SkillDriftReportPanel
       </div>
 
       <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-        \u62a5\u544a\u751f\u6210\u65f6\u95f4: {new Date(report.generatedAt).toLocaleString()} \u00b7 \u6f02\u79fb\u62a5\u544a\u4e3a\u53ea\u8bfb\u89c6\u56fe\uff0c\u4e0d\u81ea\u52a8\u4fee\u6539\u4efb\u4f55\u6280\u80fd\u6587\u4ef6
+        报告生成时间: {new Date(report.generatedAt).toLocaleString()} · 漂移报告为只读视图，不自动修改任何技能文件
       </div>
     </div>
   );

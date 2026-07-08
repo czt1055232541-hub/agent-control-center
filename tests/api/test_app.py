@@ -275,6 +275,29 @@ def test_backup_cleanup_route_uses_mock(monkeypatch) -> None:
     assert called["clean"] is True
 
 
+def test_control_center_shutdown_requires_token() -> None:
+    response = client.post("/api/control-center/shutdown")
+    assert response.status_code == 401
+    response = client.post("/api/control-center/shutdown", headers={"X-Control-Token": "bad"})
+    assert response.status_code == 403
+
+
+def test_control_center_shutdown_route_uses_mock(monkeypatch) -> None:
+    token = _token()
+    called = {"shutdown": False}
+
+    def fake_shutdown():
+        called["shutdown"] = True
+        return OperationResult(True, "control-center", "shutdown", "mock shutdown", pid=123, port=8765)
+
+    monkeypatch.setattr(app_module.control_center, "request_shutdown", fake_shutdown)
+    response = client.post("/api/control-center/shutdown", headers={"X-Control-Token": token})
+    assert response.status_code == 200
+    assert response.json()["component"] == "control-center"
+    assert response.json()["action"] == "shutdown"
+    assert called["shutdown"] is True
+
+
 def test_control_center_log_route() -> None:
     response = client.get("/api/logs/control-center-api")
     assert response.status_code == 200

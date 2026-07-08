@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -12,6 +13,13 @@ from feishu_stack.core.models import OperationResult
 from feishu_stack.core.process import CREATE_NO_WINDOW, is_port_listening, process_info, read_pid, run_capture, terminate_pid, write_pid
 
 PORT = 8765
+EXCLUDED_PROCESS_MARKERS = (
+    "openclaw",
+    "codex-agent",
+    "codex_desktop",
+    "codex desktop",
+    "moonbridge",
+)
 
 
 def _web_dist_index(cfg: StackConfig) -> Path:
@@ -20,6 +28,15 @@ def _web_dist_index(cfg: StackConfig) -> Path:
 
 def _control_pid(cfg: StackConfig) -> Path:
     return cfg.pid_dir / "control-center-api.pid"
+
+
+def _pythonpath_env(cfg: StackConfig) -> dict[str, str]:
+    env = os.environ.copy()
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    src_path = str(cfg.stack_root / "src")
+    env["PYTHONPATH"] = src_path + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    return env
 
 
 def start(config: StackConfig | None = None, open_browser: bool = False, build: bool = True) -> OperationResult:
@@ -41,6 +58,7 @@ def start(config: StackConfig | None = None, open_browser: bool = False, build: 
     proc = subprocess.Popen(
         [str(cfg.python_exe), "-m", "uvicorn", "feishu_stack.app:app", "--host", "127.0.0.1", "--port", str(PORT)],
         cwd=str(control_dir),
+        env=_pythonpath_env(cfg),
         stdin=subprocess.DEVNULL,
         stdout=open_rotating(cfg.log_dir / "control-center-api-out.log"),
         stderr=open_rotating(cfg.log_dir / "control-center-api-err.log"),
@@ -130,6 +148,8 @@ def install_shortcut(config: StackConfig | None = None) -> OperationResult:
                 "env = os.environ.copy()",
                 "env.setdefault('PYTHONUTF8', '1')",
                 "env.setdefault('PYTHONIOENCODING', 'utf-8')",
+                "src_path = str(STACK_ROOT / 'src')",
+                "env['PYTHONPATH'] = src_path + (os.pathsep + env['PYTHONPATH'] if env.get('PYTHONPATH') else '')",
                 "LAUNCHER_LOG.parent.mkdir(parents=True, exist_ok=True)",
                 "with LAUNCHER_LOG.open('a', encoding='utf-8') as log:",
                 "    log.write('Launching Agent Control Center\\n')",
@@ -154,5 +174,115 @@ def install_shortcut(config: StackConfig | None = None) -> OperationResult:
         "control-center",
         "install-shortcut",
         f"Created Python launcher: {launcher_path}",
+        duration_ms=int((time.monotonic() - started) * 1000),
+    )
+
+
+def _safe_process_table() -> list[dict[str, object]]:
+    try:
+        import psutil  # type: ignore
+    except Exception:
+        return []
+
+    rows: list[dict[str, object]] = []
+    for proc in psutil.process_iter(["pid", "name", "exe", "cmdline", "ppid"]):
+        try:
+            rows.append(
+                {
+                    "pid": proc.pid,
+                    "name": proc.info.get("name") or "",
+                    "exe": proc.info.get("exe") or "",
+                    "cmdline": " ".join(proc.info.get("cmdline") or []),
+                    "cwd": proc.cwd(),
+                }
+            )
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
+    return rows
+
+
+def _is_control_center_process(row: dict[str, object], cfg: StackConfig) -> bool:
+    pid = int(row.get("pid") or 0)
+    if pid <= 0:
+        return False
+    text = " ".join(str(row.get(key) or "") for key in ("name", "exe", "cmdline", "cwd")).lower()
+    if any(marker in text for marker in EXCLUDED_PROCESS_MARKERS):
+        return False
+    if str(cfg.stack_root).lower() not in text:
+        return False
+    return (
+        "serve-control-center" in text
+        or "stop-control-center" in text
+        or "status-control-center" in text
+        or "feishu_stack.app:app" in text
+        or "control-center" in text
+        or f"--port {PORT}" in text
+    )
+
+
+def control_center_processes(config: StackConfig | None = None) -> list[dict[str, object]]:
+    cfg = config or load_config()
+    return [row for row in _safe_process_table() if _is_control_center_process(row, cfg)]
+
+
+def _terminate_pids(pids: list[int], *, current_pid: int) -> None:
+    try:
+        import psutil  # type: ignore
+    except Exception:
+        return
+
+    for pid in pids:
+        if pid == current_pid:
+            continue
+        try:
+            psutil.Process(pid).terminate()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+    deadline = time.monotonic() + 4
+    while time.monotonic() < deadline:
+        alive: list[int] = []
+        for pid in pids:
+            if pid == current_pid:
+                continue
+            try:
+                if psutil.Process(pid).is_running():
+                    alive.append(pid)
+            except psutil.NoSuchProcess:
+                pass
+        if not alive:
+            break
+        time.sleep(0.2)
+    for pid in pids:
+        if pid == current_pid:
+            continue
+        try:
+            psutil.Process(pid).kill()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+
+def request_shutdown(config: StackConfig | None = None, *, delay_s: float = 0.4) -> OperationResult:
+    cfg = config or load_config()
+    started = time.monotonic()
+    current_pid = os.getpid()
+    pids = sorted({int(row["pid"]) for row in control_center_processes(cfg)})
+    if current_pid not in pids:
+        pids.append(current_pid)
+
+    def _shutdown_later() -> None:
+        time.sleep(delay_s)
+        _terminate_pids(pids, current_pid=current_pid)
+        if _control_pid(cfg).exists():
+            _control_pid(cfg).unlink(missing_ok=True)
+        os._exit(0)
+
+    threading.Thread(target=_shutdown_later, name="control-center-shutdown", daemon=True).start()
+    return OperationResult(
+        ok=True,
+        component="control-center",
+        action="shutdown",
+        message=f"Control Center shutdown scheduled for PIDs: {', '.join(str(pid) for pid in pids)}. OpenClaw and Codex processes are excluded.",
+        pid=current_pid,
+        port=PORT,
         duration_ms=int((time.monotonic() - started) * 1000),
     )

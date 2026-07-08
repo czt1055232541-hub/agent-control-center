@@ -1,0 +1,1078 @@
+{
+  "version": 3,
+  "agent": {
+    "id": "coordinator",
+    "icon": "C",
+    "name": "项目调度官",
+    "title": "Commander Agent",
+    "role": "任务拆解 / Agent 调度",
+    "runtime": "openclaw-agent",
+    "model": "deepseek-v4-flash",
+    "workspace": "F:\\1AI\\Agent control center\\workspaces\\coordinator",
+    "skillRoots": {
+      "openclaw": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills",
+      "codex": "E:\\codeX\\skills"
+    },
+    "tools": [
+      "dispatch",
+      "read_sessions",
+      "summarize"
+    ],
+    "permissions": [
+      "read",
+      "route"
+    ],
+    "accent": "#2f80c9"
+  },
+  "nodes": [
+    {
+      "id": "model_base",
+      "label": "模型基座",
+      "nodeType": "model",
+      "model": "deepseek-v4-flash",
+      "category": "basic",
+      "branch": "base",
+      "x": 50,
+      "y": 12,
+      "description": "项目调度官 的模型原点，不对应 SKILL.md。"
+    },
+    {
+      "id": "generic_openclaw_1password",
+      "label": "1password",
+      "nodeType": "skill",
+      "skillName": "1password",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\1password\\SKILL.md",
+      "category": "permission",
+      "branch": "generic",
+      "x": 14,
+      "y": 28,
+      "gear": [],
+      "description": "Set up and use 1Password CLI for sign-in, desktop integration, and reading or injecting secrets."
+    },
+    {
+      "id": "generic_openclaw_apple_notes",
+      "label": "apple notes",
+      "nodeType": "skill",
+      "skillName": "apple-notes",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\apple-notes\\SKILL.md",
+      "category": "basic",
+      "branch": "generic",
+      "x": 27,
+      "y": 28,
+      "gear": [],
+      "description": "Create, view, edit, delete, search, move, or export Apple Notes via the memo CLI on macOS."
+    },
+    {
+      "id": "generic_openclaw_apple_reminders",
+      "label": "apple reminders",
+      "nodeType": "skill",
+      "skillName": "apple-reminders",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\apple-reminders\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 40,
+      "y": 28,
+      "gear": [],
+      "description": "List, add, edit, complete, or delete Apple Reminders and reminder lists via remindctl."
+    },
+    {
+      "id": "generic_openclaw_bear_notes",
+      "label": "bear notes",
+      "nodeType": "skill",
+      "skillName": "bear-notes",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\bear-notes\\SKILL.md",
+      "category": "basic",
+      "branch": "generic",
+      "x": 14,
+      "y": 41,
+      "gear": [],
+      "description": "Create, search, and manage Bear notes via grizzly CLI."
+    },
+    {
+      "id": "generic_openclaw_blucli",
+      "label": "blucli",
+      "nodeType": "skill",
+      "skillName": "blucli",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\blucli\\SKILL.md",
+      "category": "tool",
+      "branch": "generic",
+      "x": 27,
+      "y": 41,
+      "gear": [],
+      "description": "BluOS CLI (blu) for discovery, playback, grouping, and volume."
+    },
+    {
+      "id": "generic_openclaw_camsnap",
+      "label": "camsnap",
+      "nodeType": "skill",
+      "skillName": "camsnap",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\camsnap\\SKILL.md",
+      "category": "tool",
+      "branch": "generic",
+      "x": 40,
+      "y": 41,
+      "gear": [],
+      "description": "Capture frames or clips from RTSP/ONVIF cameras."
+    },
+    {
+      "id": "generic_openclaw_canvas",
+      "label": "canvas",
+      "nodeType": "skill",
+      "skillName": "canvas",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\canvas\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 14,
+      "y": 54,
+      "gear": [],
+      "description": "Present HTML on connected OpenClaw node canvases, navigate/eval/snapshot, and debug canvas host URLs."
+    },
+    {
+      "id": "generic_openclaw_discord",
+      "label": "discord",
+      "nodeType": "skill",
+      "skillName": "discord",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\discord\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 27,
+      "y": 54,
+      "gear": [],
+      "description": "Discord message-tool ops: send/read/edit/delete, react, poll, pin, thread, search, presence, media/components."
+    },
+    {
+      "id": "generic_openclaw_eightctl",
+      "label": "eightctl",
+      "nodeType": "skill",
+      "skillName": "eightctl",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\eightctl\\SKILL.md",
+      "category": "tool",
+      "branch": "generic",
+      "x": 40,
+      "y": 54,
+      "gear": [],
+      "description": "Control Eight Sleep pods (status, temperature, alarms, schedules)."
+    },
+    {
+      "id": "generic_openclaw_gemini",
+      "label": "gemini",
+      "nodeType": "skill",
+      "skillName": "gemini",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\gemini\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 14,
+      "y": 67,
+      "gear": [],
+      "description": "Gemini CLI one-shot prompts, summaries, generation, skills, hooks, MCP, or Gemma routing."
+    },
+    {
+      "id": "generic_openclaw_gifgrep",
+      "label": "gifgrep",
+      "nodeType": "skill",
+      "skillName": "gifgrep",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\gifgrep\\SKILL.md",
+      "category": "tool",
+      "branch": "generic",
+      "x": 27,
+      "y": 67,
+      "gear": [],
+      "description": "Search GIF providers with CLI/TUI, download results, and extract stills/sheets."
+    },
+    {
+      "id": "generic_openclaw_gog",
+      "label": "gog",
+      "nodeType": "skill",
+      "skillName": "gog",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\gog\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 40,
+      "y": 67,
+      "gear": [],
+      "description": "Google Workspace CLI for Gmail, Calendar, Drive, Contacts, Sheets, and Docs."
+    },
+    {
+      "id": "generic_openclaw_goplaces",
+      "label": "goplaces",
+      "nodeType": "skill",
+      "skillName": "goplaces",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\goplaces\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 14,
+      "y": 80,
+      "gear": [],
+      "description": "Query Google Places for text search, place details, resolve, reviews, or scriptable JSON via goplaces."
+    },
+    {
+      "id": "generic_openclaw_himalaya",
+      "label": "himalaya",
+      "nodeType": "skill",
+      "skillName": "himalaya",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\himalaya\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 27,
+      "y": 80,
+      "gear": [],
+      "description": "Himalaya CLI for IMAP/SMTP mail: list, read, search, compose, reply, forward, copy, move, delete."
+    },
+    {
+      "id": "generic_openclaw_imsg",
+      "label": "imsg",
+      "nodeType": "skill",
+      "skillName": "imsg",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\imsg\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 40,
+      "y": 80,
+      "gear": [],
+      "description": "iMessage/SMS CLI for listing chats, history, and sending messages via Messages.app."
+    },
+    {
+      "id": "generic_openclaw_mcporter",
+      "label": "mcporter",
+      "nodeType": "skill",
+      "skillName": "mcporter",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\mcporter\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 14,
+      "y": 93,
+      "gear": [],
+      "description": "List, configure, authenticate, call, and inspect MCP servers/tools with mcporter over HTTP or stdio."
+    },
+    {
+      "id": "generic_openclaw_meme_maker",
+      "label": "meme maker",
+      "nodeType": "skill",
+      "skillName": "meme-maker",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\meme-maker\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 27,
+      "y": 93,
+      "gear": [],
+      "description": "Search meme templates, suggest formats, and generate local or hosted image memes."
+    },
+    {
+      "id": "generic_openclaw_model_usage",
+      "label": "model usage",
+      "nodeType": "skill",
+      "skillName": "model-usage",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\model-usage\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 40,
+      "y": 93,
+      "gear": [],
+      "description": "Summarize CodexBar local cost logs by model for Codex or Claude, including current or full breakdowns."
+    },
+    {
+      "id": "generic_openclaw_nano_pdf",
+      "label": "nano pdf",
+      "nodeType": "skill",
+      "skillName": "nano-pdf",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\nano-pdf\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 14,
+      "y": 106,
+      "gear": [],
+      "description": "Edit PDFs with natural-language instructions using the nano-pdf CLI."
+    },
+    {
+      "id": "generic_openclaw_node_connect",
+      "label": "node connect",
+      "nodeType": "skill",
+      "skillName": "node-connect",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\node-connect\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 27,
+      "y": 106,
+      "gear": [],
+      "description": "Diagnose OpenClaw Android, iOS, or macOS node pairing, QR/setup code, route, auth, and connection failures."
+    },
+    {
+      "id": "generic_openclaw_node_inspect_debugger",
+      "label": "node inspect debugger",
+      "nodeType": "skill",
+      "skillName": "node-inspect-debugger",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\node-inspect-debugger\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 40,
+      "y": 106,
+      "gear": [],
+      "description": "Debug Node.js with node inspect, --inspect, breakpoints, CDP, heap, and CPU profiles."
+    },
+    {
+      "id": "generic_openclaw_notion",
+      "label": "notion",
+      "nodeType": "skill",
+      "skillName": "notion",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\notion\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 14,
+      "y": 119,
+      "gear": [],
+      "description": "Notion CLI/API for pages, Markdown content, data sources, files, comments, search, Workers, and raw API calls."
+    },
+    {
+      "id": "generic_openclaw_obsidian",
+      "label": "obsidian",
+      "nodeType": "skill",
+      "skillName": "obsidian",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\obsidian\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 27,
+      "y": 119,
+      "gear": [],
+      "description": "Work with Obsidian vaults using the official obsidian CLI: read/search/create/edit notes, tasks, links, properties, plugins."
+    },
+    {
+      "id": "generic_openclaw_openai_whisper",
+      "label": "openai whisper",
+      "nodeType": "skill",
+      "skillName": "openai-whisper",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\openai-whisper\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 40,
+      "y": 119,
+      "gear": [],
+      "description": "Local speech-to-text with the Whisper CLI (no API key)."
+    },
+    {
+      "id": "generic_openclaw_openai_whisper_api",
+      "label": "openai whisper api",
+      "nodeType": "skill",
+      "skillName": "openai-whisper-api",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\openai-whisper-api\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 14,
+      "y": 132,
+      "gear": [],
+      "description": "OpenAI Audio Transcriptions API via curl; gpt-4o-transcribe, mini, diarize, or whisper-1."
+    },
+    {
+      "id": "generic_openclaw_openhue",
+      "label": "openhue",
+      "nodeType": "skill",
+      "skillName": "openhue",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\openhue\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 27,
+      "y": 132,
+      "gear": [],
+      "description": "Control Philips Hue lights and scenes via the OpenHue CLI."
+    },
+    {
+      "id": "generic_openclaw_oracle",
+      "label": "oracle",
+      "nodeType": "skill",
+      "skillName": "oracle",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\oracle\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 40,
+      "y": 132,
+      "gear": [],
+      "description": "Oracle CLI second-model review/debug/refactor/design with selected files, dry-run token checks, API or browser engine."
+    },
+    {
+      "id": "generic_openclaw_ordercli",
+      "label": "ordercli",
+      "nodeType": "skill",
+      "skillName": "ordercli",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\ordercli\\SKILL.md",
+      "category": "tool",
+      "branch": "generic",
+      "x": 14,
+      "y": 145,
+      "gear": [],
+      "description": "Foodora-only CLI for checking past orders and active order status (Deliveroo WIP)."
+    },
+    {
+      "id": "generic_openclaw_peekaboo",
+      "label": "peekaboo",
+      "nodeType": "skill",
+      "skillName": "peekaboo",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\peekaboo\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 27,
+      "y": 145,
+      "gear": [],
+      "description": "Capture and automate macOS UI with the Peekaboo CLI."
+    },
+    {
+      "id": "generic_openclaw_python_debugpy",
+      "label": "python debugpy",
+      "nodeType": "skill",
+      "skillName": "python-debugpy",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\python-debugpy\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 40,
+      "y": 145,
+      "gear": [],
+      "description": "Debug Python with pdb, breakpoint(), post-mortem inspection, and debugpy remote attach."
+    },
+    {
+      "id": "generic_openclaw_sag",
+      "label": "sag",
+      "nodeType": "skill",
+      "skillName": "sag",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\sag\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 14,
+      "y": 158,
+      "gear": [],
+      "description": "ElevenLabs text-to-speech with mac-style say UX."
+    },
+    {
+      "id": "generic_openclaw_session_logs",
+      "label": "session logs",
+      "nodeType": "skill",
+      "skillName": "session-logs",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\session-logs\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 27,
+      "y": 158,
+      "gear": [],
+      "description": "Search and analyze your own session logs (older/parent conversations) using jq."
+    },
+    {
+      "id": "generic_openclaw_sherpa_onnx_tts",
+      "label": "sherpa onnx tts",
+      "nodeType": "skill",
+      "skillName": "sherpa-onnx-tts",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\sherpa-onnx-tts\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 40,
+      "y": 158,
+      "gear": [],
+      "description": "Local text-to-speech via sherpa-onnx (offline, no cloud)"
+    },
+    {
+      "id": "generic_openclaw_skill_creator",
+      "label": "skill creator",
+      "nodeType": "skill",
+      "skillName": "skill-creator",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\skill-creator\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 14,
+      "y": 171,
+      "gear": [],
+      "description": "Create, edit, audit, tidy, validate, or restructure AgentSkills and SKILL.md files."
+    },
+    {
+      "id": "generic_openclaw_slack",
+      "label": "slack",
+      "nodeType": "skill",
+      "skillName": "slack",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\slack\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 27,
+      "y": 171,
+      "gear": [],
+      "description": "Slack tool actions: send/read/edit/delete messages, react, pin/unpin, list pins/reactions/emoji, member info."
+    },
+    {
+      "id": "generic_openclaw_songsee",
+      "label": "songsee",
+      "nodeType": "skill",
+      "skillName": "songsee",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\songsee\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 40,
+      "y": 171,
+      "gear": [],
+      "description": "Generate spectrograms and feature-panel visualizations from audio with the songsee CLI."
+    },
+    {
+      "id": "generic_openclaw_sonoscli",
+      "label": "sonoscli",
+      "nodeType": "skill",
+      "skillName": "sonoscli",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\sonoscli\\SKILL.md",
+      "category": "tool",
+      "branch": "generic",
+      "x": 14,
+      "y": 184,
+      "gear": [],
+      "description": "Control Sonos speakers (discover/status/play/volume/group)."
+    },
+    {
+      "id": "generic_openclaw_spike",
+      "label": "spike",
+      "nodeType": "skill",
+      "skillName": "spike",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\spike\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 27,
+      "y": 184,
+      "gear": [],
+      "description": "Run throwaway prototypes to validate feasibility, compare approaches, and report a verdict."
+    },
+    {
+      "id": "generic_openclaw_spotify_player",
+      "label": "spotify player",
+      "nodeType": "skill",
+      "skillName": "spotify-player",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\spotify-player\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 40,
+      "y": 184,
+      "gear": [],
+      "description": "Terminal Spotify playback/search via spogo (preferred) or spotify_player."
+    },
+    {
+      "id": "generic_openclaw_summarize",
+      "label": "summarize",
+      "nodeType": "skill",
+      "skillName": "summarize",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\summarize\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 14,
+      "y": 197,
+      "gear": [],
+      "description": "Summarize or transcribe URLs, YouTube/videos, podcasts, articles, transcripts, PDFs, and local files."
+    },
+    {
+      "id": "generic_openclaw_taskflow",
+      "label": "taskflow",
+      "nodeType": "skill",
+      "skillName": "taskflow",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\taskflow\\SKILL.md",
+      "category": "workflow",
+      "branch": "generic",
+      "x": 27,
+      "y": 197,
+      "gear": [],
+      "description": "Coordinate multi-step detached tasks as one durable TaskFlow job with owner context, state, waits, and child tasks."
+    },
+    {
+      "id": "generic_openclaw_taskflow_inbox_triage",
+      "label": "taskflow inbox triage",
+      "nodeType": "skill",
+      "skillName": "taskflow-inbox-triage",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\taskflow-inbox-triage\\SKILL.md",
+      "category": "workflow",
+      "branch": "generic",
+      "x": 40,
+      "y": 197,
+      "gear": [],
+      "description": "Example TaskFlow pattern for inbox triage, intent routing, waiting on replies, and later summaries."
+    },
+    {
+      "id": "generic_openclaw_things_mac",
+      "label": "things mac",
+      "nodeType": "skill",
+      "skillName": "things-mac",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\things-mac\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 14,
+      "y": 210,
+      "gear": [],
+      "description": "Add, update, list, search, or inspect Things 3 todos, inbox, today, projects, areas, and tags on macOS."
+    },
+    {
+      "id": "generic_openclaw_tmux",
+      "label": "tmux",
+      "nodeType": "skill",
+      "skillName": "tmux",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\tmux\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 27,
+      "y": 210,
+      "gear": [],
+      "description": "Control tmux sessions/panes for interactive CLIs: list, capture output, send keys, paste text, monitor prompts."
+    },
+    {
+      "id": "generic_openclaw_trello",
+      "label": "trello",
+      "nodeType": "skill",
+      "skillName": "trello",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\trello\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 40,
+      "y": 210,
+      "gear": [],
+      "description": "Manage Trello boards, lists, and cards via the Trello REST API."
+    },
+    {
+      "id": "generic_openclaw_video_frames",
+      "label": "video frames",
+      "nodeType": "skill",
+      "skillName": "video-frames",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\video-frames\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 14,
+      "y": 223,
+      "gear": [],
+      "description": "Extract frames or short clips from videos using ffmpeg."
+    },
+    {
+      "id": "generic_openclaw_voice_call",
+      "label": "voice call",
+      "nodeType": "skill",
+      "skillName": "voice-call",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\voice-call\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 27,
+      "y": 223,
+      "gear": [],
+      "description": "Start voice calls via the OpenClaw voice-call plugin."
+    },
+    {
+      "id": "generic_openclaw_wacli",
+      "label": "wacli",
+      "nodeType": "skill",
+      "skillName": "wacli",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\wacli\\SKILL.md",
+      "category": "tool",
+      "branch": "generic",
+      "x": 40,
+      "y": 223,
+      "gear": [],
+      "description": "Send third-party WhatsApp messages or sync/search WhatsApp history via wacli, not normal active chats."
+    },
+    {
+      "id": "generic_openclaw_weather",
+      "label": "weather",
+      "nodeType": "skill",
+      "skillName": "weather",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\weather\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 14,
+      "y": 236,
+      "gear": [],
+      "description": "Current weather and forecasts with web_fetch, falling back to wttr.in curl for locations, rain, temperature, travel planning."
+    },
+    {
+      "id": "generic_openclaw_xurl",
+      "label": "xurl",
+      "nodeType": "skill",
+      "skillName": "xurl",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\xurl\\SKILL.md",
+      "category": "advanced",
+      "branch": "generic",
+      "x": 27,
+      "y": 236,
+      "gear": [],
+      "description": "xurl CLI for authenticated X posts, replies, reads/search, DMs, media upload, followers, auth status, or raw v2 API calls."
+    },
+    {
+      "id": "professional_openclaw_blogwatcher",
+      "label": "blogwatcher",
+      "nodeType": "skill",
+      "skillName": "blogwatcher",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\blogwatcher\\SKILL.md",
+      "category": "advanced",
+      "branch": "professional",
+      "x": 60,
+      "y": 28,
+      "gear": [],
+      "description": "Monitor blogs and RSS/Atom feeds for updates using the blogwatcher CLI."
+    },
+    {
+      "id": "professional_openclaw_clawhub",
+      "label": "clawhub",
+      "nodeType": "skill",
+      "skillName": "clawhub",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\clawhub\\SKILL.md",
+      "category": "advanced",
+      "branch": "professional",
+      "x": 73,
+      "y": 28,
+      "gear": [],
+      "description": "Search, install, update, sync, or publish agent skills with the ClawHub CLI and registry."
+    },
+    {
+      "id": "professional_openclaw_coding_agent",
+      "label": "coding agent",
+      "nodeType": "skill",
+      "skillName": "coding-agent",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\coding-agent\\SKILL.md",
+      "category": "tool",
+      "branch": "professional",
+      "x": 86,
+      "y": 28,
+      "gear": [],
+      "description": "Delegate coding work to Codex, Claude Code, or OpenCode as background workers; not simple edits or read-only code lookup."
+    },
+    {
+      "id": "professional_openclaw_diagram_maker",
+      "label": "diagram maker",
+      "nodeType": "skill",
+      "skillName": "diagram-maker",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\diagram-maker\\SKILL.md",
+      "category": "advanced",
+      "branch": "professional",
+      "x": 60,
+      "y": 41,
+      "gear": [],
+      "description": "Create SVG/HTML or Excalidraw diagrams for concepts, architecture, flows, and whiteboards."
+    },
+    {
+      "id": "professional_openclaw_gh_issues",
+      "label": "gh issues",
+      "nodeType": "skill",
+      "skillName": "gh-issues",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\gh-issues\\SKILL.md",
+      "category": "advanced",
+      "branch": "professional",
+      "x": 73,
+      "y": 41,
+      "gear": [],
+      "description": "Fetch GitHub issues, select candidates, spawn background fix agents, open PRs, and optionally process PR review comments."
+    },
+    {
+      "id": "professional_openclaw_github",
+      "label": "github",
+      "nodeType": "skill",
+      "skillName": "github",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\github\\SKILL.md",
+      "category": "tool",
+      "branch": "professional",
+      "x": 86,
+      "y": 41,
+      "gear": [],
+      "description": "GitHub CLI for issues, PRs, CI/check logs, comments, reviews, releases, repos, and gh api queries."
+    },
+    {
+      "id": "professional_openclaw_healthcheck",
+      "label": "healthcheck",
+      "nodeType": "skill",
+      "skillName": "healthcheck",
+      "skillRuntime": "openclaw",
+      "skillPath": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills\\healthcheck\\SKILL.md",
+      "category": "quality",
+      "branch": "professional",
+      "x": 60,
+      "y": 54,
+      "gear": [],
+      "description": "Audit/harden OpenClaw hosts: SSH, firewall, updates, exposure, backups, disk encryption, gateway security."
+    }
+  ],
+  "edges": [
+    [
+      "model_base",
+      "generic_openclaw_1password"
+    ],
+    [
+      "generic_openclaw_1password",
+      "generic_openclaw_apple_notes"
+    ],
+    [
+      "generic_openclaw_apple_notes",
+      "generic_openclaw_apple_reminders"
+    ],
+    [
+      "generic_openclaw_apple_reminders",
+      "generic_openclaw_bear_notes"
+    ],
+    [
+      "generic_openclaw_bear_notes",
+      "generic_openclaw_blucli"
+    ],
+    [
+      "generic_openclaw_blucli",
+      "generic_openclaw_camsnap"
+    ],
+    [
+      "generic_openclaw_camsnap",
+      "generic_openclaw_canvas"
+    ],
+    [
+      "generic_openclaw_canvas",
+      "generic_openclaw_discord"
+    ],
+    [
+      "generic_openclaw_discord",
+      "generic_openclaw_eightctl"
+    ],
+    [
+      "generic_openclaw_eightctl",
+      "generic_openclaw_gemini"
+    ],
+    [
+      "generic_openclaw_gemini",
+      "generic_openclaw_gifgrep"
+    ],
+    [
+      "generic_openclaw_gifgrep",
+      "generic_openclaw_gog"
+    ],
+    [
+      "generic_openclaw_gog",
+      "generic_openclaw_goplaces"
+    ],
+    [
+      "generic_openclaw_goplaces",
+      "generic_openclaw_himalaya"
+    ],
+    [
+      "generic_openclaw_himalaya",
+      "generic_openclaw_imsg"
+    ],
+    [
+      "generic_openclaw_imsg",
+      "generic_openclaw_mcporter"
+    ],
+    [
+      "generic_openclaw_mcporter",
+      "generic_openclaw_meme_maker"
+    ],
+    [
+      "generic_openclaw_meme_maker",
+      "generic_openclaw_model_usage"
+    ],
+    [
+      "generic_openclaw_model_usage",
+      "generic_openclaw_nano_pdf"
+    ],
+    [
+      "generic_openclaw_nano_pdf",
+      "generic_openclaw_node_connect"
+    ],
+    [
+      "generic_openclaw_node_connect",
+      "generic_openclaw_node_inspect_debugger"
+    ],
+    [
+      "generic_openclaw_node_inspect_debugger",
+      "generic_openclaw_notion"
+    ],
+    [
+      "generic_openclaw_notion",
+      "generic_openclaw_obsidian"
+    ],
+    [
+      "generic_openclaw_obsidian",
+      "generic_openclaw_openai_whisper"
+    ],
+    [
+      "generic_openclaw_openai_whisper",
+      "generic_openclaw_openai_whisper_api"
+    ],
+    [
+      "generic_openclaw_openai_whisper_api",
+      "generic_openclaw_openhue"
+    ],
+    [
+      "generic_openclaw_openhue",
+      "generic_openclaw_oracle"
+    ],
+    [
+      "generic_openclaw_oracle",
+      "generic_openclaw_ordercli"
+    ],
+    [
+      "generic_openclaw_ordercli",
+      "generic_openclaw_peekaboo"
+    ],
+    [
+      "generic_openclaw_peekaboo",
+      "generic_openclaw_python_debugpy"
+    ],
+    [
+      "generic_openclaw_python_debugpy",
+      "generic_openclaw_sag"
+    ],
+    [
+      "generic_openclaw_sag",
+      "generic_openclaw_session_logs"
+    ],
+    [
+      "generic_openclaw_session_logs",
+      "generic_openclaw_sherpa_onnx_tts"
+    ],
+    [
+      "generic_openclaw_sherpa_onnx_tts",
+      "generic_openclaw_skill_creator"
+    ],
+    [
+      "generic_openclaw_skill_creator",
+      "generic_openclaw_slack"
+    ],
+    [
+      "generic_openclaw_slack",
+      "generic_openclaw_songsee"
+    ],
+    [
+      "generic_openclaw_songsee",
+      "generic_openclaw_sonoscli"
+    ],
+    [
+      "generic_openclaw_sonoscli",
+      "generic_openclaw_spike"
+    ],
+    [
+      "generic_openclaw_spike",
+      "generic_openclaw_spotify_player"
+    ],
+    [
+      "generic_openclaw_spotify_player",
+      "generic_openclaw_summarize"
+    ],
+    [
+      "generic_openclaw_summarize",
+      "generic_openclaw_taskflow"
+    ],
+    [
+      "generic_openclaw_taskflow",
+      "generic_openclaw_taskflow_inbox_triage"
+    ],
+    [
+      "generic_openclaw_taskflow_inbox_triage",
+      "generic_openclaw_things_mac"
+    ],
+    [
+      "generic_openclaw_things_mac",
+      "generic_openclaw_tmux"
+    ],
+    [
+      "generic_openclaw_tmux",
+      "generic_openclaw_trello"
+    ],
+    [
+      "generic_openclaw_trello",
+      "generic_openclaw_video_frames"
+    ],
+    [
+      "generic_openclaw_video_frames",
+      "generic_openclaw_voice_call"
+    ],
+    [
+      "generic_openclaw_voice_call",
+      "generic_openclaw_wacli"
+    ],
+    [
+      "generic_openclaw_wacli",
+      "generic_openclaw_weather"
+    ],
+    [
+      "generic_openclaw_weather",
+      "generic_openclaw_xurl"
+    ],
+    [
+      "model_base",
+      "professional_openclaw_blogwatcher"
+    ],
+    [
+      "professional_openclaw_blogwatcher",
+      "professional_openclaw_clawhub"
+    ],
+    [
+      "professional_openclaw_clawhub",
+      "professional_openclaw_coding_agent"
+    ],
+    [
+      "professional_openclaw_coding_agent",
+      "professional_openclaw_diagram_maker"
+    ],
+    [
+      "professional_openclaw_diagram_maker",
+      "professional_openclaw_gh_issues"
+    ],
+    [
+      "professional_openclaw_gh_issues",
+      "professional_openclaw_github"
+    ],
+    [
+      "professional_openclaw_github",
+      "professional_openclaw_healthcheck"
+    ]
+  ],
+  "futureAnchors": [
+    {
+      "id": "generic_openclaw_1password",
+      "label": "通用技能未来规划"
+    },
+    {
+      "id": "professional_openclaw_blogwatcher",
+      "label": "专业技能未来规划"
+    }
+  ]
+}

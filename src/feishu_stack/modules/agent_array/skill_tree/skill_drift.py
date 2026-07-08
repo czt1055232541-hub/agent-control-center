@@ -198,9 +198,8 @@ def detect_drift(
             )
         )
 
-    # P1: cross-runtime content diff for same-named skills
+    # P0: cross-runtime content diff for same-named skills
     for name, skills in _same_name_skills(inv).items():
-        # After dedup there should be only one, but if scan didn't dedup properly
         versions = set(s.version for s in skills)
         if len(versions) > 1:
             for skill in skills:
@@ -208,8 +207,8 @@ def detect_drift(
                     DriftEntry(
                         drift_id=f"cross-runtime-{skill.skill_id}",
                         skill_name=skill.name,
-                        severity="P1",
-                        category="priority_missing",
+                        severity="P0",
+                        category="cross_runtime_mismatch",
                         source=skill.source,
                         source_alias=skill.source_alias,
                         message=f"Skill {skill.name} has different versions across runtimes",

@@ -492,9 +492,6 @@ def scan_skills(
                 cache_misses += 1
                 all_skills.append(skill)
 
-    # Deduplicate
-    all_skills = _deduplicate(all_skills)
-
     # Compute aggregates
     by_source: dict[str, int] = {}
     by_agent: dict[str, int] = {}

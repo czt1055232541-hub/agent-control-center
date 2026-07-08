@@ -27,7 +27,7 @@ export function SkillRuntimeComparison({ comparisons, loading }: SkillRuntimeCom
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12 text-sm" style={{ color: "var(--text-muted)" }}>
-        \u52a0\u8f7d\u7248\u672c\u5bf9\u6bd4\u6570\u636e...
+        加载版本对比数据...
       </div>
     );
   }
@@ -40,10 +40,10 @@ export function SkillRuntimeComparison({ comparisons, loading }: SkillRuntimeCom
       >
         <GitCompare size={36} style={{ color: "var(--text-muted)", opacity: 0.4 }} />
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          \u6682\u65e0\u8de8\u8fd0\u884c\u65f6\u6280\u80fd\u5bf9\u6bd4\u6570\u636e
+          暂无跨运行时技能对比数据
         </p>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          \u5f53\u6280\u80fd\u5728\u591a\u4e2a\u8fd0\u884c\u65f6\u4e2d\u5b58\u5728\u65f6\uff0c\u5c06\u5728\u6b64\u5904\u5c55\u793a\u7248\u672c\u5bf9\u6bd4
+          当技能在多个运行时中存在时，将在此处展示版本对比
         </p>
       </div>
     );
@@ -54,17 +54,17 @@ export function SkillRuntimeComparison({ comparisons, loading }: SkillRuntimeCom
       <div className="flex items-center gap-3 rounded-lg p-3" style={{ background: "var(--bg-panel)", border: "1px solid var(--border-stone)" }}>
         <GitCompare size={16} style={{ color: "var(--accent-teal)" }} />
         <span className="text-sm font-semibold" style={{ color: "var(--text-main)" }}>
-          \u8de8\u8fd0\u884c\u65f6\u7248\u672c\u5bf9\u6bd4
+          跨运行时版本对比
         </span>
         <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-          {comparisons.length} \u4e2a\u6280\u80fd\u8de8\u8fd0\u884c\u65f6\u5b58\u5728 \u00b7 {comparisons.filter((c) => c.hasDrift).length} \u4e2a\u5b58\u5728\u6f02\u79fb
+          {comparisons.length} 个技能跨运行时存在 · {comparisons.filter((c) => c.hasDrift).length} 个存在漂移
         </span>
         <div className="ml-auto flex gap-2 text-[10px]">
           <span className="flex items-center gap-1" style={{ color: "var(--accent-red)" }}>
-            <AlertTriangle size={10} /> \u6f02\u79fb
+            <AlertTriangle size={10} /> 漂移
           </span>
           <span className="flex items-center gap-1" style={{ color: "var(--accent-green)" }}>
-            <CheckCircle size={10} /> \u4e00\u81f4
+            <CheckCircle size={10} /> 一致
           </span>
         </div>
       </div>
@@ -94,7 +94,7 @@ export function SkillRuntimeComparison({ comparisons, loading }: SkillRuntimeCom
                   {item.displayName}
                 </span>
                 <span className="rounded px-2 py-0.5 text-[10px]" style={{ background: "var(--bg-panel-soft)", color: "var(--text-secondary)", border: "1px solid var(--border-light)" }}>
-                  {item.runtimeCount} \u4e2a\u8fd0\u884c\u65f6
+                  {item.runtimeCount} 个运行时
                 </span>
                 {isExpanded ? <ChevronDown size={14} style={{ color: "var(--text-muted)" }} /> : <ChevronRight size={14} style={{ color: "var(--text-muted)" }} />}
               </button>
@@ -105,15 +105,15 @@ export function SkillRuntimeComparison({ comparisons, loading }: SkillRuntimeCom
                     <table className="w-full text-left text-xs">
                       <thead>
                         <tr>
-                          <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>\u8fd0\u884c\u65f6</th>
-                          <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>\u6765\u6e90</th>
+                          <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>运行时</th>
+                          <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>来源</th>
                           <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>
                             <span className="flex items-center gap-1"><Hash size={10} /> Hash</span>
                           </th>
                           <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>
-                            <span className="flex items-center gap-1"><Clock size={10} /> \u4fee\u6539\u65f6\u95f4</span>
+                            <span className="flex items-center gap-1"><Clock size={10} /> 修改时间</span>
                           </th>
-                          <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>\u72b6\u6001</th>
+                          <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>状态</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -150,7 +150,7 @@ export function SkillRuntimeComparison({ comparisons, loading }: SkillRuntimeCom
                                   color: inst.drift.status === "drift" ? "var(--accent-red)" : "var(--accent-green)",
                                 }}
                               >
-                                {inst.drift.status === "drift" ? "\u6f02\u79fb" : "\u4e00\u81f4"}
+                                {inst.drift.status === "drift" ? "漂移" : "一致"}
                               </span>
                             </td>
                           </tr>

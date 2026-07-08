@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { AlertTriangle, FileText, PauseCircle, Play, RefreshCcw, ShieldCheck, Wrench } from "lucide-react";
+import { AlertTriangle, FileText, PauseCircle, Play, Power, RefreshCcw, ShieldCheck, Wrench } from "lucide-react";
 import "./styles.css";
 import { logOptions } from "../types";
 import type { AgentProfile, AgentSkill } from "../types";
@@ -106,6 +106,17 @@ function RawDiagnostics({
         <div className="flex flex-wrap gap-2">
           <ActionButton disabled={busy} icon={<RefreshCcw size={16} />} label="Refresh" onClick={() => loadDiagnostics()} />
           <ActionButton disabled={busy} icon={<Wrench size={16} />} label="Clean Backups" onClick={() => run("/api/backups/clean", loadDiagnostics)} />
+          <ActionButton
+            disabled={busy}
+            danger
+            icon={<Power size={16} />}
+            label="Close Control Center"
+            onClick={() => {
+              if (window.confirm("关闭 Agent Control Center 自身进程？不会关闭 OpenClaw Gateway、Codex 或 MoonBridge。")) {
+                run("/api/control-center/shutdown");
+              }
+            }}
+          />
         </div>
       </div>
       <div className="mt-4 grid gap-3 lg:grid-cols-3">

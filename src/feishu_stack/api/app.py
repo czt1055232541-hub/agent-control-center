@@ -22,7 +22,7 @@ from feishu_stack.modules.model_provider import moonbridge
 from feishu_stack.modules.model_provider import openclaw_gateway as openclaw
 from feishu_stack.modules.backup_migration import backups
 from feishu_stack.modules.logs_diagnostics import metrics
-from feishu_stack.modules.operations import stack_actions
+from feishu_stack.modules.operations import control_center, stack_actions
 from feishu_stack.modules.logs_diagnostics import diagnostics as diagnostics_module
 from feishu_stack.core.settings import StackConfig, find_stack_root, load_config
 from feishu_stack.core.logs import tail
@@ -1032,6 +1032,17 @@ def stack_stop() -> dict:
 @app.post("/api/backups/clean", summary="Clean backups", description="Remove old backup files per retention policy.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
 def clean_backups() -> dict:
     return _run("backups", "clean", backups.clean)
+
+
+@app.post(
+    "/api/control-center/shutdown",
+    summary="Shutdown Control Center",
+    description="Close Control Center API/launcher processes only. OpenClaw, Codex, and MoonBridge processes are excluded. Requires control token.",
+    tags=[OPERATIONS_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def shutdown_control_center() -> dict:
+    return to_dict(control_center.request_shutdown())
 
 # ---------------------------------------------------------------------------
 # Exception handlers
