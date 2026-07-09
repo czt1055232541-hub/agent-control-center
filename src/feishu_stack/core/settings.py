@@ -286,6 +286,7 @@ class StackConfig:
     pid_dir: Path
     lark_cli_home: Path | None = None
     summary_dir: Path | None = None
+    watchdog_state_dir: Path | None = None
     node_exe: Path | str = "node"
     npm_exe: Path | str = "npm"
     moonbridge_reasoning_effort: str = "high"
@@ -479,6 +480,7 @@ def load_config(path: Path | None = None) -> StackConfig:
         log_dir=Path(runtime["logs"]),
         pid_dir=Path(runtime["pids"]),
         summary_dir=Path(runtime.get("summaries") or Path(runtime["dir"]) / "summaries"),
+        watchdog_state_dir=Path(agent.get("watchdogStateDir") or raw["watchdogStateDir"]) if (agent.get("watchdogStateDir") or raw.get("watchdogStateDir")) else None,
     )
     config.ensure_runtime_dirs()
     return config

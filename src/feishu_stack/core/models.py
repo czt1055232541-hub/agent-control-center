@@ -143,6 +143,23 @@ class DashboardSummary:
 
 
 @dataclass
+class CurrentWatchdogStatus:
+    enabled: bool
+    status_light: str
+    task_id: str | None
+    assignee: str | None
+    phase: str | None
+    countdown_seconds: int | None
+    next_check_at: str | None
+    send_count: int | None
+    state_file: str | None
+    pid: int | None
+    pid_running: bool
+    status: str
+    log: str | None
+
+
+@dataclass
 class ExplainedDiagnosticItem:
     id: str
     level: str

@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 from pydantic import BaseModel
 
-from feishu_stack.modules.agent_array.skill_tree import agent_config_editor, agent_dashboard, skill_baseline, skill_registry, skill_drift
+from feishu_stack.modules.agent_array.skill_tree import agent_config_editor, agent_dashboard, skill_baseline, skill_registry, skill_drift, tree_config
 from feishu_stack.modules.backup_migration import thread_migration
 from feishu_stack.modules.model_provider import codex_agent, codex_desktop, provider_switch
 from feishu_stack.modules.model_provider import moonbridge
@@ -24,6 +24,7 @@ from feishu_stack.modules.backup_migration import backups
 from feishu_stack.modules.logs_diagnostics import metrics
 from feishu_stack.modules.operations import control_center, stack_actions
 from feishu_stack.modules.logs_diagnostics import diagnostics as diagnostics_module
+from feishu_stack.modules.task_battlefield import watchdog
 from feishu_stack.core.settings import StackConfig, find_stack_root, load_config
 from feishu_stack.core.logs import tail
 from feishu_stack.core.models import ErrorResponse, OperationResult, ThreadMigrationResult, to_dict
@@ -312,6 +313,16 @@ def agents() -> dict:
 )
 def infrastructure() -> dict:
     return {"agents": to_dict(agent_dashboard.list_infrastructure())}
+
+
+@app.get(
+    "/api/watchdog/current",
+    summary="Current watchdog",
+    description="Return the single active Feishu scheduler watchdog used by the dashboard card.",
+    tags=[DASHBOARD_TAG],
+)
+def current_watchdog() -> dict:
+    return to_dict(watchdog.current_watchdog())
 
 
 @app.get(
@@ -689,6 +700,33 @@ def skill_workshop_skills(
 
 
 @app.get(
+    "/api/skill-workshop/tree-config",
+    summary="Configured skill tree",
+    description="Return the configured per-agent skill tree graph used by the integrated workshop page.",
+    tags=[SKILL_WORKSHOP_TAG],
+)
+def skill_workshop_tree_config() -> dict:
+    return tree_config.load_all_tree_configs()
+
+
+@app.get(
+    "/api/skill-workshop/tree-config/{agent_id}",
+    summary="Configured agent skill tree",
+    description="Return one configured agent skill tree graph.",
+    tags=[SKILL_WORKSHOP_TAG],
+)
+def skill_workshop_agent_tree_config(agent_id: str) -> dict:
+    try:
+        return tree_config.load_agent_tree(agent_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown skill tree agent: {agent_id}") from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get(
     "/api/skill-workshop/skills/{skill_id}",
     summary="Skill detail",
     description="Return a single skill's details.",
@@ -1032,6 +1070,20 @@ def stack_stop() -> dict:
 @app.post("/api/backups/clean", summary="Clean backups", description="Remove old backup files per retention policy.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
 def clean_backups() -> dict:
     return _run("backups", "clean", backups.clean)
+
+
+@app.post(
+    "/api/watchdog/force-stop",
+    summary="Force stop watchdog",
+    description="Force stop the currently active Feishu scheduler watchdog. Requires control token.",
+    tags=[OPERATIONS_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def force_stop_watchdog() -> dict:
+    try:
+        return to_dict(watchdog.force_stop_current())
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post(

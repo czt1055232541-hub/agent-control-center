@@ -3,14 +3,14 @@ import ReactDOM from "react-dom/client";
 import { AlertTriangle, FileText, PauseCircle, Play, Power, RefreshCcw, ShieldCheck, Wrench } from "lucide-react";
 import "./styles.css";
 import { logOptions } from "../types";
-import type { AgentProfile, AgentSkill } from "../types";
+import type { AgentProfile } from "../types";
 import { TopStatusBar } from "../modules/agent-array/skill-tree/TopStatusBar";
 import { AgentCard as AdventureAgentCard } from "../modules/agent-array/skill-tree/AgentCard";
 import { AgentDetailPanel } from "../modules/agent-array/skill-tree/AgentDetailPanel";
-import { SkillTreeCanvas } from "../modules/agent-array/skill-tree/SkillTreeCanvas";
 import { SkillWorkshopPage } from "../modules/agent-array/skill-tree/SkillWorkshopPage";
 import { RecentRunsTable } from "../modules/agent-array/skill-tree/RecentRunsTable";
 import { TaskTraceMap } from "../modules/agent-array/skill-tree/TaskTraceMap";
+import TaskDashboardPage from "../modules/task-battlefield/TaskDashboardPage";
 import { recentRunsFromOperations, taskTraceFromAgents, toAgentProfiles } from "../modules/agent-array/skill-tree/viewModels";
 import { ActionButton } from "../components/common/ActionButton";
 import { StatusPill } from "../components/common/StatusPill";
@@ -28,7 +28,83 @@ import { useOperations } from "../hooks/useOperations";
 import { useLogs } from "../hooks/useLogs";
 import { useMigration } from "../hooks/useMigration";
 import { useCommandDashboard } from "../hooks/useCommandDashboard";
-import type { AgentConfig } from "../types";
+import { useWatchdog } from "../hooks/useWatchdog";
+import type { AgentConfig, CurrentWatchdogStatus } from "../types";
+
+function formatCountdown(seconds: number | null): string {
+  if (seconds === null || seconds === undefined) {
+    return "未启用";
+  }
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `距离下次提醒 ${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
+function WatchdogCard({
+  watchdog,
+  busy,
+  run,
+}: {
+  watchdog: CurrentWatchdogStatus | null;
+  busy: boolean;
+  run: (path: string, after?: () => Promise<void>) => void;
+}) {
+  const [now, setNow] = React.useState(() => Date.now());
+
+  React.useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const countdownSeconds = React.useMemo(() => {
+    if (!watchdog?.enabled || !watchdog.next_check_at) {
+      return watchdog?.enabled ? watchdog.countdown_seconds : null;
+    }
+    const nextAt = new Date(watchdog.next_check_at).getTime();
+    if (Number.isNaN(nextAt)) {
+      return watchdog.countdown_seconds;
+    }
+    return Math.max(0, Math.floor((nextAt - now) / 1000));
+  }, [now, watchdog]);
+
+  const isEnabled = Boolean(watchdog?.enabled);
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-slate-950">Watchdog 看护</h2>
+          <p className="mt-1 text-sm text-slate-600">绿色表示启用中，灰色表示已关闭。</p>
+        </div>
+        <ActionButton
+          disabled={busy || !isEnabled}
+          danger
+          icon={<Power size={16} />}
+          label="强制关闭"
+          onClick={() => {
+            if (window.confirm("强制关闭当前 watchdog？这会停止当前任务的自动看护提醒。")) {
+              run("/api/watchdog/force-stop");
+            }
+          }}
+        />
+      </div>
+      <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-3">
+          <span className={`inline-flex h-4 w-4 rounded-full ${isEnabled ? "bg-emerald-500" : "bg-slate-300"}`} />
+          <div>
+            <div className="text-sm font-medium text-slate-900">{isEnabled ? "启用中" : "已关闭"}</div>
+            <div className="text-sm text-slate-600">{formatCountdown(countdownSeconds)}</div>
+          </div>
+        </div>
+        <div className="text-xs text-slate-500">
+          {watchdog?.task_id ? `TASK ${watchdog.task_id}` : "当前没有 active watchdog"}
+          {watchdog?.phase ? ` · ${watchdog.phase}` : ""}
+          {watchdog?.assignee ? ` · ${watchdog.assignee}` : ""}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function InfrastructureHealth({ infrastructure, onSelect }: { infrastructure: AgentConfig[]; onSelect: (agent: AgentConfig) => void }) {
   return (
@@ -221,6 +297,7 @@ function PlannedPage({ page }: { page: CommandPage }) {
       dependencies: ["OpenClaw 会话事件流", "Codex Agent 生成状态事件", "任务 ID 与消息 ID 关联"],
       next: ["定义任务事件 schema", "接入 sessions.json 增量读取", "补充生成中/排队/完成状态"],
     },
+    "task-dashboard": { title: "任务仪表盘", stage: "已实现", dependencies: [], next: [] },
     feishu: {
       title: "飞书连接",
       stage: "后续阶段",
@@ -280,10 +357,10 @@ function App() {
   const { logs, selectedLog, logLines, loadLogs, setSelectedLog, setLogLines } = useLogs();
   const mig = useMigration(token, refresh);
   const { summary, agents, infrastructure, explainedDiagnostics, refreshDashboard } = useCommandDashboard();
+  const { watchdog, refreshWatchdog } = useWatchdog();
   const [selectedAgent, setSelectedAgent] = React.useState<AgentConfig | null>(null);
   const [activePage, setActivePage] = React.useState<CommandPage>("dashboard");
   const [adventureSelectedAgent, setAdventureSelectedAgent] = React.useState<AgentProfile | null>(null);
-  const [selectedSkill, setSelectedSkill] = React.useState<AgentSkill | null>(null);
   const [activeDetailTab, setActiveDetailTab] = React.useState<string>("概览");
 
   const wrappedSwitchModel = React.useCallback(
@@ -298,8 +375,12 @@ function App() {
 
   const providerMode = status?.codex.mode ?? "unknown";
   const runAndRefresh = React.useCallback(
-    (path: string) => run(path, refreshDashboard),
-    [run, refreshDashboard],
+    (path: string) =>
+      run(path, async () => {
+        await refreshDashboard();
+        await refreshWatchdog();
+      }),
+    [run, refreshDashboard, refreshWatchdog],
   );
   const adventureAgents = React.useMemo(() => toAgentProfiles(agents), [agents]);
   const providerInfrastructure = React.useMemo(
@@ -312,12 +393,10 @@ function App() {
   React.useEffect(() => {
     if (!adventureAgents.length) {
       setAdventureSelectedAgent(null);
-      setSelectedSkill(null);
       return;
     }
     setAdventureSelectedAgent((current) => {
       const next = adventureAgents.find((agent) => agent.id === current?.id) ?? adventureAgents[0];
-      if (selectedSkill && !next.skills.some((skill) => skill.id === selectedSkill.id)) setSelectedSkill(null);
       return next;
     });
   }, [adventureAgents]);
@@ -355,6 +434,17 @@ function App() {
           {activePage === "dashboard" ? (
             <>
               <SummaryCards summary={summary} />
+              <WatchdogCard
+                watchdog={watchdog}
+                busy={busy}
+                run={(path, after) =>
+                  run(path, async () => {
+                    await refreshDashboard();
+                    await refreshWatchdog();
+                    await after?.();
+                  })
+                }
+              />
               <section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
                 <AgentTopology agents={agents} onSelect={setSelectedAgent} />
                 <DiagnosticCenter items={explainedDiagnostics} busy={busy} onRun={runAndRefresh} onLogs={(component) => loadLogs(component)} />
@@ -389,7 +479,6 @@ function App() {
                       selected={adventureSelectedAgent?.id === agent.id}
                       onSelect={(a) => {
                         setAdventureSelectedAgent(a);
-                        setSelectedSkill(null);
                       }}
                     />
                   ))}
@@ -404,8 +493,6 @@ function App() {
                 <SkillWorkshopPage
                   agents={agents}
                   adventureSelectedAgent={adventureSelectedAgent}
-                  selectedSkill={selectedSkill}
-                  onSelectSkill={setSelectedSkill}
                   token={token}
                 />
               </div>
@@ -498,6 +585,10 @@ function App() {
             </>
           ) : null}
 
+
+          {activePage === "task-dashboard" ? (
+            <TaskDashboardPage />
+          ) : null}
           {["feishu", "routing", "config", "backup"].includes(activePage) ? <PlannedPage page={activePage} /> : null}
 
           <footer className="flex items-center gap-2 pb-2 text-xs text-slate-500">

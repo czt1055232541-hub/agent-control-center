@@ -1,5 +1,5 @@
 ﻿import React, { useMemo, useRef, useState } from 'react';
-import type { AgentSkill, AgentProfile } from '../../types';
+import type { AgentSkill, AgentProfile } from '../../../types';
 import { SkillNode } from './SkillNode';
 import { SkillConfigInspector } from './SkillConfigInspector';
 

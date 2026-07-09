@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import { Cpu, FolderOpen, Wrench, BookOpen, Shield, GitBranch, BarChart3 } from 'lucide-react';
-import type { AgentEquipment } from '../../types';
+import type { AgentEquipment } from '../../../types';
 
 interface SlotCardProps {
   icon: React.ReactNode;

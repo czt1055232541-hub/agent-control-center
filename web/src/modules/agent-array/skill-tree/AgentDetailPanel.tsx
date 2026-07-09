@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import { Cpu, Wrench, GitBranch } from 'lucide-react';
-import type { AgentProfile } from '../../types';
+import type { AgentProfile } from '../../../types';
 import { EquipmentSlots } from './EquipmentSlots';
 
 const statusConfig: Record<string, { dotClass: string; label: string }> = {

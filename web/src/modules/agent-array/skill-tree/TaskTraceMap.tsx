@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import { User, Bot, Wrench, FileText, CheckCircle, ArrowDown, Clock } from 'lucide-react';
-import type { TaskTraceNode } from '../../types';
+import type { TaskTraceNode } from '../../../types';
 
 const typeConfig: Record<string, { icon: React.ReactNode; color: string }> = {
   user: { icon: <User size={14} />, color: 'var(--accent-blue)' },

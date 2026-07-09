@@ -6,7 +6,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG_DIR = ROOT / "skill-tree-configs"
+CONFIG_DIR = ROOT / "config" / "skill-tree-workshop" / "agents"
+DEMO_HTML = ROOT / "docs" / "prototypes" / "skill-tree-workshop-demo.html"
 OPENCLAW_ROOT = Path(r"E:\openclaw\npm\node_modules\openclaw\skills")
 CODEX_ROOTS = [
     ("codex", Path(r"E:\codeX\skills")),
@@ -217,7 +218,7 @@ def sync_html_fallback() -> None:
         agent.update({"nodes": cfg["nodes"], "edges": cfg["edges"], "futureAnchors": cfg.get("futureAnchors", [])})
         agents.append(agent)
     fallback = {"version": 3, "agents": agents}
-    html_path = ROOT / "skill-tree-workshop-demo.html"
+    html_path = DEMO_HTML
     text = html_path.read_text(encoding="utf-8")
     start = text.index("    const fallbackConfig = ")
     end = text.index("\n\n    function node(", start)

@@ -3,14 +3,15 @@ import {
   BarChart3, GitBranch, AlertTriangle, FileText,
   CheckCircle, Info, AlertOctagon, ShieldAlert, RotateCw, History, Undo2,
 } from "lucide-react";
-import type { AgentSkill, AgentProfile, SkillWorkshopTab } from "../../../types";
-import { SkillTreeCanvas } from "./SkillTreeCanvas";
+import type { AgentProfile, SkillWorkshopTab } from "../../../types";
 import { SkillInventoryTable } from "./SkillInventoryTable";
 import { SkillDriftReportPanel } from "./SkillDriftReportPanel";
 import { SkillRuntimeComparison } from "./SkillRuntimeComparison";
 import { useSkillWorkshop, type SkillWorkshopState } from "../../../hooks/useSkillWorkshop";
+import { useSkillTreeConfig } from "../../../hooks/useSkillTreeConfig";
 import { toAgentProfiles } from "./viewModels";
 import type { AgentConfig } from "../../../types";
+import { ConfiguredSkillTree } from "./ConfiguredSkillTree";
 
 const tabs: { key: SkillWorkshopTab; label: string; icon: React.ReactNode }[] = [
   { key: "overview", label: "概览", icon: <BarChart3 size={14} /> },
@@ -23,20 +24,17 @@ const tabs: { key: SkillWorkshopTab; label: string; icon: React.ReactNode }[] = 
 interface SkillWorkshopPageProps {
   agents: AgentConfig[];
   adventureSelectedAgent: AgentProfile | null;
-  selectedSkill: AgentSkill | null;
-  onSelectSkill: (skill: AgentSkill | null) => void;
   token: string;
 }
 
 export function SkillWorkshopPage({
   agents,
   adventureSelectedAgent,
-  selectedSkill,
-  onSelectSkill,
   token,
 }: SkillWorkshopPageProps) {
   const [activeTab, setActiveTab] = React.useState<SkillWorkshopTab>("overview");
   const ws = useSkillWorkshop();
+  const treeConfig = useSkillTreeConfig();
 
   const isFallback = !ws.backendAvailable;
   const adventureAgents = React.useMemo(() => toAgentProfiles(agents), [agents]);
@@ -54,12 +52,12 @@ export function SkillWorkshopPage({
               加载中...
             </span>
           )}
-          {isFallback && (
+          {isFallback && activeTab !== "skill-tree" && (
             <span
               className="rounded px-2 py-0.5 text-xs font-medium"
               style={{ background: "#fff3cd", border: "1px solid #ffc107", color: "#856404" }}
             >
-              静态演示 / 后端不可用
+              漂移 API 暂不可用
             </span>
           )}
         </div>
@@ -106,20 +104,13 @@ export function SkillWorkshopPage({
           <WorkshopOverview ws={ws} isFallback={isFallback} adventureAgents={adventureAgents} />
         )}
         {activeTab === "skill-tree" && (
-          isFallback ? (
-            <SkillTreeCanvas
-              agent={adventureSelectedAgent}
-              selectedSkill={selectedSkill}
-              onSelectSkill={onSelectSkill}
-            />
-          ) : (
-            <WorkshopSkillTree
-              ws={ws}
-              adventureSelectedAgent={adventureSelectedAgent}
-              selectedSkill={selectedSkill}
-              onSelectSkill={onSelectSkill}
-            />
-          )
+          <ConfiguredSkillTree
+            data={treeConfig.data}
+            loading={treeConfig.loading}
+            error={treeConfig.error}
+            selectedAgent={adventureSelectedAgent}
+            onRefresh={treeConfig.refresh}
+          />
         )}
         {activeTab === "comparison" && (
           isFallback ? (
@@ -355,59 +346,6 @@ function OverviewCard({
       <div className="text-xl font-bold" style={{ color }}>{value}</div>
       {sub && <div className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>{sub}</div>}
     </div>
-  );
-}
-
-function WorkshopSkillTree({
-  ws, adventureSelectedAgent, selectedSkill, onSelectSkill,
-}: {
-  ws: SkillWorkshopState;
-  adventureSelectedAgent: AgentProfile | null;
-  selectedSkill: AgentSkill | null;
-  onSelectSkill: (skill: AgentSkill | null) => void;
-}) {
-  const enrichedProfile = React.useMemo(() => {
-    if (!adventureSelectedAgent) return null;
-    const wsSkills: AgentSkill[] = ws.skills
-      .filter((s) => s.agentIds.includes(adventureSelectedAgent.id))
-      .map((s, i) => ({
-        id: s.skillId,
-        name: s.displayName,
-        category: "tool" as const,
-        tree: "profession" as const,
-        level: s.loadPriority > 0 ? Math.min(Math.ceil(s.loadPriority / 10), 5) : 1,
-        status: s.drift.status === "drift" ? "error" as const
-          : s.drift.status === "no_baseline" ? "warning" as const
-          : "enabled" as const,
-        description: `${s.sourceAlias} ? ${s.runtime} ? ${s.actual.skillMdSha256.slice(0, 8)}`,
-        dependencies: [],
-        permissions: [],
-        position: { x: 50 + (i % 3) * 20, y: 10 + Math.floor(i / 3) * 18 },
-        config: {},
-        metrics: { successRate: 1, avgLatencyMs: 0, usageCount: 1 },
-        version: s.actual.version,
-        sourceRuntime: s.runtime,
-        sourceAlias: s.sourceAlias,
-        sha256: s.actual.skillMdSha256,
-        baselineSha256: s.baseline.skillMdSha256,
-        driftStatus: s.drift.status,
-        loadPriority: s.loadPriority,
-        updateMechanism: s.updateMechanism,
-        agentIds: s.agentIds,
-      }));
-    return { ...adventureSelectedAgent, skills: wsSkills };
-  }, [ws.skills, adventureSelectedAgent]);
-
-  if (ws.loading) {
-    return <div className="flex items-center justify-center p-12 text-sm" style={{ color: "var(--text-muted)" }}>????????...</div>;
-  }
-
-  if (!enrichedProfile) {
-    return <div className="flex items-center justify-center p-12 text-sm" style={{ color: "var(--text-muted)" }}>?????? Agent</div>;
-  }
-
-  return (
-    <SkillTreeCanvas agent={enrichedProfile} selectedSkill={selectedSkill} onSelectSkill={onSelectSkill} />
   );
 }
 

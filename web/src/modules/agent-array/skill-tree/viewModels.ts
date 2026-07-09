@@ -1,4 +1,4 @@
-import type { AgentConfig, AgentProfile, AgentSkill, OperationRecord, RecentRun, TaskTraceNode } from "../../types";
+import type { AgentConfig, AgentProfile, AgentSkill, OperationRecord, RecentRun, TaskTraceNode } from "../../../types";
 
 const roleMeta: Record<string, { title: string; role: string; icon: string; color: string }> = {
   "openclaw-coordinator": { title: "Commander Agent", role: "Commander", icon: "C", color: "#2f80c9" },
