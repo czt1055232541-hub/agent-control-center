@@ -5,6 +5,7 @@ description = "Local desktop control center for the machine agent stack."
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
+    "psutil>=5.9",
     "uvicorn>=0.32",
     "prometheus_client>=0.20",
 ]

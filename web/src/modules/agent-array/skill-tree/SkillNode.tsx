@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import type { AgentSkill, SkillCategory, SkillStatus } from '../../types';
+import type { AgentSkill, SkillCategory, SkillStatus } from '../../../types';
 
 const shapeMap: Record<SkillCategory, string> = {
   basic: 'circle',

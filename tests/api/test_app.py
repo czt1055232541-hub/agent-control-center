@@ -86,6 +86,32 @@ def test_infrastructure_route_is_read_only_without_token(monkeypatch) -> None:
     assert response.json()["agents"] == []
 
 
+def test_current_watchdog_route_is_read_only_without_token(monkeypatch) -> None:
+    monkeypatch.setattr(
+        app_module.watchdog,
+        "current_watchdog",
+        lambda: {
+            "enabled": True,
+            "status_light": "green",
+            "task_id": "TASK-1",
+            "assignee": "代码执行官",
+            "phase": "开发实现",
+            "countdown_seconds": 120,
+            "next_check_at": "2026-07-09T12:00:00",
+            "send_count": 2,
+            "state_file": "F:/watchdogs/task.json",
+            "pid": 1234,
+            "pid_running": True,
+            "status": "waiting",
+            "log": "F:/watchdogs/task.log",
+        },
+    )
+    response = client.get("/api/watchdog/current")
+    assert response.status_code == 200
+    assert response.json()["enabled"] is True
+    assert response.json()["status_light"] == "green"
+
+
 def test_agent_detail_route_handles_unknown_agent(monkeypatch) -> None:
     monkeypatch.setattr(app_module.agent_dashboard, "get_agent", lambda agent_id: None)
     response = client.get("/api/agents/missing")
@@ -153,6 +179,39 @@ def test_explained_diagnostics_route_is_read_only_without_token(monkeypatch) -> 
     response = client.get("/api/diagnostics/explained")
     assert response.status_code == 200
     assert response.json()["items"][0]["level"] == "normal"
+
+
+def test_skill_tree_config_route_is_read_only_without_token(monkeypatch) -> None:
+    monkeypatch.setattr(
+        app_module.tree_config,
+        "load_all_tree_configs",
+        lambda: {
+            "version": 2,
+            "description": "mock",
+            "manifestPath": "F:/repo/config/skill-tree-workshop/manifest.json",
+            "agents": [
+                {
+                    "version": 3,
+                    "agent": {"id": "coordinator", "name": "项目调度官"},
+                    "nodes": [{"id": "model_base", "label": "模型基座", "nodeType": "model"}],
+                    "edges": [],
+                }
+            ],
+            "errors": [],
+        },
+    )
+    response = client.get("/api/skill-workshop/tree-config")
+    assert response.status_code == 200
+    assert response.json()["agents"][0]["agent"]["id"] == "coordinator"
+
+
+def test_skill_tree_agent_config_route_handles_unknown_agent(monkeypatch) -> None:
+    def fake_load_agent_tree(agent_id):
+        raise KeyError(agent_id)
+
+    monkeypatch.setattr(app_module.tree_config, "load_agent_tree", fake_load_agent_tree)
+    response = client.get("/api/skill-workshop/tree-config/missing")
+    assert response.status_code == 404
 
 
 def test_write_requires_token() -> None:
@@ -273,6 +332,52 @@ def test_backup_cleanup_route_uses_mock(monkeypatch) -> None:
     assert response.status_code == 200
     assert response.json()["component"] == "backups"
     assert called["clean"] is True
+
+
+def test_control_center_shutdown_requires_token() -> None:
+    response = client.post("/api/control-center/shutdown")
+    assert response.status_code == 401
+    response = client.post("/api/control-center/shutdown", headers={"X-Control-Token": "bad"})
+    assert response.status_code == 403
+
+
+def test_watchdog_force_stop_requires_token() -> None:
+    response = client.post("/api/watchdog/force-stop")
+    assert response.status_code == 401
+    response = client.post("/api/watchdog/force-stop", headers={"X-Control-Token": "bad"})
+    assert response.status_code == 403
+
+
+def test_watchdog_force_stop_route_uses_mock(monkeypatch) -> None:
+    token = _token()
+    called = {"stop": False}
+
+    def fake_force_stop():
+        called["stop"] = True
+        return OperationResult(True, "watchdog", "force-stop", "mock stop", pid=456)
+
+    monkeypatch.setattr(app_module.watchdog, "force_stop_current", fake_force_stop)
+    response = client.post("/api/watchdog/force-stop", headers={"X-Control-Token": token})
+    assert response.status_code == 200
+    assert response.json()["component"] == "watchdog"
+    assert response.json()["action"] == "force-stop"
+    assert called["stop"] is True
+
+
+def test_control_center_shutdown_route_uses_mock(monkeypatch) -> None:
+    token = _token()
+    called = {"shutdown": False}
+
+    def fake_shutdown():
+        called["shutdown"] = True
+        return OperationResult(True, "control-center", "shutdown", "mock shutdown", pid=123, port=8765)
+
+    monkeypatch.setattr(app_module.control_center, "request_shutdown", fake_shutdown)
+    response = client.post("/api/control-center/shutdown", headers={"X-Control-Token": token})
+    assert response.status_code == 200
+    assert response.json()["component"] == "control-center"
+    assert response.json()["action"] == "shutdown"
+    assert called["shutdown"] is True
 
 
 def test_control_center_log_route() -> None:

@@ -9,6 +9,7 @@
 - `EquipmentSlots.tsx`：装备槽位展示。
 - `RecentRunsTable.tsx`：最近运行记录表格。
 - `SkillConfigInspector.tsx`：技能/配置检查面板。
+- `ConfiguredSkillTree.tsx`：读取后端 `tree-config` 接口后渲染的正式配置驱动技能树。
 - `SkillNode.tsx`：单个技能节点。
 - `SkillTreeCanvas.tsx`：技能树主画布。
 - `TaskTraceMap.tsx`：任务轨迹展示。
@@ -19,3 +20,4 @@
 
 - 想改“显示效果”，通常看各个 `.tsx` 组件。
 - 想改“前端怎么理解后端数据”，优先看 `viewModels.ts`。
+- 想改每个 Agent 的真实技能树图谱，优先改 `config/skill-tree-workshop/agents/*.skill-tree.json`，不要直接改 React 里的节点。

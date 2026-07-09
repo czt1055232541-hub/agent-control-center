@@ -3,11 +3,11 @@ import { Hash, Clock, Layers, AlertTriangle, CheckCircle, Info } from "lucide-re
 import type { SkillWorkshopSkill, DriftStatus } from "../../../types";
 
 const driftBadge: Record<DriftStatus, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  ok: { label: "\u6b63\u5e38", color: "var(--accent-green)", bg: "rgba(59,168,90,0.1)", icon: <CheckCircle size={12} /> },
-  no_baseline: { label: "\u65e0\u57fa\u7ebf", color: "var(--accent-gold)", bg: "rgba(216,167,46,0.1)", icon: <Info size={12} /> },
-  drift: { label: "\u6f02\u79fb", color: "var(--accent-red)", bg: "rgba(216,60,46,0.1)", icon: <AlertTriangle size={12} /> },
-  missing_priority: { label: "\u7f3a\u4f18\u5148\u7ea7", color: "var(--accent-orange)", bg: "rgba(232,138,40,0.1)", icon: <AlertTriangle size={12} /> },
-  stale_version: { label: "\u7248\u672c\u8fc7\u65e7", color: "var(--accent-orange)", bg: "rgba(232,138,40,0.1)", icon: <AlertTriangle size={12} /> },
+  ok: { label: "正常", color: "var(--accent-green)", bg: "rgba(59,168,90,0.1)", icon: <CheckCircle size={12} /> },
+  no_baseline: { label: "无基线", color: "var(--accent-gold)", bg: "rgba(216,167,46,0.1)", icon: <Info size={12} /> },
+  drift: { label: "漂移", color: "var(--accent-red)", bg: "rgba(216,60,46,0.1)", icon: <AlertTriangle size={12} /> },
+  missing_priority: { label: "缺优先级", color: "var(--accent-orange)", bg: "rgba(232,138,40,0.1)", icon: <AlertTriangle size={12} /> },
+  stale_version: { label: "版本过旧", color: "var(--accent-orange)", bg: "rgba(232,138,40,0.1)", icon: <AlertTriangle size={12} /> },
 };
 
 const runtimeColors: Record<string, string> = {
@@ -45,7 +45,7 @@ export function SkillInventoryTable({ skills, compact = false }: SkillInventoryT
           ? skill.runtime
           : groupBy === "source"
             ? skill.sourceAlias
-            : skill.agentIds.join(", ") || "(\u65e0 Agent)";
+            : skill.agentIds.join(", ") || "(无 Agent)";
       const existing = map.get(key);
       if (existing) {
         existing.push(skill);
@@ -59,7 +59,7 @@ export function SkillInventoryTable({ skills, compact = false }: SkillInventoryT
   if (!skills.length) {
     return (
       <div className="flex items-center justify-center p-8 text-sm" style={{ color: "var(--text-muted)" }}>
-        \u6682\u65e0\u6280\u80fd\u6570\u636e
+        暂无技能数据
       </div>
     );
   }
@@ -80,13 +80,13 @@ export function SkillInventoryTable({ skills, compact = false }: SkillInventoryT
                   borderRight: mode !== "agent" ? "1px solid var(--border-light)" : "none",
                 }}
               >
-                {mode === "runtime" ? "\u6309\u8fd0\u884c\u65f6" : mode === "source" ? "\u6309\u6765\u6e90" : "\u6309 Agent"}
+                {mode === "runtime" ? "按运行时" : mode === "source" ? "按来源" : "按 Agent"}
               </button>
             ))}
           </div>
           <input
             type="text"
-            placeholder="\u641c\u7d22\u6280\u80fd..."
+            placeholder="搜索技能..."
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             className="rounded-md px-3 py-1.5 text-xs"
@@ -98,7 +98,7 @@ export function SkillInventoryTable({ skills, compact = false }: SkillInventoryT
             }}
           />
           <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            {filtered.length} / {skills.length} \u9879
+            {filtered.length} / {skills.length} 项
           </span>
         </div>
       )}
@@ -115,23 +115,23 @@ export function SkillInventoryTable({ skills, compact = false }: SkillInventoryT
                 }}
               >
                 <Layers size={10} />
-                {groupBy === "runtime" ? "\u8fd0\u884c\u65f6" : groupBy === "source" ? "\u6765\u6e90" : "Agent"}: {groupName}
+                {groupBy === "runtime" ? "运行时" : groupBy === "source" ? "来源" : "Agent"}: {groupName}
               </span>
               <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-                ({groupSkills.length} \u9879)
+                ({groupSkills.length} 项)
               </span>
             </div>
             <div className="overflow-x-auto rounded-md" style={{ border: "1px solid var(--border-light)" }}>
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr style={{ background: "var(--bg-panel-soft)" }}>
-                    {!compact && <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>\u6280\u80fd\u540d\u79f0</th>}
-                    <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>{compact ? "\u6280\u80fd\u540d\u79f0" : ""}</th>
-                    <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>\u6765\u6e90</th>
-                    {!compact && <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>\u8fd0\u884c\u65f6</th>}
+                    {!compact && <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>技能名称</th>}
+                    <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>{compact ? "技能名称" : ""}</th>
+                    <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>来源</th>
+                    {!compact && <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>运行时</th>}
                     <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>Hash</th>
-                    {!compact && <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>\u4f18\u5148\u7ea7</th>}
-                    <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>\u72b6\u6001</th>
+                    {!compact && <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>优先级</th>}
+                    <th className="px-3 py-2 font-medium" style={{ color: "var(--text-secondary)" }}>状态</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -199,7 +199,7 @@ export function SkillInventoryTable({ skills, compact = false }: SkillInventoryT
 
       {!compact && (
         <div className="flex flex-wrap gap-3 rounded-md p-2 text-[10px]" style={{ background: "var(--bg-panel-soft)", border: "1px solid var(--border-light)" }}>
-          <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>\u56fe\u4f8b:</span>
+          <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>图例:</span>
           {Object.entries(driftBadge).map(([key, badge]) => (
             <span key={key} className="flex items-center gap-1" style={{ color: badge.color }}>
               {badge.icon}

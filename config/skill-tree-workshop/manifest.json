@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "description": "Manifest only. Each Agent skill tree is designed in an independent JSON file under config/skill-tree-workshop/agents/.",
+  "agentConfigs": [
+    {
+      "agentId": "coordinator",
+      "name": "项目调度官",
+      "configPath": "config/skill-tree-workshop/agents/agent-coordinator.skill-tree.json",
+      "runtime": "openclaw-agent"
+    },
+    {
+      "agentId": "ops",
+      "name": "运维验证官",
+      "configPath": "config/skill-tree-workshop/agents/agent-ops.skill-tree.json",
+      "runtime": "openclaw-agent"
+    },
+    {
+      "agentId": "audit",
+      "name": "质量审计官",
+      "configPath": "config/skill-tree-workshop/agents/agent-audit.skill-tree.json",
+      "runtime": "openclaw-agent"
+    },
+    {
+      "agentId": "archive",
+      "name": "项目档案官",
+      "configPath": "config/skill-tree-workshop/agents/agent-archive.skill-tree.json",
+      "runtime": "openclaw-agent"
+    },
+    {
+      "agentId": "codex",
+      "name": "代码执行官",
+      "configPath": "config/skill-tree-workshop/agents/agent-codex.skill-tree.json",
+      "runtime": "codex-agent"
+    }
+  ]
+}

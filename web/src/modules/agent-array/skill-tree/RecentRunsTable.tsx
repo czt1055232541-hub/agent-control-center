@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import { CheckCircle, XCircle, Play, Clock } from 'lucide-react';
-import type { RecentRun } from '../../types';
+import type { RecentRun } from '../../../types';
 
 const statusIcon: Record<string, React.ReactNode> = {
   success: <CheckCircle size={14} style={{color:'var(--accent-green)'}} />,

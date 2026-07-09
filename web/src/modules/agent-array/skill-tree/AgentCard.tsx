@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import { Eye, Logs, ChevronRight } from 'lucide-react';
-import type { AgentProfile } from '../../types';
+import type { AgentProfile } from '../../../types';
 
 const statusConfig: Record<string, { dotClass: string; label: string }> = {
   online: { dotClass: 'online', label: '在线' },

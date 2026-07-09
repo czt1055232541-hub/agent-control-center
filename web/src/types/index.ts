@@ -187,6 +187,22 @@ export type DashboardSummary = {
   failedRequests: number;
 };
 
+export type CurrentWatchdogStatus = {
+  enabled: boolean;
+  status_light: "green" | "gray";
+  task_id: string | null;
+  assignee: string | null;
+  phase: string | null;
+  countdown_seconds: number | null;
+  next_check_at: string | null;
+  send_count: number | null;
+  state_file: string | null;
+  pid: number | null;
+  pid_running: boolean;
+  status: string;
+  log: string | null;
+};
+
 export type DiagnosticAction = {
   id: string;
   label: string;
@@ -498,4 +514,56 @@ export interface SkillRollbackResult {
   skillCount: number;
   confirmedAt: string;
   confirmedBy: string;
+}
+
+export type ConfigSkillTreeNodeType = 'model' | 'skill' | 'planned';
+
+export type ConfigSkillTreeBranch = 'base' | 'generic' | 'professional';
+
+export interface ConfigSkillTreeNode {
+  id: string;
+  label: string;
+  nodeType: ConfigSkillTreeNodeType;
+  model?: string;
+  skillName?: string;
+  skillRuntime?: string;
+  skillPath?: string;
+  category: SkillCategory;
+  branch: ConfigSkillTreeBranch;
+  x: number;
+  y: number;
+  description: string;
+  gear?: string[];
+}
+
+export interface ConfigSkillTreeAgent {
+  id: string;
+  icon: string;
+  name: string;
+  title: string;
+  role: string;
+  runtime: string;
+  model: string;
+  workspace: string;
+  skillRoots: Record<string, string>;
+  tools: string[];
+  permissions: string[];
+  accent: string;
+}
+
+export interface ConfigSkillTreeConfig {
+  version: number;
+  agent: ConfigSkillTreeAgent;
+  nodes: ConfigSkillTreeNode[];
+  edges: Array<[string, string]>;
+  futureAnchors?: Array<{ id: string; label: string }>;
+  configPath?: string;
+}
+
+export interface ConfigSkillTreeResponse {
+  version: number;
+  description: string;
+  manifestPath: string;
+  agents: ConfigSkillTreeConfig[];
+  errors: Array<{ agentId: string; error: string }>;
 }

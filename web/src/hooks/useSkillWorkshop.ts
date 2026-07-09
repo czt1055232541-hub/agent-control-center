@@ -124,11 +124,12 @@ export function useSkillWorkshop() {
       }
     } catch (err) {
       failureRef.current += 1;
-      const isUnavailable = failureRef.current >= MAX_FAILURES;
+      const message = err instanceof Error ? err.message : "获取技能工坊数据失败";
+      const isUnavailable = failureRef.current >= MAX_FAILURES || message === "No workshop data returned";
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: isUnavailable ? "后端技能工坊 API 不可用，已切换至静态技能树演示模式" : (err instanceof Error ? err.message : "获取技能工坊数据失败"),
+        error: isUnavailable ? "后端技能工坊 API 不可用，已切换至静态技能树演示模式" : message,
         backendAvailable: !isUnavailable,
         consecutiveFailures: failureRef.current,
       }));

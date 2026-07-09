@@ -432,8 +432,41 @@ def test_scan_skills_empty_sources_returns_empty_inventory(tmp_path: Path, monke
     assert inventory.skills == []
 
 
-def test_scan_skills_respects_dedup(tmp_path: Path) -> None:
-    """When same-named skill exists in multiple sources, higher priority wins."""
+def test_scan_skills_preserves_same_named_sources(tmp_path: Path, monkeypatch) -> None:
+    """The registry inventory keeps all source instances for drift comparison."""
+    lark_dir = tmp_path / "lark-skills"
+    npm_dir = tmp_path / "npm-skills"
+    codex_dir = tmp_path / "codex-skills"
+    cfg = _mock_config(tmp_path)
+
+    _make_skill_dir(lark_dir, "shared-skill", description="from lark")
+    _make_skill_dir(npm_dir, "shared-skill", description="from npm")
+    _make_skill_dir(codex_dir, "shared-skill", description="from codex")
+
+    # Force lark version to be different
+    lark_md = lark_dir / "shared-skill" / "SKILL.md"
+    lark_md.write_text("# Shared Skill\n\n---\ndescription: \"from lark (custom)\"\n---\n\nLark version.\n")
+
+    def fake_dirs(config=None):
+        return {
+            SOURCE_LARK_CLI: lark_dir,
+            SOURCE_OPENCLAW_NPM: npm_dir,
+            SOURCE_CODEX: codex_dir,
+        }
+
+    monkeypatch.setattr(
+        "feishu_stack.modules.agent_array.skill_tree.skill_registry._resolve_source_dirs",
+        fake_dirs,
+    )
+
+    inventory = scan_skills(cfg, force_full=True)
+
+    assert inventory.total == 3
+    assert {skill.source for skill in inventory.skills} == {SOURCE_LARK_CLI, SOURCE_OPENCLAW_NPM, SOURCE_CODEX}
+
+
+def test_deduplicate_prefers_highest_priority_source(tmp_path: Path) -> None:
+    """When a loaded view needs one winner, higher priority still wins."""
     lark_dir = tmp_path / "lark-skills"
     npm_dir = tmp_path / "npm-skills"
     codex_dir = tmp_path / "codex-skills"
@@ -442,7 +475,6 @@ def test_scan_skills_respects_dedup(tmp_path: Path) -> None:
     _make_skill_dir(npm_dir, "shared-skill", description="from npm")
     _make_skill_dir(codex_dir, "shared-skill", description="from codex")
 
-    # Force lark version to be different
     lark_md = lark_dir / "shared-skill" / "SKILL.md"
     lark_md.write_text("# Shared Skill\n\n---\ndescription: \"from lark (custom)\"\n---\n\nLark version.\n")
 

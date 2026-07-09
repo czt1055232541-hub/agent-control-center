@@ -286,6 +286,7 @@ class StackConfig:
     pid_dir: Path
     lark_cli_home: Path | None = None
     summary_dir: Path | None = None
+    watchdog_state_dir: Path | None = None
     node_exe: Path | str = "node"
     npm_exe: Path | str = "npm"
     moonbridge_reasoning_effort: str = "high"
@@ -441,6 +442,15 @@ def load_config(path: Path | None = None) -> StackConfig:
     agent = raw["agent"]
     runtime = raw["runtime"]
     codex_config = Path(raw["codexConfig"])
+    configured_port = int(openclaw["port"])
+    openclaw_json_port = _read_openclaw_json_port(Path(openclaw["home"]))
+    if openclaw_json_port is not None and configured_port != openclaw_json_port:
+        _log.warning(
+            "openclaw.port %d differs from openclaw.json gateway.port %d; "
+            "stack.settings value is used, update it to match when upstream changes.",
+            configured_port,
+            openclaw_json_port,
+        )
     config = StackConfig(
         raw=raw,
         stack_root=stack_root,
@@ -461,7 +471,7 @@ def load_config(path: Path | None = None) -> StackConfig:
         moonbridge_port=int(moonbridge["port"]),
         openclaw_home=Path(openclaw["home"]),
         openclaw_gateway_cmd=Path(openclaw["gatewayCmd"]),
-        openclaw_port=int(openclaw["port"]),
+        openclaw_port=configured_port,
         agent_dir=Path(agent["dir"]),
         agent_entry=Path(agent["dir"]) / agent["entry"],
         lark_cli_bin=Path(agent["larkCliBin"]),
@@ -470,6 +480,33 @@ def load_config(path: Path | None = None) -> StackConfig:
         log_dir=Path(runtime["logs"]),
         pid_dir=Path(runtime["pids"]),
         summary_dir=Path(runtime.get("summaries") or Path(runtime["dir"]) / "summaries"),
+        watchdog_state_dir=Path(agent.get("watchdogStateDir") or raw["watchdogStateDir"]) if (agent.get("watchdogStateDir") or raw.get("watchdogStateDir")) else None,
     )
     config.ensure_runtime_dirs()
     return config
+
+
+def _read_openclaw_json_port(openclaw_home: Path) -> int | None:
+    """Read the gateway port from the upstream openclaw.json config.
+
+    Returns None when the config file is missing or unreadable.
+    This is the port OpenClaw itself believes it should run on.
+    """
+    config_path = openclaw_home / ".openclaw" / "openclaw.json"
+    if not config_path.exists():
+        return None
+    try:
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    port = data.get("gateway", {}).get("port")
+    if isinstance(port, int) and 1 <= port <= 65535:
+        return port
+    if isinstance(port, str):
+        try:
+            p = int(port)
+            if 1 <= p <= 65535:
+                return p
+        except ValueError:
+            pass
+    return None
