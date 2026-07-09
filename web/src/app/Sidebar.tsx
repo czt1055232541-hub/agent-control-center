@@ -6,7 +6,6 @@ export type CommandPage =
   | "tasks"
   | "feishu"
   | "provider"
-  | "task-dashboard"
   | "routing"
   | "config"
   | "diagnostics"
@@ -20,8 +19,7 @@ const navItems: Array<{
 }> = [
   { key: "dashboard", label: "Dashboard 总览", icon: LayoutDashboard, status: "已实现" },
   { key: "agents", label: "Agent 阵列", icon: Swords, status: "已实现" },
-  { key: "tasks", label: "任务战场", icon: CalendarClock, status: "开发中" },
-  { key: "task-dashboard", label: "任务仪表盘", icon: LayoutDashboard, status: "已实现" },
+  { key: "tasks", label: "任务战场", icon: CalendarClock, status: "已实现" },
   { key: "feishu", label: "飞书连接", icon: Send, status: "后续" },
   { key: "provider", label: "模型与 Provider", icon: ServerCog, status: "已实现" },
   { key: "routing", label: "路由规则", icon: Route, status: "后续" },

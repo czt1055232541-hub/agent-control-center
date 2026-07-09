@@ -1,344 +1,529 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import React from "react";
+import { Edit3, Plus, RefreshCcw, Save, Search, Trash2, X } from "lucide-react";
+import { readJson } from "../../api";
 
-// ---------- types ----------
-type TaskStatus = '开发中' | '待运维验证' | '待质量审计' | '已完成' | '已归档' | '阻塞' | '返工中';
-
-interface TaskState {
+type TaskEntry = {
   taskId: string;
+  title: string;
+  parentProjectId: string;
+  parentProjectName: string;
+  workspacePath: string;
+  status: string;
   phase: string;
   assignee: string;
-  status: TaskStatus;
-  updated: string;
-  artifactPath: string | null;
-  selfTest: string | null;
-  auditResult: string | null;
-  opsResult: string | null;
-  archiveDate: string | null;
-  parent_project: string;
-}
-
-// ---------- sample data (matches task_state.json schema) ----------
-const SAMPLE_TASKS: TaskState[] = [
-  { taskId: 'phase1-health-monitor', phase: 'Phase 1', assignee: '代码执行官', status: '已归档', updated: '2026-06-30T12:00:00', artifactPath: 'agent-evolution/phase1-health-monitor/health_check.py', selfTest: '3项检查全部通过', auditResult: '通过 - 已归档', opsResult: '通过', archiveDate: '2026-06-30', parent_project: 'Agent Control Center 发展规划' },
-  { taskId: 'phase2-config-conflict-detection', phase: 'Phase 2', assignee: '代码执行官', status: '已归档', updated: '2026-06-30T13:30:00', artifactPath: 'agent-evolution/phase2-config-conflict/config_checker.py', selfTest: '检测到2个端口冲突、5个AppSecret泄漏', auditResult: '通过 - 数据安全边界已定义', opsResult: '复审通过', archiveDate: '2026-06-30', parent_project: 'Agent Control Center 发展规划' },
-  { taskId: 'phase3-task-dashboard', phase: 'Phase 3', assignee: '代码执行官', status: '开发中', updated: '2026-07-08T18:55:00', artifactPath: 'agent-evolution/phase3-task-dashboard/dashboard.html', selfTest: '构建中 - HTML独立仪表盘', auditResult: null, opsResult: null, archiveDate: null, parent_project: 'Agent Control Center 发展规划' },
-  { taskId: 'phase4-privacy-scan', phase: 'Phase 4', assignee: '代码执行官', status: '已归档', updated: '2026-06-30T15:00:00', artifactPath: 'agent-evolution/phase4-privacy-scan/privacy_scan.py', selfTest: '扫描50+文件，检测15个appSecret', auditResult: '通过 - 补充数据安全规则后通过', opsResult: '复审通过（初检漏5个appSecret）', archiveDate: '2026-06-30', parent_project: 'Agent Control Center 发展规划' },
-  { taskId: 'phase5-skill-registry', phase: 'Phase 5', assignee: '代码执行官', status: '已完成', updated: '2026-07-08T18:15:00', artifactPath: 'agent-evolution/phase5-skill-registry/tests/check_registry.py', selfTest: 'skill-registry.json 注册16个skill，sha256漂移检测', auditResult: '通过 - 评分44/50', opsResult: '三目录确认: codeX(11) npm(57) lark-cli(27)', archiveDate: null, parent_project: 'Agent Control Center 发展规划' },
-  { taskId: 'phase6-task-calc-regression', phase: 'Phase 6', assignee: '代码执行官', status: '已完成', updated: '2026-07-08T18:55:00', artifactPath: 'agent-evolution/phase6-task-calc-regression/task_calc_regression.py', selfTest: '20/20项通过', auditResult: '通过 - 评分44/50', opsResult: 'JS 15项全通过，浏览器环境已确认', archiveDate: null, parent_project: 'Agent Control Center 发展规划' },
-  { taskId: 'TASK-MMI-3D-OPT-20260703-113038', phase: '独立任务', assignee: '代码执行官', status: '待运维验证', updated: '2026-07-04T16:02:00', artifactPath: 'agent-evolution/index/MMI-3D-OPT/src/mmr_2d_optimize.py', selfTest: '2D优化跑通，收敛曲线正常', auditResult: null, opsResult: null, archiveDate: null, parent_project: 'MMI 优化' },
-];
-
-// ---------- constants ----------
-const STATUS_BADGE_CLASSES: Record<string, string> = {
-  '开发中': 'bg-amber-50 text-amber-600',
-  '待运维验证': 'bg-indigo-50 text-indigo-600',
-  '待质量审计': 'bg-stone-50 text-stone-600',
-  '已完成': 'bg-emerald-50 text-emerald-600',
-  '已归档': 'bg-gray-100 text-gray-500',
-  '阻塞': 'bg-red-50 text-red-600',
-  '返工中': 'bg-purple-50 text-purple-600',
+  updatedAt: string;
+  tags: string[];
+  source: string;
+  hidden: boolean;
 };
 
-const FILTER_OPTIONS: { label: string; value: string }[] = [
-  { label: '全部状态', value: '' },
-  { label: '已完成', value: 'completed' },
-  { label: '进行中', value: 'in_progress' },
-  { label: '阻塞', value: 'blocked' },
-];
+type TaskGroup = {
+  projectId: string;
+  projectName: string;
+  taskCount: number;
+};
 
-const LS_KEY = 'dashboard-project-names';
+type TaskDirectoryResponse = {
+  version: number;
+  directoryFile: string;
+  projectsRoot: string;
+  updatedAt: string;
+  tasks: TaskEntry[];
+  groups: TaskGroup[];
+  sync: {
+    addedFolders: string[];
+    missingWorkspaces: string[];
+  };
+};
 
-// ---------- helpers ----------
-function formatTime(iso: string | null): string {
-  if (!iso) return '--';
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+type TaskForm = {
+  taskId: string;
+  title: string;
+  parentProjectName: string;
+  workspacePath: string;
+  status: string;
+  phase: string;
+  assignee: string;
+  tags: string;
+};
+
+const EMPTY_FORM: TaskForm = {
+  taskId: "",
+  title: "",
+  parentProjectName: "",
+  workspacePath: "",
+  status: "进行中",
+  phase: "独立任务",
+  assignee: "",
+  tags: "",
+};
+
+const STATUS_OPTIONS = ["进行中", "开发中", "待运维验证", "待质量审计", "已完成", "已归档", "阻塞", "返工中"];
+
+const STATUS_BADGE_CLASSES: Record<string, string> = {
+  "进行中": "bg-sky-50 text-sky-700",
+  "开发中": "bg-amber-50 text-amber-700",
+  "待运维验证": "bg-indigo-50 text-indigo-700",
+  "待质量审计": "bg-stone-100 text-stone-700",
+  "已完成": "bg-emerald-50 text-emerald-700",
+  "已归档": "bg-slate-100 text-slate-600",
+  "阻塞": "bg-red-50 text-red-700",
+  "返工中": "bg-purple-50 text-purple-700",
+};
+
+function formatTime(value: string | null): string {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-function loadProjectNames(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
+function taskToForm(task: TaskEntry): TaskForm {
+  return {
+    taskId: task.taskId,
+    title: task.title,
+    parentProjectName: task.parentProjectName,
+    workspacePath: task.workspacePath,
+    status: task.status,
+    phase: task.phase,
+    assignee: task.assignee,
+    tags: task.tags.join(", "),
+  };
 }
 
-function saveProjectNames(names: Record<string, string>) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(names)); } catch { /* noop */ }
+function formToPayload(form: TaskForm) {
+  return {
+    taskId: form.taskId.trim() || undefined,
+    title: form.title.trim() || undefined,
+    parentProjectName: form.parentProjectName.trim() || form.title.trim() || undefined,
+    workspacePath: form.workspacePath.trim() || undefined,
+    status: form.status.trim() || undefined,
+    phase: form.phase.trim() || undefined,
+    assignee: form.assignee.trim() || undefined,
+    tags: form.tags.split(/[,，;\n]/).map((tag) => tag.trim()).filter(Boolean),
+  };
 }
 
-function statusToFilterKey(status: TaskStatus): string {
-  if (status === '已归档' || status === '已完成') return 'completed';
-  if (status === '阻塞') return 'blocked';
-  return 'in_progress';
+function statusFilterKey(status: string): string {
+  if (status === "已完成" || status === "已归档") return "completed";
+  if (status === "阻塞") return "blocked";
+  return "active";
 }
 
-// ---------- main component ----------
-export default function TaskDashboardPage() {
-  const [tasks] = useState<TaskState[]>(SAMPLE_TASKS);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  const [projectNames, setProjectNames] = useState<Record<string, string>>(loadProjectNames);
-  const [editingGroup, setEditingGroup] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortField, setSortField] = useState<'updated' | 'taskId' | 'phase' | 'assignee' | 'status'>('updated');
-  const [sortAsc, setSortAsc] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<TaskState | null>(null);
+function StatusBadge({ status }: { status: string }) {
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${STATUS_BADGE_CLASSES[status] ?? "bg-slate-100 text-slate-600"}`}>
+      {status || "--"}
+    </span>
+  );
+}
 
-  // persist project names
-  useEffect(() => { saveProjectNames(projectNames); }, [projectNames]);
+function IconButton({
+  title,
+  onClick,
+  children,
+  disabled,
+  danger,
+}: {
+  title: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      disabled={disabled}
+      onClick={onClick}
+      className={`inline-flex h-8 w-8 items-center justify-center rounded-md border text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
+        danger ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
-  // filtered + sorted tasks
-  const filteredTasks = useMemo(() => {
-    let result = [...tasks];
+export default function TaskDashboardPage({ token }: { token: string }) {
+  const [directory, setDirectory] = React.useState<TaskDirectoryResponse | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState("");
+  const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>({});
+  const [selectedTask, setSelectedTask] = React.useState<TaskEntry | null>(null);
+  const [editingTask, setEditingTask] = React.useState<TaskEntry | null>(null);
+  const [showAddForm, setShowAddForm] = React.useState(false);
+  const [form, setForm] = React.useState<TaskForm>(EMPTY_FORM);
 
-    if (statusFilter) {
-      result = result.filter(t => statusToFilterKey(t.status) === statusFilter);
+  const refresh = React.useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const next = await readJson<TaskDirectoryResponse>("/api/task-battlefield/directory");
+      setDirectory(next);
+      setSelectedTask((current) => current ? next.tasks.find((task) => task.taskId === current.taskId) ?? null : null);
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : String(exc));
+    } finally {
+      setLoading(false);
     }
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      result = result.filter(t =>
-        [t.taskId, t.phase, t.assignee, t.status, t.artifactPath, t.parent_project]
-          .filter(Boolean).join(' ').toLowerCase().includes(q)
-      );
-    }
-
-    result.sort((a, b) => {
-      const va = a[sortField] || '';
-      const vb = b[sortField] || '';
-      const cmp = va < vb ? -1 : va > vb ? 1 : 0;
-      return sortAsc ? cmp : -cmp;
-    });
-    return result;
-  }, [tasks, statusFilter, searchTerm, sortField, sortAsc]);
-
-  // group by parent_project
-  const groups = useMemo(() => {
-    const map: Record<string, TaskState[]> = {};
-    const order: string[] = [];
-    for (const t of filteredTasks) {
-      const key = t.parent_project || '未归类任务';
-      if (!map[key]) { map[key] = []; order.push(key); }
-      map[key].push(t);
-    }
-    return order.map(name => ({ name, tasks: map[name] }));
-  }, [filteredTasks]);
-
-  const stats = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const t of tasks) m[t.status] = (m[t.status] || 0) + 1;
-    return m;
-  }, [tasks]);
-
-  const toggleGroup = useCallback((name: string) => {
-    setExpandedGroups(prev => ({ ...prev, [name]: prev[name] === false ? true : false }));
   }, []);
 
-  const startEdit = useCallback((name: string) => {
-    setEditingGroup(name);
-    setEditValue(projectNames[name] || name);
-  }, [projectNames]);
+  React.useEffect(() => {
+    refresh().catch(() => {});
+  }, [refresh]);
 
-  const finishEdit = useCallback(() => {
-    if (!editingGroup) return;
-    const trimmed = editValue.trim();
-    setProjectNames(prev => {
-      const next = { ...prev };
-      if (trimmed && trimmed !== editingGroup) {
-        next[editingGroup] = trimmed;
-      } else {
-        delete next[editingGroup];
+  const filteredTasks = React.useMemo(() => {
+    const tasks = directory?.tasks ?? [];
+    return tasks
+      .filter((task) => !statusFilter || statusFilterKey(task.status) === statusFilter)
+      .filter((task) => {
+        if (!searchTerm.trim()) return true;
+        const q = searchTerm.trim().toLowerCase();
+        return [
+          task.taskId,
+          task.title,
+          task.parentProjectName,
+          task.workspacePath,
+          task.status,
+          task.phase,
+          task.assignee,
+          task.tags.join(" "),
+        ].join(" ").toLowerCase().includes(q);
+      })
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }, [directory, searchTerm, statusFilter]);
+
+  const groups = React.useMemo(() => {
+    const map: Record<string, TaskEntry[]> = {};
+    const order: string[] = [];
+    for (const task of filteredTasks) {
+      const key = task.parentProjectName || "未归类任务";
+      if (!map[key]) {
+        map[key] = [];
+        order.push(key);
+      }
+      map[key].push(task);
+    }
+    return order.map((name) => ({ name, tasks: map[name] }));
+  }, [filteredTasks]);
+
+  React.useEffect(() => {
+    setExpandedGroups((current) => {
+      const next = { ...current };
+      for (const group of groups) {
+        if (next[group.name] === undefined) next[group.name] = true;
       }
       return next;
     });
-    setEditingGroup(null);
-  }, [editingGroup, editValue]);
-
-  // initialise all groups as expanded
-  useEffect(() => {
-    const init: Record<string, boolean> = {};
-    for (const g of groups) {
-      if (expandedGroups[g.name] === undefined) init[g.name] = true;
-    }
-    if (Object.keys(init).length) setExpandedGroups(prev => ({ ...prev, ...init }));
   }, [groups]);
 
-  const handleSort = (field: typeof sortField) => {
-    if (sortField === field) setSortAsc(!sortAsc);
-    else { setSortField(field); setSortAsc(true); }
+  const stats = React.useMemo(() => {
+    const result: Record<string, number> = {};
+    for (const task of directory?.tasks ?? []) {
+      result[task.status] = (result[task.status] ?? 0) + 1;
+    }
+    return result;
+  }, [directory]);
+
+  const saveTask = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const payload = formToPayload(form);
+      const endpoint = editingTask ? `/api/task-battlefield/tasks/${encodeURIComponent(editingTask.taskId)}` : "/api/task-battlefield/tasks";
+      const method = editingTask ? "PUT" : "POST";
+      const next = await readJson<TaskDirectoryResponse>(endpoint, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Control-Token": token,
+        },
+        body: JSON.stringify(payload),
+      });
+      setDirectory(next);
+      const savedTask = editingTask
+        ? next.tasks.find((task) => task.taskId === (payload.taskId ?? editingTask.taskId))
+          ?? next.tasks.find((task) => task.taskId === editingTask.taskId)
+          ?? next.tasks.find((task) => task.title === (payload.title ?? editingTask.title))
+          ?? null
+        : null;
+      setSelectedTask(savedTask);
+      setEditingTask(null);
+      setShowAddForm(false);
+      setForm(EMPTY_FORM);
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : String(exc));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const sortArrow = (field: typeof sortField) => {
-    if (sortField !== field) return '';
-    return sortAsc ? ' ▲' : ' ▼';
+  const deleteTask = async (task: TaskEntry) => {
+    setBusy(true);
+    setError("");
+    try {
+      const next = await readJson<TaskDirectoryResponse>(`/api/task-battlefield/tasks/${encodeURIComponent(task.taskId)}`, {
+        method: "DELETE",
+        headers: { "X-Control-Token": token },
+      });
+      setDirectory(next);
+      setSelectedTask(null);
+      setEditingTask(null);
+      setForm(EMPTY_FORM);
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : String(exc));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const getDisplayName = (key: string) => projectNames[key] || key;
+  const openAdd = () => {
+    setEditingTask(null);
+    setSelectedTask(null);
+    setForm(EMPTY_FORM);
+    setShowAddForm(true);
+  };
 
-  // ---------- render ----------
+  const openEdit = (task: TaskEntry) => {
+    setEditingTask(task);
+    setSelectedTask(task);
+    setShowAddForm(true);
+    setForm(taskToForm(task));
+  };
+
+  const closeForm = () => {
+    setEditingTask(null);
+    setShowAddForm(false);
+    setForm(EMPTY_FORM);
+  };
+
+  const total = directory?.tasks.length ?? 0;
+
   return (
-    <div className='max-w-7xl mx-auto px-5 py-6'>
-      {/* header */}
-      <div className='flex items-center justify-between mb-5 flex-wrap gap-3'>
-        <div>
-          <h1 className='text-[22px] font-semibold text-gray-900'>任务状态仪表盘</h1>
-          <div className='text-xs text-gray-500 mt-0.5'>Phase 3 &middot; Agent Evolution &middot; {filteredTasks.length} 个任务</div>
+    <div className="mx-auto flex max-w-7xl flex-col gap-4">
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-slate-950">任务战场</h2>
+            <p className="mt-1 break-all text-sm text-slate-600">
+              {directory?.projectsRoot ?? "正在读取项目根目录..."}
+            </p>
+            {directory ? (
+              <p className="mt-1 break-all text-xs text-slate-500">
+                目录文件：{directory.directoryFile}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <IconButton title="刷新任务目录" onClick={refresh} disabled={loading || busy}>
+              <RefreshCcw size={15} />
+            </IconButton>
+            <button
+              type="button"
+              onClick={openAdd}
+              disabled={busy}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-teal-700 bg-teal-600 px-3 text-sm font-medium text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Plus size={15} />
+              添加任务
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* stats row */}
-      <div className='flex gap-2.5 mb-5 flex-wrap'>
-        {(['开发中', '待运维验证', '待质量审计', '已完成', '已归档', '阻塞', '返工中'] as TaskStatus[]).map(s => (
-          stats[s] !== undefined && (
-            <div key={s} className='bg-white border border-gray-200 rounded-lg px-4 py-3 min-w-[90px] text-center flex-1'>
-              <div className='text-[26px] font-semibold text-gray-900'>{stats[s]}</div>
-              <div className='text-[11px] text-gray-500 mt-0.5'>{s}</div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-4">
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+            <div className="text-xl font-semibold text-slate-950">{total}</div>
+            <div className="text-xs text-slate-500">任务条目</div>
+          </div>
+          {STATUS_OPTIONS.filter((status) => stats[status]).slice(0, 3).map((status) => (
+            <div key={status} className="rounded-md border border-slate-200 bg-white px-3 py-2">
+              <div className="text-xl font-semibold text-slate-950">{stats[status]}</div>
+              <div className="text-xs text-slate-500">{status}</div>
             </div>
-          )
-        ))}
-      </div>
-
-      {/* toolbar */}
-      <div className='flex items-center gap-2.5 mb-3 bg-white border border-gray-200 rounded-lg px-3.5 py-2 flex-wrap'>
-        <div className='relative flex-1 min-w-[200px]'>
-          <svg className='absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
-            <path strokeLinecap='round' strokeLinejoin='round' d='M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z' />
-          </svg>
-          <input
-            className='w-full pl-8 pr-2.5 py-1.5 border border-gray-200 rounded-md text-[13px] bg-gray-50 outline-none focus:border-blue-500'
-            placeholder='搜索 TASK-ID / 阶段 / 负责人...'
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
+          ))}
         </div>
-        <select
-          className='px-2.5 py-1.5 border border-gray-200 rounded-md text-[13px] bg-gray-50 cursor-pointer text-gray-700'
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-        >
-          {FILTER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      </div>
 
-      {/* table */}
-      <div className='bg-white border border-gray-200 rounded-lg overflow-x-auto'>
-        <table className='w-full border-collapse'>
-          <thead>
-            <tr>
-              {([
-                ['taskId', 'TASK-ID'],
-                ['phase', '阶段'],
-                ['assignee', '负责人'],
-                ['status', '状态'],
-                ['updated', '更新时间'],
-              ] as const).map(([f, label]) => (
-                <th
-                  key={f}
-                  className='text-left px-3.5 py-2.5 text-xs font-semibold text-gray-500 border-b border-gray-200 cursor-pointer select-none whitespace-nowrap hover:text-blue-500'
-                  onClick={() => handleSort(f)}
+        {directory?.sync.addedFolders.length ? (
+          <div className="mt-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            已同步新增文件夹：{directory.sync.addedFolders.join(", ")}
+          </div>
+        ) : null}
+        {directory?.sync.missingWorkspaces.length ? (
+          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            有任务目录路径不存在：{directory.sync.missingWorkspaces.join(", ")}
+          </div>
+        ) : null}
+        {error ? (
+          <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">{error}</div>
+        ) : null}
+      </section>
+
+      {showAddForm ? (
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-950">{editingTask ? "编辑任务条目" : "添加任务条目"}</h3>
+            <IconButton title="关闭表单" onClick={closeForm} disabled={busy}>
+              <X size={15} />
+            </IconButton>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="grid gap-1 text-xs font-medium text-slate-600">
+              TASK-ID
+              <input className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-teal-500" value={form.taskId} onChange={(e) => setForm({ ...form, taskId: e.target.value })} />
+            </label>
+            <label className="grid gap-1 text-xs font-medium text-slate-600">
+              任务名称
+              <input className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-teal-500" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            </label>
+            <label className="grid gap-1 text-xs font-medium text-slate-600">
+              大项目
+              <input className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-teal-500" value={form.parentProjectName} onChange={(e) => setForm({ ...form, parentProjectName: e.target.value })} />
+            </label>
+            <label className="grid gap-1 text-xs font-medium text-slate-600">
+              状态
+              <select className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-teal-500" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-medium text-slate-600">
+              阶段
+              <input className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-teal-500" value={form.phase} onChange={(e) => setForm({ ...form, phase: e.target.value })} />
+            </label>
+            <label className="grid gap-1 text-xs font-medium text-slate-600">
+              负责人
+              <input className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-teal-500" value={form.assignee} onChange={(e) => setForm({ ...form, assignee: e.target.value })} />
+            </label>
+            <label className="grid gap-1 text-xs font-medium text-slate-600 md:col-span-2">
+              工作区路径
+              <input className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-teal-500" value={form.workspacePath} onChange={(e) => setForm({ ...form, workspacePath: e.target.value })} />
+            </label>
+            <label className="grid gap-1 text-xs font-medium text-slate-600 md:col-span-2">
+              标签
+              <input className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-teal-500" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} />
+            </label>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <button type="button" onClick={closeForm} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">取消</button>
+            <button type="button" onClick={saveTask} disabled={busy || !token} className="inline-flex items-center gap-1.5 rounded-md border border-teal-700 bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50">
+              <Save size={15} />
+              保存
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-2 border-b border-slate-200 p-3 sm:flex-row sm:items-center">
+          <div className="relative min-w-[220px] flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              className="w-full rounded-md border border-slate-200 bg-slate-50 py-2 pl-8 pr-3 text-sm outline-none focus:border-teal-500"
+              placeholder="搜索任务、项目、路径、标签"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <select className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-teal-500" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">全部状态</option>
+            <option value="active">进行中</option>
+            <option value="completed">已完成/归档</option>
+            <option value="blocked">阻塞</option>
+          </select>
+        </div>
+
+        <div className="divide-y divide-slate-200">
+          {loading ? (
+            <div className="px-3 py-10 text-center text-sm text-slate-400">正在读取任务目录...</div>
+          ) : groups.length === 0 ? (
+            <div className="px-3 py-10 text-center text-sm text-slate-400">没有匹配的任务条目</div>
+          ) : groups.map((group) => {
+            const open = expandedGroups[group.name] !== false;
+            return (
+              <div key={group.name}>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 bg-slate-100 px-3 py-2 text-left"
+                  onClick={() => setExpandedGroups((current) => ({ ...current, [group.name]: !open }))}
                 >
-                  {label}<span className='ml-1 text-[10px]'>{sortArrow(f)}</span>
-                </th>
-              ))}
-              <th className='text-left px-3.5 py-2.5 text-xs font-semibold text-gray-500 border-b border-gray-200 whitespace-nowrap'>产物路径</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredTasks.length === 0 ? (
-              <tr><td colSpan={6} className='text-center py-10 text-gray-400'>无匹配任务</td></tr>
-            ) : (
-              groups.flatMap(g => {
-                const isOpen = expandedGroups[g.name] !== false;
-                const rows: React.ReactNode[] = [];
-                // group header row
-                rows.push(
-                  <tr key={'g-' + g.name} className='cursor-pointer bg-gray-100 border-b-2 border-gray-300'>
-                    <td colSpan={6} className='p-0'>
+                  <span className={`inline-block w-4 shrink-0 text-xs text-slate-500 transition ${open ? "rotate-90" : ""}`}>▶</span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{group.name}</span>
+                  <span className="shrink-0 text-xs text-slate-500">{group.tasks.length} 个任务</span>
+                </button>
+                {open ? (
+                  <div className="divide-y divide-slate-100">
+                    {group.tasks.map((task) => (
                       <div
-                        className='flex items-center gap-1.5 px-3.5 py-2.5'
-                        onClick={() => toggleGroup(g.name)}
+                        key={task.taskId}
+                        className="grid cursor-pointer gap-2 px-3 py-3 hover:bg-slate-50 xl:grid-cols-[minmax(90px,0.8fr)_minmax(120px,1.1fr)_minmax(100px,1fr)_84px_104px_minmax(140px,1.4fr)_72px]"
+                        onClick={() => setSelectedTask(task)}
                       >
-                        <span className='text-[11px] text-gray-500 w-4 text-center inline-block transition-transform' style={isOpen ? {transform:'rotate(90deg)'} : {}}>
-                          {'▶'}
-                        </span>
-                        {editingGroup === g.name ? (
-                          <input
-                            className='border border-blue-400 rounded px-1.5 py-0.5 text-[13px] font-semibold outline-none bg-white w-[260px] text-gray-900'
-                            value={editValue}
-                            onChange={e => setEditValue(e.target.value)}
-                            onBlur={finishEdit}
-                            onKeyDown={e => { if (e.key === 'Enter') finishEdit(); if (e.key === 'Escape') { setEditValue(projectNames[g.name] || g.name); finishEdit(); } }}
-                            autoFocus
-                            onClick={e => e.stopPropagation()}
-                          />
-                        ) : (
-                          <span
-                            className='font-semibold text-[13px] text-gray-900 group'
-                            onClick={e => { e.stopPropagation(); startEdit(g.name); }}
-                          >
-                            {getDisplayName(g.name)}
-                            <span className='text-[10px] text-gray-400 ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity'>{'✎'}</span>
-                          </span>
-                        )}
-                        <span className='text-xs text-gray-500 ml-2'>{g.tasks.length} 个任务</span>
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-semibold uppercase text-slate-400 xl:hidden">TASK-ID</div>
+                          <div className="break-all font-mono text-xs text-slate-700">{task.taskId}</div>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-semibold uppercase text-slate-400 xl:hidden">任务</div>
+                          <div className="break-words text-sm font-medium text-slate-900">{task.title}</div>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-semibold uppercase text-slate-400 xl:hidden">阶段</div>
+                          <div className="line-clamp-2 break-words text-sm text-slate-600">{task.phase || "--"}</div>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-semibold uppercase text-slate-400 xl:hidden">状态</div>
+                          <StatusBadge status={task.status} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-semibold uppercase text-slate-400 xl:hidden">更新时间</div>
+                          <div className="text-sm tabular-nums text-slate-600">{formatTime(task.updatedAt)}</div>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-semibold uppercase text-slate-400 xl:hidden">工作区路径</div>
+                          <div className="break-all text-xs text-sky-700" title={task.workspacePath}>{task.workspacePath}</div>
+                        </div>
+                        <div className="flex items-start justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                          <IconButton title="编辑任务条目" onClick={() => openEdit(task)} disabled={busy}><Edit3 size={14} /></IconButton>
+                          <IconButton title="删除记录，不删除文件夹" onClick={() => deleteTask(task)} disabled={busy} danger><Trash2 size={14} /></IconButton>
+                        </div>
                       </div>
-                    </td>
-                  </tr>
-                );
-                // task rows
-                if (isOpen) {
-                  for (const t of g.tasks) {
-                    rows.push(
-                      <tr key={t.taskId} className='hover:bg-gray-50 cursor-pointer border-b border-gray-100' onClick={() => setSelectedTask(t)}>
-                        <td className='px-3.5 py-2.5 text-xs font-mono pl-7'>{t.taskId}</td>
-                        <td className='px-3.5 py-2.5 text-[13px] whitespace-nowrap'>{t.phase}</td>
-                        <td className='px-3.5 py-2.5 text-[13px] whitespace-nowrap'>{t.assignee}</td>
-                        <td className='px-3.5 py-2.5 whitespace-nowrap'>
-                          <span className={'inline-block px-2.5 py-1 rounded-full text-[11px] font-medium ' + (STATUS_BADGE_CLASSES[t.status] || 'bg-gray-100 text-gray-500')}>
-                            {t.status}
-                          </span>
-                        </td>
-                        <td className='px-3.5 py-2.5 text-[13px] whitespace-nowrap tabular-nums'>{formatTime(t.updated)}</td>
-                        <td className='px-3.5 py-2.5 text-[11px] whitespace-nowrap'>
-                          {t.artifactPath ? (
-                            <span className='text-blue-500 cursor-pointer hover:underline' onClick={e => { e.stopPropagation(); setSelectedTask(t); }}>
-                              {t.artifactPath}
-                            </span>
-                          ) : <span className='text-gray-400'>--</span>}
-                        </td>
-                      </tr>
-                    );
-                  }
-                }
-                return rows;
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* detail panel */}
-      {selectedTask && (
-        <div className='bg-white border border-gray-200 rounded-lg p-4 mt-3'>
-          <div className='flex items-center justify-between mb-2.5'>
-            <h3 className='text-[15px] font-semibold text-gray-900'>{selectedTask.taskId}</h3>
-            <button className='px-3 py-1.5 border border-gray-200 rounded-md text-xs text-gray-500 hover:bg-gray-50' onClick={() => setSelectedTask(null)}>关闭</button>
-          </div>
-          <div className='grid grid-cols-[120px_1fr] gap-1.5 text-[13px]'>
-            <span className='text-gray-500'>阶段</span><span>{selectedTask.phase}</span>
-            <span className='text-gray-500'>负责人</span><span>{selectedTask.assignee}</span>
-            <span className='text-gray-500'>状态</span>
-            <span><span className={'inline-block px-2.5 py-1 rounded-full text-[11px] font-medium ' + (STATUS_BADGE_CLASSES[selectedTask.status] || 'bg-gray-100 text-gray-500')}>{selectedTask.status}</span></span>
-            <span className='text-gray-500'>更新时间</span><span>{formatTime(selectedTask.updated)}</span>
-            <span className='text-gray-500'>产物路径</span><span>{selectedTask.artifactPath || '--'}</span>
-            <span className='text-gray-500'>自测结果</span><span>{selectedTask.selfTest || '--'}</span>
-            <span className='text-gray-500'>运维验证</span><span>{selectedTask.opsResult || '--'}</span>
-            <span className='text-gray-500'>质量审计</span><span>{selectedTask.auditResult || '--'}</span>
-            <span className='text-gray-500'>归档日期</span><span>{selectedTask.archiveDate || '--'}</span>
-          </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
-      )}
+      </section>
+
+      {selectedTask ? (
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="min-w-0 truncate text-sm font-semibold text-slate-950">{selectedTask.title}</h3>
+            <div className="flex gap-1">
+              <IconButton title="编辑任务条目" onClick={() => openEdit(selectedTask)} disabled={busy}><Edit3 size={14} /></IconButton>
+              <IconButton title="关闭详情" onClick={() => setSelectedTask(null)}><X size={14} /></IconButton>
+            </div>
+          </div>
+          <div className="grid gap-2 text-sm sm:grid-cols-[120px_minmax(0,1fr)]">
+            <span className="text-slate-500">TASK-ID</span><span className="font-mono text-slate-900">{selectedTask.taskId}</span>
+            <span className="text-slate-500">大项目</span><span>{selectedTask.parentProjectName}</span>
+            <span className="text-slate-500">阶段</span><span>{selectedTask.phase || "--"}</span>
+            <span className="text-slate-500">负责人</span><span>{selectedTask.assignee || "--"}</span>
+            <span className="text-slate-500">状态</span><span><StatusBadge status={selectedTask.status} /></span>
+            <span className="text-slate-500">更新时间</span><span>{formatTime(selectedTask.updatedAt)}</span>
+            <span className="text-slate-500">工作区路径</span><span className="break-all">{selectedTask.workspacePath}</span>
+            <span className="text-slate-500">来源</span><span>{selectedTask.source}</span>
+            <span className="text-slate-500">标签</span><span>{selectedTask.tags.length ? selectedTask.tags.join(", ") : "--"}</span>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

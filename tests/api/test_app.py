@@ -112,6 +112,92 @@ def test_current_watchdog_route_is_read_only_without_token(monkeypatch) -> None:
     assert response.json()["status_light"] == "green"
 
 
+def test_task_battlefield_directory_is_read_only_without_token(monkeypatch) -> None:
+    monkeypatch.setattr(
+        app_module.task_directory,
+        "load_directory",
+        lambda: {
+            "version": 1,
+            "directoryFile": "F:/projects/task_directory.json",
+            "projectsRoot": "F:/projects",
+            "updatedAt": "2026-07-09T00:00:00+00:00",
+            "tasks": [{"taskId": "task-1", "title": "Task 1"}],
+            "groups": [{"projectId": "task-1", "projectName": "Task 1", "taskCount": 1}],
+            "sync": {"addedFolders": [], "missingWorkspaces": []},
+        },
+    )
+    response = client.get("/api/task-battlefield/directory")
+    assert response.status_code == 200
+    assert response.json()["tasks"][0]["taskId"] == "task-1"
+
+
+def test_task_battlefield_write_routes_require_token() -> None:
+    response = client.post("/api/task-battlefield/tasks", json={"taskId": "task-1", "title": "Task 1"})
+    assert response.status_code == 401
+    response = client.put("/api/task-battlefield/tasks/task-1", json={"title": "Task 1"})
+    assert response.status_code == 401
+    response = client.delete("/api/task-battlefield/tasks/task-1")
+    assert response.status_code == 401
+
+
+def test_task_battlefield_write_route_uses_mock(monkeypatch) -> None:
+    token = _token()
+    called = {"add": False}
+
+    def fake_add(payload):
+        called["add"] = True
+        return {"tasks": [payload], "groups": [], "sync": {"addedFolders": [], "missingWorkspaces": []}}
+
+    monkeypatch.setattr(app_module.task_directory, "add_task", fake_add)
+    response = client.post(
+        "/api/task-battlefield/tasks",
+        headers={"X-Control-Token": token},
+        json={"taskId": "task-1", "title": "Task 1"},
+    )
+    assert response.status_code == 200
+    assert called["add"] is True
+    assert response.json()["tasks"][0]["taskId"] == "task-1"
+
+
+def test_task_battlefield_update_tags_uses_mock(monkeypatch) -> None:
+    token = _token()
+    called = {"payload": None}
+
+    def fake_update(task_id, payload):
+        called["payload"] = payload
+        return {
+            "tasks": [{"taskId": task_id, "title": "Task 1", "tags": payload["tags"]}],
+            "groups": [],
+            "sync": {"addedFolders": [], "missingWorkspaces": []},
+        }
+
+    monkeypatch.setattr(app_module.task_directory, "update_task", fake_update)
+    response = client.put(
+        "/api/task-battlefield/tasks/task-1",
+        headers={"X-Control-Token": token},
+        json={"tags": ["new", "重点"]},
+    )
+    assert response.status_code == 200
+    assert called["payload"]["tags"] == ["new", "重点"]
+    assert response.json()["tasks"][0]["tags"] == ["new", "重点"]
+
+
+def test_task_battlefield_classify_is_read_only_without_token(monkeypatch) -> None:
+    monkeypatch.setattr(
+        app_module.task_directory,
+        "classify_task",
+        lambda description, workspace_path=None: {
+            "decision": "existing_project",
+            "project": {"projectId": "alpha", "projectName": "Alpha", "taskCount": 1},
+            "candidates": [],
+            "suggestedWorkspacePath": "F:/projects/Alpha",
+        },
+    )
+    response = client.post("/api/task-battlefield/classify", json={"description": "Alpha 新任务"})
+    assert response.status_code == 200
+    assert response.json()["decision"] == "existing_project"
+
+
 def test_agent_detail_route_handles_unknown_agent(monkeypatch) -> None:
     monkeypatch.setattr(app_module.agent_dashboard, "get_agent", lambda agent_id: None)
     response = client.get("/api/agents/missing")

@@ -24,7 +24,7 @@ from feishu_stack.modules.backup_migration import backups
 from feishu_stack.modules.logs_diagnostics import metrics
 from feishu_stack.modules.operations import control_center, stack_actions
 from feishu_stack.modules.logs_diagnostics import diagnostics as diagnostics_module
-from feishu_stack.modules.task_battlefield import watchdog
+from feishu_stack.modules.task_battlefield import task_directory, watchdog
 from feishu_stack.core.settings import StackConfig, find_stack_root, load_config
 from feishu_stack.core.logs import tail
 from feishu_stack.core.models import ErrorResponse, OperationResult, ThreadMigrationResult, to_dict
@@ -44,6 +44,7 @@ METRICS_TAG = "Metrics"
 DIAGNOSTICS_TAG = "Diagnostics"
 THREAD_MIGRATION_TAG = "Thread Migration"
 DASHBOARD_TAG = "Dashboard"
+TASK_BATTLEFIELD_TAG = "Task Battlefield"
 SKILL_WORKSHOP_TAG = "Skill Workshop"
 
 
@@ -69,6 +70,7 @@ app = FastAPI(
         {"name": METRICS_TAG, "description": "Prometheus metrics endpoint"},
         {"name": DIAGNOSTICS_TAG, "description": "Debugging and diagnostics tools"},
         {"name": DASHBOARD_TAG, "description": "Read-only command dashboard aggregates"},
+        {"name": TASK_BATTLEFIELD_TAG, "description": "Task battlefield directory and project workspace mapping"},
         {"name": THREAD_MIGRATION_TAG, "description": "Cross-provider thread migration"},
         {"name": SKILL_WORKSHOP_TAG, "description": "Skill tree workshop — scan, drift, and compare skills"},
     ],
@@ -101,6 +103,24 @@ class MoonBridgeModelSwitchRequest(BaseModel):
 
 class AgentEditableConfigUpdateRequest(BaseModel):
     values: dict
+
+
+class TaskDirectoryTaskRequest(BaseModel):
+    taskId: str | None = None
+    title: str | None = None
+    parentProjectId: str | None = None
+    parentProjectName: str | None = None
+    workspacePath: str | None = None
+    status: str | None = None
+    phase: str | None = None
+    assignee: str | None = None
+    tags: list[str] | None = None
+    source: str | None = None
+
+
+class TaskClassifyRequest(BaseModel):
+    description: str
+    workspacePath: str | None = None
 
 
 class SkillBaselineConfirmRequest(BaseModel):
@@ -323,6 +343,70 @@ def infrastructure() -> dict:
 )
 def current_watchdog() -> dict:
     return to_dict(watchdog.current_watchdog())
+
+
+@app.get(
+    "/api/task-battlefield/directory",
+    summary="Task battlefield directory",
+    description="Return the task directory mapped to the Feishu agent projects workspace.",
+    tags=[TASK_BATTLEFIELD_TAG],
+)
+def task_battlefield_directory() -> dict:
+    return task_directory.load_directory()
+
+
+@app.post(
+    "/api/task-battlefield/tasks",
+    summary="Add task directory entry",
+    description="Add a manual task entry and workspace path. Requires control token.",
+    tags=[TASK_BATTLEFIELD_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def add_task_battlefield_task(request: TaskDirectoryTaskRequest) -> dict:
+    try:
+        return task_directory.add_task(request.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.put(
+    "/api/task-battlefield/tasks/{task_id}",
+    summary="Update task directory entry",
+    description="Update task metadata or workspace path. Requires control token.",
+    tags=[TASK_BATTLEFIELD_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def update_task_battlefield_task(task_id: str, request: TaskDirectoryTaskRequest) -> dict:
+    try:
+        return task_directory.update_task(task_id, request.model_dump(exclude_none=True))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown task: {task_id}") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete(
+    "/api/task-battlefield/tasks/{task_id}",
+    summary="Delete task directory entry",
+    description="Hide a task entry from the directory. This does not delete the workspace folder. Requires control token.",
+    tags=[TASK_BATTLEFIELD_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def delete_task_battlefield_task(task_id: str) -> dict:
+    try:
+        return task_directory.delete_task(task_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown task: {task_id}") from exc
+
+
+@app.post(
+    "/api/task-battlefield/classify",
+    summary="Classify task description",
+    description="Suggest whether a task belongs to an existing parent project or needs a new workspace.",
+    tags=[TASK_BATTLEFIELD_TAG],
+)
+def classify_task_battlefield_task(request: TaskClassifyRequest) -> dict:
+    return task_directory.classify_task(request.description, request.workspacePath)
 
 
 @app.get(

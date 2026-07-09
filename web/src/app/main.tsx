@@ -297,7 +297,6 @@ function PlannedPage({ page }: { page: CommandPage }) {
       dependencies: ["OpenClaw 会话事件流", "Codex Agent 生成状态事件", "任务 ID 与消息 ID 关联"],
       next: ["定义任务事件 schema", "接入 sessions.json 增量读取", "补充生成中/排队/完成状态"],
     },
-    "task-dashboard": { title: "任务仪表盘", stage: "已实现", dependencies: [], next: [] },
     feishu: {
       title: "飞书连接",
       stage: "后续阶段",
@@ -504,25 +503,7 @@ function App() {
           ) : null}
 
           {activePage === "tasks" ? (
-            <div className="flex flex-col gap-4">
-              <div className="parchment-panel p-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h2 className="text-base font-semibold" style={{ color: "var(--text-main)" }}>任务战场</h2>
-                    <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-                      第一版使用真实执行态和 Operation Log：当前任务来自 `/api/agents` 的 `executing/currentTask`，最近运行来自 `/api/operations`。
-                    </p>
-                  </div>
-                  <span className="rounded px-2 py-1 text-xs" style={{ background: "var(--bg-panel-soft)", color: "var(--text-muted)", border: "1px solid var(--border-light)" }}>
-                    {currentTrace ? "有任务执行中" : "当前空闲"}
-                  </span>
-                </div>
-              </div>
-              <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-                <TaskTraceMap trace={currentTrace} />
-                <RecentRunsTable runs={recentRuns} onSelectRun={() => {}} />
-              </section>
-            </div>
+            <TaskDashboardPage token={token} />
           ) : null}
 
           {activePage === "provider" ? (
@@ -585,10 +566,6 @@ function App() {
             </>
           ) : null}
 
-
-          {activePage === "task-dashboard" ? (
-            <TaskDashboardPage />
-          ) : null}
           {["feishu", "routing", "config", "backup"].includes(activePage) ? <PlannedPage page={activePage} /> : null}
 
           <footer className="flex items-center gap-2 pb-2 text-xs text-slate-500">
