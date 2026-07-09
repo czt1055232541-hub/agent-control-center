@@ -244,7 +244,7 @@ test("handler strips internal lark-cli tails from codex replies", async () => {
     a2aRelay: { enabled: false }
   };
   const fakeLark = {
-    setTypingStatus: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    addTypingReaction: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
     sendText: async (_chatId: string, text: string) => {
       sent.push(text);
       return { ok: true, code: 0, stdout: "", stderr: "" };
@@ -319,7 +319,7 @@ test("private chat codex route uses direct-reply context", async () => {
     a2aRelay: { enabled: false }
   };
   const fakeLark = {
-    setTypingStatus: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    addTypingReaction: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
     sendText: async (_chatId: string, text: string) => {
       sent.push(text);
       return { ok: true, code: 0, stdout: "", stderr: "" };
@@ -413,18 +413,18 @@ test("sendPost uses Feishu rich text post content for mentions", async () => {
   ]);
 });
 
-test("setTypingStatus uses Feishu typing status OpenAPI", async () => {
+test("addTypingReaction uses Feishu reaction OpenAPI", async () => {
   const config = { ...getConfig(), dryRun: true };
   const lark = new LarkCli(config);
-  const result = await lark.setTypingStatus("oc_chat", "Started");
+  const result = await lark.addTypingReaction("oc_msg");
   assert.equal(result.ok, true);
   const payload = JSON.parse(result.stdout) as { command: string[] };
   assert.deepEqual(payload.command.slice(1), [
     "api",
-    "PATCH",
-    "/open-apis/im/v1/typing_status",
+    "POST",
+    "/open-apis/im/v1/messages/oc_msg/reactions",
     "--data",
-    JSON.stringify({ chat_id: "oc_chat", status: "Started" }),
+    JSON.stringify({ reaction_type: { emoji_type: "Typing" } }),
     "--as",
     "bot"
   ]);
@@ -440,7 +440,7 @@ test("handler starts and stops typing status around agent reply", async () => {
     a2aRelay: { enabled: false }
   };
   const fakeLark = {
-    setTypingStatus: async (_chatId: string, status: "Started" | "Stopped") => {
+    addTypingReaction: async (_chatId: string, status: "Started" | "Stopped") => {
       statuses.push(status);
       return { ok: true, code: 0, stdout: "", stderr: "" };
     },
@@ -492,7 +492,7 @@ test("handler suppresses stale replies when a newer chat request finishes first"
     a2aRelay: { enabled: false }
   };
   const fakeLark = {
-    setTypingStatus: async (_chatId: string, status: "Started" | "Stopped") => {
+    addTypingReaction: async (_chatId: string, status: "Started" | "Stopped") => {
       statuses.push(status);
       return { ok: true, code: 0, stdout: "", stderr: "" };
     },
@@ -566,7 +566,7 @@ test("codex progress reporter sends only the first status message", async () => 
     a2aRelay: { enabled: false }
   };
   const fakeLark = {
-    setTypingStatus: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    addTypingReaction: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
     sendText: async (_chatId: string, text: string) => {
       sent.push(text);
       return { ok: true, code: 0, stdout: "", stderr: "" };
@@ -719,7 +719,7 @@ test("A2A task replies without explicit mention are sent back to coordinator as 
     a2aRelay: { enabled: false }
   };
   const fakeLark = {
-    setTypingStatus: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    addTypingReaction: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
     sendText: async (chatId: string, text: string) => {
       sent.push({ chatId, text });
       return { ok: true, code: 0, stdout: "", stderr: "" };
@@ -781,7 +781,7 @@ test("handler converts only the first A2A mention in a final reply", async () =>
     a2aRelay: { enabled: false }
   };
   const fakeLark = {
-    setTypingStatus: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+    addTypingReaction: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
     sendText: async (chatId: string, text: string) => {
       sent.push({ chatId, text });
       return { ok: true, code: 0, stdout: "", stderr: "" };

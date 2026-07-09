@@ -13,13 +13,15 @@ export class MessageHandler {
   private readonly confirmations: ConfirmationStore;
   private readonly a2aBotOpenIds: Set<string>;
   private readonly a2aRelay: A2ARelay;
-  private readonly replyGenerations = new Map<string, number>();
-  private readonly eventQueue: Array<{
-    event: FeishuMessageEvent;
-    resolve: () => void;
-    reject: (error: Error) => void;
-  }> = [];
-  private queueRunning = false;
+ private readonly replyGenerations = new Map<string, number>();
+ private codexUsageCooldownUntil = 0;
+ private readonly eventQueue: Array<{
+   event: FeishuMessageEvent;
+   resolve: () => void;
+   reject: (error: Error) => void;
+ }> = [];
+ private queueRunning = false;
+  private typingReactions = new Map<number, { messageId: string; reactionId: string }>();
 
   constructor(
     private readonly config: AppConfig,
@@ -92,11 +94,11 @@ export class MessageHandler {
       return this.a2aRelay.run(event, cleanText);
     }
     const senderKey = senderKeyFor(event);
-    const confirmed = this.confirmations.consumeIfConfirmed(event.chatId, senderKey, cleanText);
-    if (confirmed) {
-      return this.executeAndReply(event.chatId, confirmed.route, true);
-    }
-    const senderIsA2ABot = this.a2aBotOpenIds.has(event.sender.openId || "");
+   const confirmed = this.confirmations.consumeIfConfirmed(event.chatId, senderKey, cleanText);
+   if (confirmed) {
+      return this.executeAndReply(event.chatId, event.messageId, confirmed.route, true);
+   }
+   const senderIsA2ABot = this.a2aBotOpenIds.has(event.sender.openId || "");
     const route = senderIsA2ABot
       ? routeCommandAsAgentTask(cleanText)
       : routeCommand(cleanText);
@@ -104,18 +106,23 @@ export class MessageHandler {
     if (route.plan.requiresConfirmation) {
       this.confirmations.create(event.chatId, senderKey, route);
       const response = formatConfirmation(route);
-      await this.larkCli.sendText(event.chatId, response);
-      return response;
-    }
-    return this.executeAndReply(event.chatId, route, false);
-  }
+     await this.larkCli.sendText(event.chatId, response);
+     return response;
+   }
+    return this.executeAndReply(event.chatId, event.messageId, route, false);
+ }
 
-  private async executeAndReply(chatId: string, route: RouteResult, confirmed: boolean): Promise<string> {
-    const generation = this.nextReplyGeneration(chatId);
-    await this.setTypingStatus(chatId, "Started");
-    const progress = this.startProgressReporter(chatId, route, generation);
-    try {
-      const agentText = sanitizeAgentText(await draftAgentResponse(this.config, route));
+  private async executeAndReply(chatId: string, messageId: string, route: RouteResult, confirmed: boolean): Promise<string> {
+   const generation = this.nextReplyGeneration(chatId);
+   if (this.isCodexUsageCooldownActive()) {
+     infoLog(`suppressed codex task during usage cooldown chat_id=${chatId}`);
+     return "";
+   }
+   await this.startTypingReaction(messageId, generation);
+    const progress = { stop: () => undefined };
+   try {
+     const agentText = sanitizeAgentText(await draftAgentResponse(this.config, route));
+      this.recordCodexUsageCooldownIfNeeded(agentText);
       if (!this.isCurrentReplyGeneration(chatId, generation)) {
         infoLog(`suppressed stale draft chat_id=${chatId} generation=${generation}`);
         return prepareResponseForFeishu(agentText);
@@ -154,34 +161,77 @@ export class MessageHandler {
       }
       return response;
     } finally {
-      progress.stop();
-      if (this.isCurrentReplyGeneration(chatId, generation)) {
-        await this.setTypingStatus(chatId, "Stopped");
-      }
-    }
-  }
+     progress.stop();
+     if (this.isCurrentReplyGeneration(chatId, generation)) {
+        await this.stopTypingReaction(generation);
+     }
+   }
+ }
 
-  private nextReplyGeneration(chatId: string): number {
-    const next = (this.replyGenerations.get(chatId) ?? 0) + 1;
-    this.replyGenerations.set(chatId, next);
-    return next;
-  }
+ private nextReplyGeneration(chatId: string): number {
+   const next = (this.replyGenerations.get(chatId) ?? 0) + 1;
+   this.replyGenerations.set(chatId, next);
+    // Clean up any stale typing reaction from previous generation
+    const prev = next - 1;
+    const staleState = this.typingReactions.get(prev);
+    if (staleState) {
+      this.typingReactions.delete(prev);
+      this.larkCli.removeTypingReaction(staleState.messageId, staleState.reactionId).catch(() => {});
+    }
+   return next;
+ }
 
   private isCurrentReplyGeneration(chatId: string, generation: number): boolean {
     return this.replyGenerations.get(chatId) === generation;
   }
 
-  private async setTypingStatus(chatId: string, status: "Started" | "Stopped"): Promise<void> {
-    if (typeof this.larkCli.setTypingStatus !== "function") {
+  private isCodexUsageCooldownActive(): boolean {
+    return this.config.agentProvider === "codex" && Date.now() < this.codexUsageCooldownUntil;
+  }
+
+  private recordCodexUsageCooldownIfNeeded(response: string): void {
+    if (this.config.agentProvider !== "codex" || !isCodexUsageLimitText(response)) {
       return;
     }
+    this.codexUsageCooldownUntil = codexUsageCooldownUntil(response, Date.now());
+    infoLog(`codex usage cooldown active until ${new Date(this.codexUsageCooldownUntil).toISOString()}`);
+  }
+
+  private async startTypingReaction(messageId: string, generation: number): Promise<void> {
     try {
-      const result = await this.larkCli.setTypingStatus(chatId, status);
+      const result = await this.larkCli.addTypingReaction(messageId);
       if (!result.ok) {
-        debugLog(`typing status ${status} failed chat_id=${chatId} code=${result.code} stderr=${preview(result.stderr || result.stdout, 500)}`);
+        debugLog(`typing reaction add failed message_id=${messageId} code=${result.code} stderr=${preview(result.stderr || result.stdout, 500)}`);
+        return;
+      }
+      let reactionId: string | null = null;
+      try {
+        const body = JSON.parse(result.stdout);
+        reactionId = body?.data?.reaction_id ?? null;
+      } catch {
+        // ignore parse errors
+      }
+      if (reactionId) {
+        this.typingReactions.set(generation, { messageId, reactionId });
       }
     } catch (error) {
-      debugLog(`typing status ${status} threw chat_id=${chatId} error=${error instanceof Error ? error.message : String(error)}`);
+      debugLog(`typing reaction add error message_id=${messageId} error=${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async stopTypingReaction(generation: number): Promise<void> {
+    const state = this.typingReactions.get(generation);
+    if (!state) {
+      return;
+    }
+    this.typingReactions.delete(generation);
+    try {
+      const result = await this.larkCli.removeTypingReaction(state.messageId, state.reactionId);
+      if (!result.ok) {
+        debugLog(`typing reaction remove failed message_id=${state.messageId} reaction_id=${state.reactionId} code=${result.code} stderr=${preview(result.stderr || result.stdout, 500)}`);
+      }
+    } catch (error) {
+      debugLog(`typing reaction remove error message_id=${state.messageId} reaction_id=${state.reactionId} error=${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -236,7 +286,6 @@ export class MessageHandler {
     const mentionPattern = buildMentionPattern(this.config.a2aBots);
     const elements: LarkPostElement[] = [];
     let cursor = 0;
-    let hasMention = false;
     for (const match of value.matchAll(mentionPattern)) {
       const matchText = match[0];
       const index = match.index ?? 0;
@@ -244,18 +293,12 @@ export class MessageHandler {
         elements.push({ tag: "text", text: value.slice(cursor, index) });
       }
       const bot = resolveMentionBot(matchText, this.config.a2aBots);
-      if (bot && !hasMention) {
+      if (bot) {
         elements.push({ tag: "at", user_id: bot.openId, user_name: bot.name });
-        hasMention = true;
-      } else if (bot) {
-        elements.push({ tag: "text", text: neutralizedMentionText(matchText, bot) });
       } else {
         elements.push({ tag: "text", text: matchText });
       }
       cursor = index + matchText.length;
-    }
-    if (!hasMention) {
-      return null;
     }
     if (cursor < value.length) {
       elements.push({ tag: "text", text: value.slice(cursor) });
@@ -340,6 +383,33 @@ function shouldSendProgress(route: RouteResult): boolean {
     return false;
   }
   return route.plan.executable || /(?:Phase\s*\d+|开发|实现|修复|返工|GUI|Lumerical|FDTD|仿真|本地文件|代码|自测|产物)/i.test(route.cleanText);
+}
+
+function isCodexUsageLimitText(value: string): boolean {
+  return /usage limit|you've hit your usage limit|try again at/i.test(value);
+}
+
+function codexUsageCooldownUntil(value: string, nowMs: number): number {
+  const retry = value.match(/try again at\s+(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!retry) {
+    return nowMs + 30 * 60 * 1000;
+  }
+  const now = new Date(nowMs);
+  let hour = Number(retry[1]);
+  const minute = Number(retry[2]);
+  const meridiem = retry[3].toUpperCase();
+  if (meridiem === "PM" && hour < 12) {
+    hour += 12;
+  }
+  if (meridiem === "AM" && hour === 12) {
+    hour = 0;
+  }
+  const until = new Date(now);
+  until.setHours(hour, minute + 1, 0, 0);
+  if (until.getTime() <= nowMs) {
+    until.setDate(until.getDate() + 1);
+  }
+  return until.getTime();
 }
 
 function progressReceivedText(route: RouteResult): string {

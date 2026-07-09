@@ -49,14 +49,23 @@ export class LarkCli {
       { env: options.env }
     );
   }
-
-  setTypingStatus(chatId: string, status: "Started" | "Stopped"): Promise<CliResult> {
+  addTypingReaction(messageId: string): Promise<CliResult> {
     return this.run([
       "api",
-      "PATCH",
-      "/open-apis/im/v1/typing_status",
+      "POST",
+      `/open-apis/im/v1/messages/${messageId}/reactions`,
       "--data",
-      JSON.stringify({ chat_id: chatId, status }),
+      JSON.stringify({ reaction_type: { emoji_type: "Typing" } }),
+      "--as",
+      this.config.larkIdentity
+    ]);
+  }
+
+  removeTypingReaction(messageId: string, reactionId: string): Promise<CliResult> {
+    return this.run([
+      "api",
+      "DELETE",
+      `/open-apis/im/v1/messages/${messageId}/reactions/${reactionId}`,
       "--as",
       this.config.larkIdentity
     ]);

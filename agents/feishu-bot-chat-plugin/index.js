@@ -349,11 +349,13 @@ const plugin = {
         permissionNote = `\n\n⚠️ 注意：当前群聊尚未检测到飞书原生 bot@bot 投递能力。如果你 @ 其他机器人后对方没有响应，请提醒用户在飞书开发者后台为每个机器人应用开通「接收群聊中机器人@机器人的消息」权限（im:message.group_at_msg.include_bot:readonly）。开通后，机器人之间就可以直接通过 @ 来通信了。`;
       }
 
-      const instruction = `[A2A — 群内协作规则]
+            const isCoordinator = botRegistry[currentAgentId]?.botName === “项目调度官”;
+
+const instruction = `[A2A — 群内协作规则]
 
 默认行为：
 - 正常情况下不要主动 @ 其他机器人
-- 每次回复最多 @ 1 个机器人
+${isCoordinator ? '- 作为项目调度官，可同时 @ 多个机器人进行并行任务派发，不受数量限制' : '- 每次回复最多 @ 1 个机器人'}
 
 重要：区分"提到"和"请求"
 - 如果你只是在回复中提到某个机器人，直接用它的名字，不要用 <at> 标签

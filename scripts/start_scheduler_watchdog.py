@@ -6,6 +6,7 @@ import datetime as dt
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -51,6 +52,13 @@ def lark_env() -> dict[str, str]:
     env["LARK_CLI_CWD"] = str(REPO_ROOT)
     env["LARK_CLI_OUTPUT_ENCODING"] = "utf-8"
     return env
+
+
+def redact_sensitive(value: str) -> str:
+    redacted = re.sub(r"\bou_[A-Za-z0-9_-]+\b", "ou_***", value or "")
+    redacted = re.sub(r"\boc_[A-Za-z0-9_-]+\b", "oc_***", redacted)
+    redacted = re.sub(r"\bcli_[A-Za-z0-9_-]+\b", "cli_***", redacted)
+    return redacted
 
 
 def send_dispatch_message(task_id: str, assignee: str, phase: str | None, task_text: str, dry_run: bool) -> dict:
@@ -100,8 +108,8 @@ def send_dispatch_message(task_id: str, assignee: str, phase: str | None, task_t
     return {
         "ok": result.returncode == 0,
         "returncode": result.returncode,
-        "stdout_preview": (result.stdout or "")[:500],
-        "stderr_preview": (result.stderr or "")[:500],
+        "stdout_preview": redact_sensitive(result.stdout or "")[:500],
+        "stderr_preview": redact_sensitive(result.stderr or "")[:500],
     }
 
 
@@ -212,11 +220,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--delay-minutes", type=float, default=None)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--keep-existing", action="store_true", help="Do not cancel earlier watchdogs for the same task.")
-    parser.add_argument("--no-dispatch", action="store_true", help="Only launch the watchdog; kept for backwards-compatible explicitness.")
+    parser.add_argument("--no-dispatch", action="store_true", help="Compatibility no-op: watchdog launch never sends the assignment unless --dispatch-as-user is set.")
     parser.add_argument(
         "--dispatch-as-user",
         action="store_true",
-        help="Deprecated compatibility mode: send the assignee dispatch as the authenticated user before launching the watchdog.",
+        help="Legacy recovery mode: send the assignee assignment as the authenticated user before launching the watchdog.",
     )
     args = parser.parse_args(argv)
 
@@ -247,7 +255,11 @@ def main(argv: list[str] | None = None) -> int:
     log_path = LOG_DIR / f"{safe_task}_{args.assignee}_{stamp}_watchdog.log"
     state_path = WATCHDOG_DIR / f"{safe_task}_{safe_assignee}_{stamp}.json"
     command.extend(["--state-file", str(state_path)])
-    dispatch_result = {"ok": True, "skipped": True, "reason": "coordinator_dispatch_required"}
+    dispatch_result = {
+        "ok": True,
+        "skipped": True,
+        "reason": "coordinator_visible_reply_required",
+    }
     if args.dispatch_as_user and not args.no_dispatch:
         dispatch_result = send_dispatch_message(args.task_id, args.assignee, args.phase, args.task_text, args.dry_run)
         if not dispatch_result.get("ok"):
@@ -287,19 +299,15 @@ def main(argv: list[str] | None = None) -> int:
         "dispatch_result": dispatch_result,
     }
     write_json(state_path, state)
-    print(json.dumps({
+    status_msg = json.dumps({
         "ok": True,
         "pid": proc.pid,
         "task_id": args.task_id,
-        "assignee": args.assignee,
-        "phase": args.phase,
-        "log": str(log_path),
         "state": str(state_path),
-        "launcher": "python",
-        "cancelled_previous": cancelled,
-        "dispatch_sent": bool(dispatch_result.get("ok") and not dispatch_result.get("skipped")),
-        "dispatch_required_from": "项目调度官",
-    }, ensure_ascii=False))
+    }, ensure_ascii=False)
+    print(status_msg, file=sys.stderr)
+    log.write(status_msg + "\n")
+    log.flush()
     return 0
 
 

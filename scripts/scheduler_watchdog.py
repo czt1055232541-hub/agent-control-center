@@ -119,6 +119,10 @@ def build_prompt(task_id: str, task_text: str, elapsed_seconds: int, assignee: s
         "3. 是否需要继续同一 TASK-ID 轻推；"
         "4. 是否存在卡死、失效回复或上下文过大；"
         "5. 下一步只调度一个 agent。"
+        "如果任务仍在执行且未收到有效最终回报，本 watchdog 会继续周期性提醒；你必须确认仍有 active waiting watchdog。"
+        "只有发现没有 active waiting watchdog 时，才立即调用 "
+        "`python scripts/start_scheduler_watchdog.py --task-id ... --assignee ... --phase ... --task-text ... --no-dispatch` 补开同一 TASK-ID 的 continuation watchdog；不要等待人工提醒。"
+        "如果已收到有效最终回报，你必须调用 `python scripts/stop_scheduler_watchdog.py --task-id ... --assignee ... --phase ...` 关闭 watchdog。"
         f" 原任务摘要：{compact(task_text, 500)}"
     )
 
@@ -128,6 +132,10 @@ def compact(value: str, max_len: int) -> str:
     if len(normalized) <= max_len:
         return normalized
     return normalized[: max_len - 3] + "..."
+
+
+def iso_after(seconds: int) -> str:
+    return (dt.datetime.now() + dt.timedelta(seconds=seconds)).isoformat(timespec="seconds")
 
 
 def send_coordinator_prompt(
@@ -203,6 +211,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--no-wait", action="store_true", help="Send immediately after computing the delay; useful for smoke tests.")
     parser.add_argument("--state-file", default=None, help="Runtime state JSON written by the launcher.")
+    parser.add_argument(
+        "--single-shot",
+        action="store_true",
+        help="Send one coordinator check and exit. Default is periodic checks until stop_scheduler_watchdog cancels the process.",
+    )
+    parser.add_argument(
+        "--max-sends",
+        type=int,
+        default=0,
+        help="Maximum check prompts before exiting in periodic mode. 0 means unlimited.",
+    )
     args = parser.parse_args(argv)
 
     state_file = Path(args.state_file) if args.state_file else None
@@ -226,6 +245,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"task_id": task_id, "status": "config_failed", "error": repr(exc)}, ensure_ascii=False), flush=True)
         return 2
 
+    periodic = not args.single_shot and not args.dry_run
     startup = {
         "task_id": task_id,
         "chat_id_source": "argument" if args.chat_id else "local_config_or_env",
@@ -235,21 +255,64 @@ def main(argv: list[str] | None = None) -> int:
         "started_at": dt.datetime.now().isoformat(timespec="seconds"),
         "pid": os.getpid(),
         "status": "waiting" if not args.no_wait and delay_seconds > 0 else "sending",
+        "periodic": periodic,
+        "max_sends": max(0, args.max_sends),
+        "send_count": 0,
     }
+    if startup["status"] == "waiting":
+        startup["next_check_at"] = iso_after(delay_seconds)
     print(json.dumps(startup, ensure_ascii=False), flush=True)
     update_state(state_file, **startup)
-    if not args.no_wait and delay_seconds > 0:
-        time.sleep(delay_seconds)
-    update_state(state_file, status="sending", sending_at=dt.datetime.now().isoformat(timespec="seconds"))
-    rc = send_coordinator_prompt(chat_id, task_id, args.task_text, delay_seconds, args.dry_run, args.assignee, args.phase)
-    update_state(
-        state_file,
-        status="sent" if rc == 0 else "send_failed",
-        returncode=rc,
-        finished_at=dt.datetime.now().isoformat(timespec="seconds"),
-    )
-    print(json.dumps({"task_id": task_id, "status": "sent" if rc == 0 else "send_failed", "returncode": rc}, ensure_ascii=False), flush=True)
-    return rc
+    send_count = 0
+    first = True
+    while True:
+        should_wait = not args.no_wait or not first
+        if should_wait and delay_seconds > 0:
+            update_state(
+                state_file,
+                status="waiting",
+                send_count=send_count,
+                next_check_at=iso_after(delay_seconds),
+                updated_at=dt.datetime.now().isoformat(timespec="seconds"),
+            )
+            time.sleep(delay_seconds)
+        update_state(state_file, status="sending", sending_at=dt.datetime.now().isoformat(timespec="seconds"))
+        rc = send_coordinator_prompt(chat_id, task_id, args.task_text, delay_seconds, args.dry_run, args.assignee, args.phase)
+        send_count += 1
+        sent_at = dt.datetime.now().isoformat(timespec="seconds")
+        if rc != 0:
+            update_state(
+                state_file,
+                status="send_failed",
+                returncode=rc,
+                send_count=send_count,
+                finished_at=sent_at,
+            )
+            print(json.dumps({"task_id": task_id, "status": "send_failed", "returncode": rc, "send_count": send_count}, ensure_ascii=False), flush=True)
+            return rc
+        max_reached = args.max_sends > 0 and send_count >= args.max_sends
+        if not periodic or max_reached:
+            update_state(
+                state_file,
+                status="sent",
+                returncode=rc,
+                send_count=send_count,
+                finished_at=sent_at,
+            )
+            print(json.dumps({"task_id": task_id, "status": "sent", "returncode": rc, "send_count": send_count}, ensure_ascii=False), flush=True)
+            return rc
+        next_check_at = iso_after(delay_seconds)
+        update_state(
+            state_file,
+            status="waiting",
+            returncode=rc,
+            send_count=send_count,
+            last_sent_at=sent_at,
+            next_check_at=next_check_at,
+            updated_at=sent_at,
+        )
+        print(json.dumps({"task_id": task_id, "status": "waiting", "returncode": rc, "send_count": send_count, "next_check_at": next_check_at}, ensure_ascii=False), flush=True)
+        first = False
 
 
 if __name__ == "__main__":
