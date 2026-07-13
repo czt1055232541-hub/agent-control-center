@@ -1,0 +1,32 @@
+{
+  "repository": "czt1055232541-hub/feishu-codex-stack",
+  "stackRoot": "F:\\1AI\\feishu_agent",
+  "codexHome": "E:\\codeX",
+  "codexBin": "E:\\codeX\\bin\\codex.exe",
+  "codexConfig": "E:\\codeX\\config.toml",
+  "codexNativeModel": "gpt-5.5",
+  "codexMoonBridgeModel": "moonbridge",
+  "codexSwitchScript": "F:\\1AI\\feishu_agent\\codex\\switch_provider.py",
+  "moonBridgeBaseUrl": "http://127.0.0.1:38440/v1",
+  "moonbridge": {
+    "dir": "E:\\codeX\\moon-bridge",
+    "exe": "E:\\codeX\\moon-bridge\\.cache\\moonbridge.exe",
+    "config": "E:\\codeX\\moon-bridge\\config.yml",
+    "port": 38440
+  },
+  "openclaw": {
+    "home": "E:\\openclaw\\clawclaw",
+    "gatewayCmd": "E:\\openclaw\\clawclaw\\.openclaw\\gateway.cmd",
+    "port": 18789
+  },
+  "agent": {
+    "dir": "F:\\1AI\\feishu_agent\\agents\\feishu-codex-agent",
+    "entry": "dist\\src\\index.js",
+    "larkCliBin": "F:\\1AI\\feishu_agent\\.npm-global\\node_modules\\@larksuite\\cli\\bin\\lark-cli.exe"
+  },
+  "runtime": {
+    "dir": "F:\\1AI\\feishu_agent\\runtime",
+    "logs": "F:\\1AI\\feishu_agent\\runtime\\logs",
+    "pids": "F:\\1AI\\feishu_agent\\runtime\\pids"
+  }
+}

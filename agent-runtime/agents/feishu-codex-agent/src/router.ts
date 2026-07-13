@@ -1,0 +1,205 @@
+import type { CommandPlan, RouteIntent, RouteResult } from "./types.js";
+
+export function routeCommand(cleanText: string): RouteResult {
+  const text = cleanText.trim();
+  const intent = detectIntent(text);
+  const plan = buildPlan(intent, text);
+  return { intent, cleanText: text, plan };
+}
+
+function detectIntent(text: string): RouteIntent {
+  if (!text || /^(?:\u4f60\u597d|\u5728\u5417|\u5728\u4e0d\u5728|hi|hello|help|\u5e2e\u52a9|\u4ecb\u7ecd)/i.test(text)) {
+    return "greeting";
+  }
+  if (isDevelopmentOrAnalysisRequest(text)) {
+    return "unknown";
+  }
+  if (/(?:\u591a\u7ef4\u8868\u683c|base|\u8868\u683c).*(?:\u521b\u5efa|\u65b0\u5efa)|(?:\u521b\u5efa|\u65b0\u5efa).*(?:\u591a\u7ef4\u8868\u683c|base|\u8868\u683c)/i.test(text)) {
+    return "baseCreate";
+  }
+  if (/(?:\u5199\u5165|\u540c\u6b65|\u8ffd\u52a0).*(?:\u591a\u7ef4\u8868\u683c|base|\u8868\u683c|\u884c\u52a8\u9879)/i.test(text)) {
+    return "baseWrite";
+  }
+  if (/(?:\u641c\u7d22|\u67e5\u627e).*(?:\u6587\u6863|wiki|\u77e5\u8bc6\u5e93|\u9879\u76ee\u8ba1\u5212)|(?:\u6587\u6863|wiki).*\u603b\u7ed3/i.test(text)) {
+    return "docSearch";
+  }
+  if (/(?:\u6574\u7406|\u751f\u6210|\u521b\u5efa|\u65b0\u5efa).*(?:\u6587\u6863|\u98de\u4e66\u6587\u6863|wiki)/i.test(text)) {
+    return "docCreate";
+  }
+  if (isExplicitChatSummaryRequest(text)) {
+    return "summarize";
+  }
+  if (isExplicitAppsRequest(text)) {
+    return "apps";
+  }
+  if (isExplicitTaskRequest(text)) {
+    return "task";
+  }
+  if (isCalendarRequest(text)) {
+    return "calendar";
+  }
+  return "unknown";
+}
+
+function isDevelopmentOrAnalysisRequest(text: string): boolean {
+  if (isExplicitAppsRequest(text) || isExplicitTaskRequest(text) || isCalendarRequest(text)) {
+    return false;
+  }
+  return /(?:Phase\s*\d+|技术意见|技术建议|技术可行性|可行性意见|复杂度评估|风险点|架构建议|开发|实现|修复|代码|自测|产物路径|本地文件|本地项目|健康监控|监控面板|MVP|只读健康监控|方案评估)/i.test(text);
+}
+
+function isExplicitChatSummaryRequest(text: string): boolean {
+  if (isDevelopmentOrAnalysisRequest(text)) {
+    return false;
+  }
+  if (/(?:总结|复盘|整理).{0,20}(?:群聊|聊天记录|最近消息|刚才的讨论|上面的讨论|这个群)/.test(text)) {
+    return true;
+  }
+  if (/(?:群聊|聊天记录|最近消息|刚才的讨论|上面的讨论).{0,20}(?:总结|复盘|整理|纪要|行动项)/.test(text)) {
+    return true;
+  }
+  return false;
+}
+
+function isExplicitAppsRequest(text: string): boolean {
+  if (/(?:no|not|don't|do not|without|\u4e0d|\u4e0d\u8981|\u4e0d\u8d70|\u4e0d\u7528|\u4e0d\u4f7f\u7528|\u65e0\u9700|\u65e0\u987b|\u7981\u6b62).{0,80}(?:\u5999\u642d|miaoda|spark|lark-cli\s*apps?|feishu\s*apps?|\u98de\u4e66\u5e94\u7528|\u5e94\u7528|app)/i.test(text)) {
+    return false;
+  }
+  if (/(?:local|single-file|\u672c\u5730|\u5355\u4e2a\s*HTML|\u5355\u6587\u4ef6\s*HTML)/i.test(text) && /(?:no|not|don't|do not|without|\u4e0d|\u4e0d\u8981|\u4e0d\u8d70|\u4e0d\u7528|\u4e0d\u4f7f\u7528|\u65e0\u9700|\u65e0\u987b|\u7981\u6b62).{0,120}(?:\u5999\u642d|miaoda|spark|lark-cli\s*apps?|feishu\s*apps?|\u98de\u4e66\u5e94\u7528|\u5e94\u7528|app)/i.test(text)) {
+    return false;
+  }
+  if (/(?:\u5999\u642d|miaoda|spark|lark\s*apps?|feishu\s*apps?)/i.test(text)) {
+    return true;
+  }
+  if (/(?:\u98de\u4e66|\u591a\u7ef4|\u4e91\u7a7a\u95f4).*(?:\u5e94\u7528|app)/i.test(text)) {
+    return true;
+  }
+  if (/(?:\u521b\u5efa|\u65b0\u5efa|\u751f\u6210|\u642d\u5efa|\u53d1\u5e03).*(?:\u98de\u4e66\u5e94\u7528|\u98de\u4e66\s*app|apps?\s*\u5e94\u7528)/i.test(text)) {
+    return true;
+  }
+  if (/(?:\u53d1\u5e03|publish|html-publish).*(?:\u98de\u4e66|\u5999\u642d|miaoda|spark|\u5e94\u7528|app)/i.test(text)) {
+    return true;
+  }
+  if (/(?:\u9759\u6001\u9875\u9762|html).*(?:\u53d1\u5e03\u5230\u98de\u4e66|\u53d1\u5e03\u4e3a\u5e94\u7528|\u5999\u642d|miaoda|spark)/i.test(text)) {
+    return true;
+  }
+  return false;
+}
+
+function isExplicitTaskRequest(text: string): boolean {
+  if (/(?:\u5f00\u53d1\u4efb\u52a1|\u5b9e\u73b0\u4efb\u52a1|\u534f\u4f5c\u4efb\u52a1|\u6d4b\u8bd5\u4efb\u52a1|\u4efb\u52a1\s*[:：]\s*(?:\u5f00\u53d1|\u5b9e\u73b0|build|create))/i.test(text)) {
+    return false;
+  }
+  if (/(?:\u98de\u4e66\u4efb\u52a1|\u98de\u4e66\u5f85\u529e|\u5f85\u529e|todo|task\s+list|\u4efb\u52a1\u6e05\u5355)/i.test(text)) {
+    return /(?:\u521b\u5efa|\u65b0\u5efa|\u751f\u6210|\u767b\u8bb0|\u5199\u5165|\u6dfb\u52a0|\u5206\u914d|create|add|assign)/i.test(text);
+  }
+  return false;
+}
+
+function isCalendarRequest(text: string): boolean {
+  if (/(?:拆分|测试|审计|开发|实现|修复|代码|部署|配置|重构|debug|test|build|implement|refactor|Phase\s*\d|单元测试|集成测试|任务拆解|任务分配|代码任务|开发任务|返工|自测)/i.test(text)) {
+    return false;
+  }
+  if (/(?:今天|明天|本周|下周|这周|查).*(?:日程|日历|有什么会|开会|会议|会议室)/i.test(text)) {
+    return true;
+  }
+  if (/(?:日程|日历|会议室|会议时间|忙闲|agenda|calendar|meeting\s+room)/i.test(text)) {
+    return true;
+  }
+  if (/(?:查看|查询|显示|show|list).*(?:日程|日历|会议|会议室)/i.test(text)) {
+    return true;
+  }
+  if (/(?:创建|新建|预定|安排).*(?:日程|日历|会议|会议室)/i.test(text)) {
+    return true;
+  }
+  return false;
+}
+function buildPlan(intent: RouteIntent, text: string): CommandPlan {
+  switch (intent) {
+    case "greeting":
+      return {
+        title: "\u80fd\u529b\u4ecb\u7ecd",
+        commands: [],
+        executable: true,
+        requiresConfirmation: false,
+        responsePreview: /^(?:\u5728\u5417|\u5728\u4e0d\u5728)/.test(text)
+          ? "\u6211\u5728\u3002\u4f60\u53ef\u4ee5\u76f4\u63a5\u628a\u8981\u5904\u7406\u7684\u4efb\u52a1\u53d1\u7ed9\u6211\u3002"
+          : "\u4f60\u597d\uff0c\u6211\u662f\u98de\u4e66\u91cc\u7684 Codex \u52a9\u624b\u3002\u4f60\u53ef\u4ee5\u8ba9\u6211\u603b\u7ed3\u7fa4\u804a\u3001\u521b\u5efa\u6216\u5199\u5165\u591a\u7ef4\u8868\u683c\u3001\u641c\u7d22/\u751f\u6210\u6587\u6863\u3001\u521b\u5efa\u4efb\u52a1\u3001\u67e5\u8be2\u65e5\u5386\uff0c\u6216\u51c6\u5907\u5999\u642d/Spark \u5e94\u7528\u64cd\u4f5c\u3002"
+      };
+    case "summarize":
+      return {
+        title: "\u7fa4\u804a\u603b\u7ed3",
+        commands: [["im", "+chat-messages-list", "--chat-id", "$CHAT_ID", "--page-size", "30", "--as", "bot"]],
+        executable: true,
+        requiresConfirmation: false,
+        responsePreview: "\u6211\u4f1a\u57fa\u4e8e\u5f53\u524d\u6d88\u606f\u548c\u53ef\u83b7\u53d6\u7684\u6700\u8fd1\u4e0a\u4e0b\u6587\u8f93\u51fa\uff1a\u80cc\u666f\u3001\u5173\u952e\u7ed3\u8bba\u3001\u884c\u52a8\u9879\u3001\u8d1f\u8d23\u4eba\u3001\u622a\u6b62\u65f6\u95f4\u3002"
+      };
+    case "baseCreate":
+      return {
+        title: "\u521b\u5efa\u591a\u7ef4\u8868\u683c",
+        commands: [["base", "+base-create"], ["base", "+table-create"]],
+        executable: false,
+        requiresConfirmation: false,
+        responsePreview: `\u6211\u4f1a\u521b\u5efa\u9879\u76ee\u4efb\u52a1\u591a\u7ef4\u8868\u683c\uff0c\u5e76\u6309\u9700\u6c42\u8bbe\u7f6e\u5b57\u6bb5\u3002\u9700\u6c42\uff1a${text}`
+      };
+    case "baseWrite":
+      return {
+        title: "\u5199\u5165\u591a\u7ef4\u8868\u683c\u8bb0\u5f55",
+        commands: [["base", "+record-batch-create"]],
+        executable: false,
+        requiresConfirmation: true,
+        confirmationReason: "\u5199\u5165\u6216\u6279\u91cf\u66f4\u65b0\u591a\u7ef4\u8868\u683c\u8bb0\u5f55\u524d\u9700\u8981\u786e\u8ba4\u3002",
+        responsePreview: `\u6211\u5c06\u628a\u884c\u52a8\u9879\u5199\u5165\u6307\u5b9a\u591a\u7ef4\u8868\u683c\u3002\u9700\u6c42\uff1a${text}`
+      };
+    case "docSearch":
+      return {
+        title: "\u641c\u7d22\u5e76\u603b\u7ed3\u6587\u6863",
+        commands: [["docs", "+search"], ["docs", "+fetch"]],
+        executable: false,
+        requiresConfirmation: false,
+        responsePreview: `\u6211\u4f1a\u641c\u7d22\u76f8\u5173\u6587\u6863\u5e76\u603b\u7ed3\u5173\u952e\u5185\u5bb9\u3002\u9700\u6c42\uff1a${text}`
+      };
+    case "docCreate":
+      return {
+        title: "\u751f\u6210\u98de\u4e66\u6587\u6863",
+        commands: [["docs", "+create"]],
+        executable: false,
+        requiresConfirmation: false,
+        responsePreview: `\u6211\u4f1a\u628a\u4e0a\u4e0b\u6587\u6574\u7406\u6210\u98de\u4e66\u6587\u6863\u5e76\u8fd4\u56de\u94fe\u63a5\u3002\u9700\u6c42\uff1a${text}`
+      };
+    case "apps":
+      return {
+        title: "\u5999\u642d/Spark/Apps \u64cd\u4f5c",
+        commands: [["apps", "+create"], ["apps", "+html-publish"]],
+        executable: false,
+        requiresConfirmation: true,
+        confirmationReason: "\u521b\u5efa\u6216\u53d1\u5e03\u5999\u642d/Spark/Miaoda \u5e94\u7528\u3001\u9759\u6001\u9875\u9762\u524d\u9700\u8981\u786e\u8ba4\u3002",
+        responsePreview: `\u6211\u4f1a\u5148\u68c0\u7d22 lark-cli apps \u80fd\u529b\u5e76\u51c6\u5907\u5e94\u7528\u64cd\u4f5c\u3002\u9700\u6c42\uff1a${text}`
+      };
+    case "task":
+      return {
+        title: "\u521b\u5efa\u4efb\u52a1\u6e05\u5355",
+        commands: [["task", "+create"]],
+        executable: false,
+        requiresConfirmation: /(?:\u591a\u4eba|\u6210\u5458|\u5206\u914d|\u8f6c\u4ea4|\u6279\u91cf)/.test(text),
+        confirmationReason: "\u6d89\u53ca\u591a\u4eba\u4efb\u52a1\u3001\u8f6c\u4ea4\u6216\u6279\u91cf\u64cd\u4f5c\u524d\u9700\u8981\u786e\u8ba4\u3002",
+        responsePreview: `\u6211\u4f1a\u6839\u636e\u8ba8\u8bba\u521b\u5efa\u4efb\u52a1\u3001\u8d1f\u8d23\u4eba\u548c\u622a\u6b62\u65f6\u95f4\u3002\u9700\u6c42\uff1a${text}`
+      };
+    case "calendar":
+      return {
+        title: "\u65e5\u5386\u4e0e\u4f1a\u8bae",
+        commands: [["calendar", "+agenda"]],
+        executable: true,
+        requiresConfirmation: false,
+        responsePreview: `\u6211\u4f1a\u67e5\u8be2\u65e5\u5386\u6216\u51c6\u5907\u4f1a\u8bae\u65e5\u7a0b\u3002\u9700\u6c42\uff1a${text}`
+      };
+    default:
+      return {
+        title: "\u901a\u7528\u8bf7\u6c42",
+        commands: [],
+        executable: true,
+        requiresConfirmation: false,
+        responsePreview: `\u6211\u4f1a\u6309\u4ee3\u7801\u6267\u884c\u5b98\u804c\u8d23\u5904\u7406\u8be5\u8bf7\u6c42\uff0c\u53ea\u5728\u660e\u786e\u9700\u8981\u98de\u4e66\u8d44\u6e90\u64cd\u4f5c\u65f6\u624d\u4f7f\u7528 lark-cli \u6216 OpenAPI\u3002\u8bf7\u6c42\uff1a${text}`
+      };
+  }
+}
