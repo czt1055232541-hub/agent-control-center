@@ -18,11 +18,14 @@ export type ProviderStatus = {
 
 export type StackStatus = {
   codex: ProviderStatus;
+  codex_app: ProviderStatus;
+  codex_agent_provider: ProviderStatus;
   openclaw: ComponentStatus;
   moonbridge: ComponentStatus;
   codex_agent: ComponentStatus;
   codex_agent_args: string;
   codex_agent_follows_global_config: boolean;
+  codex_agent_config_scope: "independent" | "shared_legacy" | string;
   codex_desktop_running: boolean;
   codex_desktop: {
     running: boolean;

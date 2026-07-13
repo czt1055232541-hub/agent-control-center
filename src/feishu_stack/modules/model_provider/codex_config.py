@@ -94,6 +94,38 @@ def _timestamp() -> str:
     return time.strftime("%Y%m%d-%H%M%S") + f"-{int((time.time() % 1) * 1000):03d}"
 
 
+def _target_paths(cfg: StackConfig, target: str) -> tuple[Path, Path, str]:
+    if target == "app":
+        return cfg.codex_home, cfg.codex_config, "app"
+    if target == "agent":
+        return cfg.agent.codex_home, cfg.agent.codex_config, "agent"
+    raise ValueError(f"Unsupported codex provider target: {target}")
+
+
+def _bootstrap_agent_config(cfg: StackConfig) -> None:
+    agent_home = cfg.agent.codex_home
+    agent_config = cfg.agent.codex_config
+    agent_home.mkdir(parents=True, exist_ok=True)
+    if not agent_config.exists():
+        if not cfg.codex_config.exists():
+            raise FileNotFoundError(f"Cannot bootstrap Agent Codex config because App config is missing: {cfg.codex_config}")
+        agent_config.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(cfg.codex_config, agent_config)
+    lines = _read_lines(agent_config)
+    replacements = {
+        "CODEX_HOME": str(agent_home).replace("\\", "\\\\"),
+        "CODEX_CLI_PATH": str(cfg.codex_bin).replace("\\", "\\\\"),
+    }
+    for key, value in replacements.items():
+        lines = [f"{key} = '{value}'" if line.strip().startswith(key) and "=" in line else line for line in lines]
+    _write_lines(agent_config, lines)
+    for name in ("models_catalog.json", "models_catalog.json.bak-switch"):
+        source = cfg.codex_home / name
+        target = agent_home / name
+        if source.exists() and not target.exists():
+            shutil.copy2(source, target)
+
+
 def _cleanup_backups(codex_home: Path, pattern: str, keep: int, keep_path: Path | None = None) -> int:
     files = sorted(codex_home.glob(pattern), key=lambda path: path.stat().st_mtime, reverse=True)
     removed = 0
@@ -170,6 +202,7 @@ def _normalize_reasoning_effort(value: str | None, fallback: str = "high") -> st
 def _apply_moonbridge(
     lines: list[str],
     cfg: StackConfig,
+    codex_home: Path | None = None,
     allow_unavailable: bool = False,
     model: str | None = None,
     reasoning_effort: str | None = None,
@@ -180,8 +213,9 @@ def _apply_moonbridge(
         raise RuntimeError(f"MoonBridge is not reachable at 127.0.0.1:{cfg.moonbridge_port}.")
     if not allow_unavailable and not _moonbridge_has_model(cfg, target_model):
         raise RuntimeError(f"MoonBridge model is not available: {target_model}.")
-    catalog = cfg.codex_home / "models_catalog.json"
-    catalog_source = cfg.codex_home / "models_catalog.json.bak-switch"
+    home = codex_home or cfg.codex_home
+    catalog = home / "models_catalog.json"
+    catalog_source = home / "models_catalog.json.bak-switch"
     if not catalog.exists() and catalog_source.exists():
         shutil.copy2(catalog_source, catalog)
     if not catalog.exists():
@@ -211,30 +245,34 @@ def switch_provider(
     allow_unavailable_moonbridge: bool = False,
     moonbridge_model: str | None = None,
     reasoning_effort: str | None = None,
+    target: str = "app",
 ) -> OperationResult:
     if mode not in {"native", "moonbridge", "toggle"}:
         raise ValueError(f"Unsupported provider mode: {mode}")
     cfg = config or load_config()
+    codex_home, codex_config_path, target_label = _target_paths(cfg, target)
+    if target_label == "agent":
+        _bootstrap_agent_config(cfg)
     started = time.monotonic()
-    current = read_provider_status(cfg)
+    current = read_provider_status(cfg, codex_config_path)
     target = "native" if mode == "toggle" and current.mode == "moonbridge" else "moonbridge" if mode == "toggle" else mode
-    lines = _read_lines(cfg.codex_config)
-    backup = cfg.codex_home / f"config.toml.bak-switch-{_timestamp()}"
-    shutil.copy2(cfg.codex_config, backup)
+    lines = _read_lines(codex_config_path)
+    backup = codex_home / f"config.toml.bak-switch-{target_label}-{_timestamp()}"
+    shutil.copy2(codex_config_path, backup)
     new_lines = (
         _apply_native(lines, cfg)
         if target == "native"
-        else _apply_moonbridge(lines, cfg, allow_unavailable_moonbridge, moonbridge_model, reasoning_effort)
+        else _apply_moonbridge(lines, cfg, codex_home, allow_unavailable_moonbridge, moonbridge_model, reasoning_effort)
     )
-    _write_lines(cfg.codex_config, new_lines)
-    verified = read_provider_status(cfg)
+    _write_lines(codex_config_path, new_lines)
+    verified = read_provider_status(cfg, codex_config_path)
     expected_model = cfg.native_model if target == "native" else (moonbridge_model or cfg.moonbridge_model)
     ok = verified.mode == target and verified.model == expected_model
-    _cleanup_backups(cfg.codex_home, "config.toml.bak-switch-*", 1, backup)
+    _cleanup_backups(codex_home, f"config.toml.bak-switch-{target_label}-*", 1, backup)
     return OperationResult(
         ok=ok,
-        component="codex-provider",
+        component=f"codex-provider-{target_label}",
         action=f"switch-{target}",
-        message=f"Switched provider from {current.mode}/{current.model} to {verified.mode}/{verified.model}. Backup: {backup}",
+        message=f"Switched {target_label} provider from {current.mode}/{current.model} to {verified.mode}/{verified.model}. Backup: {backup}",
         duration_ms=int((time.monotonic() - started) * 1000),
     )

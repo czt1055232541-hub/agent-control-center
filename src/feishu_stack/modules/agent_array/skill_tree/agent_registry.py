@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from feishu_stack.core.settings import StackConfig, load_config
-from feishu_stack.core.models import ComponentStatus
+from feishu_stack.core.models import ComponentStatus, ProviderStatus
 
 
 REAL_OPENCLAW_AGENT_ORDER = ["coordinator", "orchestrator", "main", "archivist"]
@@ -77,6 +77,30 @@ def _iso_from_ms(value: Any) -> str | None:
 
 def _component_running(component: ComponentStatus) -> bool:
     return bool(component.pid_running or component.port_listening)
+
+
+def _agent_codex_config_path(cfg: StackConfig) -> Path:
+    value = getattr(cfg.agent, "codex_config", None)
+    if value is None:
+        value = getattr(cfg, "agent_codex_config", None)
+    if value is None:
+        value = getattr(cfg, "codex_config", Path("config.toml"))
+    return Path(value)
+
+
+def _read_codex_provider_config(config_path: Path) -> ProviderStatus:
+    text = config_path.read_text(encoding="utf-8", errors="replace") if config_path.exists() else ""
+
+    def value(key: str, fallback: str) -> str:
+        import re
+
+        match = re.search(rf'(?m)^\s*{key}\s*=\s*"([^"]+)"', text)
+        return match.group(1) if match else fallback
+
+    model = value("model", "unknown")
+    provider = value("model_provider", "openai/default")
+    mode = "moonbridge" if provider == "moonbridge" else "native"
+    return ProviderStatus(model=model, provider=provider, mode=mode, config=str(config_path), reasoning_effort=value("model_reasoning_effort", "high"))
 
 
 def _backend_action(
@@ -291,6 +315,8 @@ def load_registry(
     env = _read_env(env_path)
     peers = _parse_a2a_bots(env.get("A2A_BOTS", "")) or _configured_a2a_peers(cfg.agent.a2a_bots)
     provider = env.get("AGENT_PROVIDER") or cfg.agent.provider or "codex"
+    codex_config = _agent_codex_config_path(cfg)
+    codex_provider = _read_codex_provider_config(codex_config)
     bot_open_id = env.get("LARK_BOT_OPEN_ID") or cfg.agent.lark_bot_open_id
     workspace = _codex_workspace(cfg)
     code_running = _component_running(code_agent_status)
@@ -304,8 +330,8 @@ def load_registry(
             display_name=env.get("LARK_BOT_NAME") or "代码执行官",
             role="代码实现、修复和本地测试",
             status=code_status,
-            provider=str(provider),
-            model=str(cfg.codex.native_model),
+            provider=codex_provider.mode if provider == "codex" else str(provider),
+            model=codex_provider.model if provider == "codex" else "--",
             workspace_path=str(workspace),
             config_path=str(env_path),
             binding_status="bound" if bot_open_id else "missing-binding",

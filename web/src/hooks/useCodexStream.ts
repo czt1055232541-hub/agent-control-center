@@ -65,7 +65,7 @@ export function useCodexStream() {
         }
       };
       ws.onerror = () => {
-        setError("Codex stream WebSocket error.");
+        setConnected(false);
         ws?.close();
       };
       ws.onclose = () => {

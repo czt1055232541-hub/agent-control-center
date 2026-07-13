@@ -12,6 +12,7 @@ def make_config(tmp_path: Path) -> StackConfig:
     runtime = tmp_path / "runtime"
     codex_home.mkdir()
     stack_root.mkdir()
+    agent_codex_home = tmp_path / "agent-codex"
     (codex_home / "models_catalog.json").write_text("{}", encoding="utf-8")
     config_path = codex_home / "config.toml"
     config_path.write_text(
@@ -22,6 +23,10 @@ def make_config(tmp_path: Path) -> StackConfig:
                 "",
                 "[features]",
                 "multi_agent = true",
+                "",
+                "[mcp_servers.node_repl.env]",
+                f"CODEX_HOME = '{str(codex_home).replace(chr(92), chr(92) + chr(92))}'",
+                "CODEX_CLI_PATH = 'C:\\\\old\\\\codex.exe'",
             ]
         )
         + "\n",
@@ -46,6 +51,8 @@ def make_config(tmp_path: Path) -> StackConfig:
         openclaw_port=18789,
         agent_dir=tmp_path,
         agent_entry=tmp_path / "dist" / "src" / "index.js",
+        agent_codex_home=agent_codex_home,
+        agent_codex_config=agent_codex_home / "config.toml",
         lark_cli_bin=tmp_path / "lark-cli.exe",
         runtime_dir=runtime,
         log_dir=runtime / "logs",
@@ -93,6 +100,37 @@ def test_switch_provider_to_native_removes_moonbridge_keys(tmp_path: Path, monke
     assert "model_provider" not in text
     assert "[model_providers.moonbridge]" not in text
     assert len(list(cfg.codex_home.glob("config.toml.bak-switch-*"))) == 1
+
+
+def test_switch_agent_provider_does_not_modify_app_config(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_config(tmp_path)
+    monkeypatch.setattr("feishu_stack.modules.model_provider.codex_config._moonbridge_ready", lambda _cfg: True)
+    monkeypatch.setattr("feishu_stack.modules.model_provider.codex_config._moonbridge_has_model", lambda _cfg, _model: True)
+
+    original_app_text = cfg.codex_config.read_text(encoding="utf-8")
+    result = switch_provider("moonbridge", cfg, target="agent")
+
+    assert result.ok is True
+    assert cfg.codex_config.read_text(encoding="utf-8") == original_app_text
+    agent_text = cfg.agent.codex_config.read_text(encoding="utf-8")
+    assert 'model = "moonbridge-flash"' in agent_text
+    assert 'model_provider = "moonbridge"' in agent_text
+    assert f"CODEX_HOME = '{str(cfg.agent.codex_home).replace(chr(92), chr(92) + chr(92))}'" in agent_text
+    assert f"CODEX_CLI_PATH = '{str(cfg.codex_bin).replace(chr(92), chr(92) + chr(92))}'" in agent_text
+
+
+def test_switch_app_provider_does_not_modify_agent_config(tmp_path: Path, monkeypatch) -> None:
+    cfg = make_config(tmp_path)
+    cfg.agent.codex_home.mkdir(parents=True)
+    cfg.agent.codex_config.write_text('model = "agent-native"\n', encoding="utf-8")
+    monkeypatch.setattr("feishu_stack.modules.model_provider.codex_config._moonbridge_ready", lambda _cfg: True)
+    monkeypatch.setattr("feishu_stack.modules.model_provider.codex_config._moonbridge_has_model", lambda _cfg, _model: True)
+
+    result = switch_provider("moonbridge", cfg, target="app")
+
+    assert result.ok is True
+    assert cfg.agent.codex_config.read_text(encoding="utf-8") == 'model = "agent-native"\n'
+    assert 'model = "moonbridge-flash"' in cfg.codex_config.read_text(encoding="utf-8")
 
 
 def test_clean_backups_preserves_goal_backups(tmp_path: Path) -> None:

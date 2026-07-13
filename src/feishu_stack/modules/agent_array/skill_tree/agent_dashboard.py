@@ -290,8 +290,8 @@ def list_agents(config: StackConfig | None = None, status: StackStatus | None = 
 def list_infrastructure(config: StackConfig | None = None, status: StackStatus | None = None) -> list[AgentConfig]:
     cfg = config or load_config()
     stack = status or get_status(cfg)
-    provider_label = stack.codex.mode
-    model = stack.codex.model
+    provider_label = stack.codex_agent_provider.mode
+    model = stack.codex_agent_provider.model
     codex_runtime_running = bool(stack.codex_desktop.running)
     return [
         _agent(

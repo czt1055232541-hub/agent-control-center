@@ -1,6 +1,11 @@
 # Codex Provider Switching
 
-`E:\codeX` remains the real Codex home. Provider scripts only edit `E:\codeX\config.toml`; they do not move sessions, rewrite sqlite databases, or modify rollout files.
+Provider state is now split by runtime:
+
+- ChatGPT/Codex App keeps using the App Codex home, usually `E:\codeX`, and its provider config is `E:\codeX\config.toml`.
+- Feishu Codex Agent uses an independent Codex home, by default `{ACC_ROOT}\agent-runtime\codex-home`, and its provider config is `{ACC_ROOT}\agent-runtime\codex-home\config.toml`.
+
+Provider scripts edit only the selected runtime's `config.toml`; they do not move sessions, rewrite sqlite databases, or modify rollout files. When the Agent config does not exist yet, ACC bootstraps it from the App config and copies the model catalog needed for MoonBridge. During bootstrap, ACC also rewrites Agent `CODEX_HOME` and `CODEX_CLI_PATH` so the Agent follows its independent config while still using the current app-managed Codex CLI binary.
 
 ## Switch Provider
 
@@ -8,6 +13,8 @@
 python scripts/stack.py switch-provider native
 python scripts/stack.py switch-provider moonbridge
 ```
+
+The legacy CLI switch command targets the App config. In the ACC frontend, the "ChatGPT/Codex App Provider" and "Feishu Codex Agent Provider" cards call separate API routes and can be switched independently. Switching the Agent provider restarts a running `codex-agent` process so the new `CODEX_HOME` is inherited by future Codex CLI child processes.
 
 MoonBridge mode requires `http://127.0.0.1:38440/v1/models` to be reachable unless `-AllowUnavailableMoonBridge` is passed.
 
@@ -25,7 +32,11 @@ python scripts/stack.py status
 
 `moonbridge` starts OpenClaw, MoonBridge, and Codex Feishu Agent.
 
-`current` reads `E:\codeX\config.toml` and starts MoonBridge only when the active provider is MoonBridge.
+Stack start actions now switch only the Feishu Codex Agent provider. They intentionally leave the ChatGPT/Codex App provider unchanged.
+
+Stack start actions restart `codex-agent` even when it is already running. This is intentional: provider choice is read from environment/config at process start, so a running Agent must be refreshed after switching between Native and MoonBridge.
+
+`status` reports both App and Agent provider configs so operators can confirm they are intentionally different.
 
 ## Verified Status
 

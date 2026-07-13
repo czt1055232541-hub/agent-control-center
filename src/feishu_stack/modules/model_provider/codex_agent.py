@@ -9,6 +9,7 @@ from pathlib import Path
 from feishu_stack.core.settings import StackConfig, load_config
 from feishu_stack.core.models import OperationResult
 from feishu_stack.core.process import CREATE_NO_WINDOW, process_info, read_pid, start_process, stop_component, write_pid
+from feishu_stack.modules.model_provider import codex_config
 
 AGENT_CONTEXT_ENV_KEYS = (
     "OPENCLAW_HOME",
@@ -64,7 +65,7 @@ def _build_agent_env(cfg: StackConfig) -> dict[str, str]:
         env.pop(key, None)
     env.update(
         {
-            "CODEX_HOME": str(cfg.codex_home),
+            "CODEX_HOME": str(cfg.agent.codex_home),
             "CODEX_CLI_BIN": str(cfg.codex_bin),
             "CODEX_CLI_PATH": str(cfg.codex_bin),
             "CODEX_AGENT_ARGS": cfg.agent.codex_agent_args,
@@ -110,6 +111,7 @@ def start(config: StackConfig | None = None) -> OperationResult:
     running, _ = process_info(pid)
     if running:
         return OperationResult(True, "codex-agent", "start", "Codex Agent is already running.", pid=pid)
+    codex_config._bootstrap_agent_config(cfg)
     built, build_message = _build_if_needed(cfg)
     if not built:
         return OperationResult(False, "codex-agent", "start", build_message)

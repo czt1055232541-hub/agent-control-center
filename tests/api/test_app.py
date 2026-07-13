@@ -31,7 +31,37 @@ def test_status_is_read_only_without_token() -> None:
     assert response.status_code == 200
     data = response.json()
     assert "codex" in data
+    assert "codex_app" in data
+    assert "codex_agent_provider" in data
     assert "codex_desktop_running" in data
+
+
+def test_provider_target_routes_call_switch_provider(monkeypatch) -> None:
+    calls = []
+
+    def fake_switch(mode, _cfg, moonbridge_model=None, reasoning_effort=None, target="app"):
+        calls.append((mode, moonbridge_model, reasoning_effort, target))
+        return OperationResult(True, f"codex-provider-{target}", f"switch-{mode}", "ok")
+
+    def fake_switch_agent(mode, _cfg, moonbridge_model=None, reasoning_effort=None):
+        calls.append((mode, moonbridge_model, reasoning_effort, "agent"))
+        return OperationResult(True, "codex-provider-agent", f"switch-agent-{mode}", "ok")
+
+    monkeypatch.setattr(api_app_module.provider_switch, "switch_provider", fake_switch)
+    monkeypatch.setattr(api_app_module.stack_actions, "switch_agent_provider", fake_switch_agent)
+    headers = {"X-Control-Token": _token()}
+
+    assert client.post("/api/codex-provider/app/native", headers=headers).status_code == 200
+    assert client.post(
+        "/api/codex-provider/agent/moonbridge",
+        headers=headers,
+        json={"model": "bridge-model", "reasoning_effort": "xhigh"},
+    ).status_code == 200
+
+    assert calls == [
+        ("native", None, None, "app"),
+        ("moonbridge", "bridge-model", "xhigh", "agent"),
+    ]
 
 
 def test_response_has_request_id() -> None:

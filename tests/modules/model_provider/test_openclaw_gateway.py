@@ -30,6 +30,8 @@ def _config(tmp_path: Path) -> StackConfig:
         openclaw_port=18789,
         agent_dir=tmp_path / "agent",
         agent_entry=tmp_path / "agent" / "dist" / "src" / "index.js",
+        agent_codex_home=tmp_path / "agent-codex",
+        agent_codex_config=tmp_path / "agent-codex" / "config.toml",
         lark_cli_bin=tmp_path / "agent" / "lark-cli.cmd",
         runtime_dir=tmp_path / "runtime",
         log_dir=log_dir,

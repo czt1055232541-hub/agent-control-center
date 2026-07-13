@@ -23,13 +23,23 @@ def _component(name: str, running: bool, port: int | None = None) -> ComponentSt
 
 
 def _status(*, openclaw: bool = True, agent: bool = True, moonbridge: bool = False, mode: str = "native") -> StackStatus:
+    provider = ProviderStatus(model="gpt-5.5", provider="openai/default", mode=mode, config="E:/codeX/config.toml")
+    agent_provider = ProviderStatus(
+        model="deepseek-v4-flash" if mode == "moonbridge" else "gpt-5.5",
+        provider="moonbridge" if mode == "moonbridge" else "openai/default",
+        mode=mode,
+        config="F:/ACC/agent-runtime/codex-home/config.toml",
+    )
     return StackStatus(
-        codex=ProviderStatus(model="gpt-5.5", provider="openai/default", mode=mode, config="E:/codeX/config.toml"),
+        codex=provider,
+        codex_app=provider,
+        codex_agent_provider=agent_provider,
         openclaw=_component("openclaw", openclaw, 18789),
         moonbridge=_component("moonbridge", moonbridge, 38440),
         codex_agent=_component("codex-agent", agent),
         codex_agent_args="exec --skip-git-repo-check",
-        codex_agent_follows_global_config=True,
+        codex_agent_follows_global_config=False,
+        codex_agent_config_scope="independent",
         codex_desktop_running=True,
         codex_desktop=CodexDesktopStatus(True, 4321, 1, "Codex.exe"),
         stack_root="F:/1AI/Agent control center",
@@ -125,12 +135,23 @@ def _a2a_peers() -> list[dict[str, str]]:
 def _config(tmp_path: Path) -> SimpleNamespace:
     openclaw_home = tmp_path / "openclaw"
     agent_dir = tmp_path / "codex-agent"
+    agent_codex_home = tmp_path / "agent-codex"
+    agent_codex_home.mkdir()
+    agent_codex_config = agent_codex_home / "config.toml"
+    agent_codex_config.write_text('model = "deepseek-v4-flash"\nmodel_provider = "moonbridge"\n', encoding="utf-8")
     _write_openclaw(openclaw_home)
     _write_codex_agent(agent_dir)
     return SimpleNamespace(
         raw={"agent": {"provider": "codex", "codexAgentArgs": "exec --skip-git-repo-check"}, "codexNativeModel": "gpt-5.5"},
         stack_root=tmp_path,
-        agent=SimpleNamespace(provider="codex", codex_agent_args="exec --skip-git-repo-check", lark_bot_open_id="", a2a_bots=[]),
+        agent=SimpleNamespace(
+            provider="codex",
+            codex_agent_args="exec --skip-git-repo-check",
+            codex_home=agent_codex_home,
+            codex_config=agent_codex_config,
+            lark_bot_open_id="",
+            a2a_bots=[],
+        ),
         codex=SimpleNamespace(native_model="gpt-5.5"),
         openclaw=SimpleNamespace(home=openclaw_home),
         openclaw_home=openclaw_home,
@@ -180,6 +201,8 @@ def test_code_agent_exposes_codex_agent_controls(tmp_path: Path) -> None:
     assert {"/api/codex-agent/start", "/api/codex-agent/stop", "/api/codex-agent/restart"} <= endpoints
     assert len(code_agent.a2aPeers or []) == 5
     assert code_agent.workspacePath == str((tmp_path / "workspaces" / "dev").resolve(strict=False))
+    assert code_agent.provider == "moonbridge"
+    assert code_agent.model == "deepseek-v4-flash"
 
 
 def test_code_agent_uses_stack_config_a2a_when_env_is_missing(tmp_path: Path) -> None:
@@ -275,10 +298,13 @@ def test_openclaw_dispatch_log_marks_role_executing(tmp_path: Path) -> None:
 
 
 def test_infrastructure_stays_separate_from_real_agents(tmp_path: Path) -> None:
-    infra = list_infrastructure(_config(tmp_path), _status())
+    infra = list_infrastructure(_config(tmp_path), _status(mode="moonbridge", moonbridge=True))
 
     assert {agent.id for agent in infra} == {"feishu-codex-agent", "openclaw-gateway", "moonbridge", "codex-runtime"}
     assert all(agent.source == "infrastructure" for agent in infra)
+    codex_agent = next(agent for agent in infra if agent.id == "feishu-codex-agent")
+    assert codex_agent.provider == "moonbridge"
+    assert codex_agent.model == "deepseek-v4-flash"
 
 
 def test_explained_diagnostics_flags_missing_a2a(tmp_path: Path) -> None:

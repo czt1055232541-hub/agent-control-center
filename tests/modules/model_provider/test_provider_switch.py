@@ -43,4 +43,5 @@ class ProviderTests(unittest.TestCase):
             cfg,
             moonbridge_model="deepseek-r1",
             reasoning_effort="xhigh",
+            target="app",
         )

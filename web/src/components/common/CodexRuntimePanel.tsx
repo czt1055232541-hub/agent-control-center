@@ -1,12 +1,108 @@
 import React from "react";
 import { FolderOpen, Play, Power, RefreshCcw, Server, Terminal, XCircle } from "lucide-react";
-import type { OperationResult, StackStatus, ThreadListItem, ThreadMigrationResult } from "../../types";
+import type { OperationResult, ProviderStatus, StackStatus, ThreadListItem, ThreadMigrationResult } from "../../types";
 import { ActionButton } from "./ActionButton";
 import { StatusPill } from "./StatusPill";
 
+function ProviderControl({
+  title,
+  provider,
+  target,
+  busy,
+  availableModels,
+  switchingModel,
+  run,
+  loadDiagnostics,
+}: {
+  title: string;
+  provider: ProviderStatus | null;
+  target: "app" | "agent";
+  busy: boolean;
+  availableModels: string[];
+  switchingModel: boolean;
+  run: (path: string, after?: () => Promise<void>, body?: unknown) => Promise<void>;
+  loadDiagnostics: () => Promise<void>;
+}) {
+  const activeMoonbridgeModel =
+    provider?.mode === "moonbridge" && availableModels.includes(provider.model)
+      ? provider.model
+      : availableModels[0] ?? "";
+  const [selectedMoonbridgeModel, setSelectedMoonbridgeModel] = React.useState(activeMoonbridgeModel);
+  const [selectedReasoningEffort, setSelectedReasoningEffort] = React.useState(provider?.reasoning_effort ?? "high");
+
+  React.useEffect(() => {
+    if (activeMoonbridgeModel && !availableModels.includes(selectedMoonbridgeModel)) {
+      setSelectedMoonbridgeModel(activeMoonbridgeModel);
+    }
+  }, [activeMoonbridgeModel, availableModels, selectedMoonbridgeModel]);
+
+  React.useEffect(() => {
+    setSelectedReasoningEffort(provider?.reasoning_effort ?? "high");
+  }, [provider?.reasoning_effort]);
+
+  return (
+    <div>
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">{title}</p>
+      <div className="mb-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+        <div className="font-medium text-slate-800">
+          {provider?.mode ?? "unknown"} / {provider?.model ?? "unknown"}
+        </div>
+        <div className="mt-1 truncate">{provider?.config ?? "config not loaded"}</div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <ActionButton
+          disabled={busy || provider?.mode === "native"}
+          icon={<Server size={16} />}
+          label="Native"
+          onClick={() => run(`/api/codex-provider/${target}/native`, loadDiagnostics)}
+        />
+        <ActionButton
+          disabled={busy || switchingModel || !selectedMoonbridgeModel}
+          icon={<Server size={16} />}
+          label={provider?.mode === "moonbridge" ? "Apply" : "MoonBridge"}
+          onClick={() =>
+            run(`/api/codex-provider/${target}/moonbridge`, loadDiagnostics, {
+              model: selectedMoonbridgeModel,
+              reasoning_effort: selectedReasoningEffort,
+            })
+          }
+        />
+      </div>
+      {availableModels.length > 0 ? (
+        <div className="mt-2">
+          <select
+            className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
+            value={selectedMoonbridgeModel}
+            disabled={busy || switchingModel}
+            onChange={(event) => setSelectedMoonbridgeModel(event.target.value)}
+          >
+            {availableModels.map((modelName) => (
+              <option key={modelName} value={modelName}>
+                {modelName}
+              </option>
+            ))}
+          </select>
+          <select
+            className="mt-2 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
+            value={selectedReasoningEffort}
+            disabled={busy || switchingModel}
+            onChange={(event) => setSelectedReasoningEffort(event.target.value)}
+          >
+            <option value="minimal">推理：最低</option>
+            <option value="low">推理：低</option>
+            <option value="medium">推理：中</option>
+            <option value="high">推理：高</option>
+            <option value="xhigh">推理：超高</option>
+          </select>
+          {switchingModel ? <p className="mt-1 text-xs text-slate-500">Switching model&hellip;</p> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function CodexRuntimePanel({
   status,
-  providerMode,
   busy,
   migrationSessionId,
   migrationTargetProvider,
@@ -23,10 +119,8 @@ export function CodexRuntimePanel({
   run,
   loadLogs,
   loadDiagnostics,
-  switchModel,
 }: {
   status: StackStatus | null;
-  providerMode: string;
   busy: boolean;
   migrationSessionId: string;
   migrationTargetProvider: string;
@@ -43,28 +137,12 @@ export function CodexRuntimePanel({
   run: (path: string, after?: () => Promise<void>, body?: unknown) => Promise<void>;
   loadLogs: (component?: string, lines?: number) => Promise<void>;
   loadDiagnostics: () => Promise<void>;
-  switchModel: (model: string, reasoningEffort: string) => Promise<void>;
 }) {
   const running = Boolean(status?.codex_desktop.running ?? status?.codex_desktop_running);
   const isMigration = migrationResult?.component === "thread-migration";
   const mr = isMigration ? (migrationResult as ThreadMigrationResult) : null;
-  const currentReasoningEffort = status?.codex.reasoning_effort ?? "high";
-  const activeMoonbridgeModel =
-    providerMode === "moonbridge" && availableModels.includes(status?.codex.model ?? "")
-      ? status?.codex.model ?? ""
-      : availableModels[0] ?? "";
-  const [selectedMoonbridgeModel, setSelectedMoonbridgeModel] = React.useState(activeMoonbridgeModel);
-  const [selectedReasoningEffort, setSelectedReasoningEffort] = React.useState(currentReasoningEffort);
-
-  React.useEffect(() => {
-    if (activeMoonbridgeModel && !availableModels.includes(selectedMoonbridgeModel)) {
-      setSelectedMoonbridgeModel(activeMoonbridgeModel);
-    }
-  }, [activeMoonbridgeModel, availableModels, selectedMoonbridgeModel]);
-
-  React.useEffect(() => {
-    setSelectedReasoningEffort(currentReasoningEffort);
-  }, [currentReasoningEffort]);
+  const appProvider = status?.codex_app ?? status?.codex ?? null;
+  const agentProvider = status?.codex_agent_provider ?? status?.codex ?? null;
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
@@ -72,15 +150,11 @@ export function CodexRuntimePanel({
         <div>
           <h2 className="text-base font-semibold text-slate-950">Codex Runtime</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Provider {providerMode} | Model {status?.codex.model ?? "unknown"} | PID{" "}
-            {status?.codex_desktop.pid ?? "none"}
+            App {appProvider?.mode ?? "unknown"} / {appProvider?.model ?? "unknown"} · Agent{" "}
+            {agentProvider?.mode ?? "unknown"} / {agentProvider?.model ?? "unknown"} · PID {status?.codex_desktop.pid ?? "none"}
           </p>
           <p className="mt-1 text-sm text-slate-600">
-            Agent{" "}
-            {status?.codex_agent_follows_global_config
-              ? "follows global config"
-              : "uses a profile override"}{" "}
-            | Args {status?.codex_agent_args ?? "unknown"}
+            Agent config {status?.codex_agent_config_scope ?? "unknown"} | Args {status?.codex_agent_args ?? "unknown"}
           </p>
           <p className="mt-1 truncate text-xs text-slate-500">
             {status?.codex_desktop.executable ?? "Codex Desktop executable not detected"}
@@ -89,7 +163,7 @@ export function CodexRuntimePanel({
         <StatusPill active={running} label={running ? "Desktop Running" : "Desktop Stopped"} />
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-2">
+      <div className="grid gap-3 xl:grid-cols-3">
         <div>
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Desktop</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -144,66 +218,40 @@ export function CodexRuntimePanel({
           </div>
         </div>
 
-        <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Provider</p>
-          <div className="grid grid-cols-2 gap-2">
-            <ActionButton
-              disabled={busy || providerMode === "native"}
-              icon={<Server size={16} />}
-              label="Native"
-              onClick={() => run("/api/codex-provider/native", loadDiagnostics)}
-            />
-            <ActionButton
-              disabled={busy || switchingModel || !selectedMoonbridgeModel}
-              icon={<Server size={16} />}
-              label={providerMode === "moonbridge" ? "Apply" : "MoonBridge"}
-              onClick={() => switchModel(selectedMoonbridgeModel, selectedReasoningEffort)}
-            />
-          </div>
-          {availableModels.length > 0 ? (
-            <div className="mt-2">
-              <select
-                className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
-                value={selectedMoonbridgeModel}
-                disabled={busy || switchingModel}
-                onChange={(event) => setSelectedMoonbridgeModel(event.target.value)}
-              >
-                {availableModels.map((modelName) => (
-                  <option key={modelName} value={modelName}>
-                    {modelName}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="mt-2 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
-                value={selectedReasoningEffort}
-                disabled={busy || switchingModel}
-                onChange={(event) => setSelectedReasoningEffort(event.target.value)}
-              >
-                <option value="minimal">推理：最低</option>
-                <option value="low">推理：低</option>
-                <option value="medium">推理：中</option>
-                <option value="high">推理：高</option>
-                <option value="xhigh">推理：超高</option>
-              </select>
-              {switchingModel ? (
-                <p className="mt-1 text-xs text-slate-500">Switching model&hellip;</p>
-              ) : null}
-            </div>
-          ) : null}
-          {confirmStop || confirmRestart ? (
-            <ActionButton
-              disabled={busy}
-              icon={<XCircle size={16} />}
-              label="Cancel Desktop Action"
-              onClick={() => {
-                setConfirmStop(false);
-                setConfirmRestart(false);
-              }}
-            />
-          ) : null}
-        </div>
+        <ProviderControl
+          title="ChatGPT/Codex App Provider"
+          provider={appProvider}
+          target="app"
+          busy={busy}
+          availableModels={availableModels}
+          switchingModel={switchingModel}
+          run={run}
+          loadDiagnostics={loadDiagnostics}
+        />
+        <ProviderControl
+          title="Feishu Codex Agent Provider"
+          provider={agentProvider}
+          target="agent"
+          busy={busy}
+          availableModels={availableModels}
+          switchingModel={switchingModel}
+          run={run}
+          loadDiagnostics={loadDiagnostics}
+        />
       </div>
+      {confirmStop || confirmRestart ? (
+        <div className="mt-3">
+          <ActionButton
+            disabled={busy}
+            icon={<XCircle size={16} />}
+            label="Cancel Desktop Action"
+            onClick={() => {
+              setConfirmStop(false);
+              setConfirmRestart(false);
+            }}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-4 border-t border-slate-200 pt-4">
         <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">

@@ -5,6 +5,8 @@ import csv
 import io
 import json
 
+from pathlib import Path
+
 from feishu_stack.core.settings import StackConfig, load_config
 from feishu_stack.core.models import CodexDesktopStatus, ProviderStatus, StackStatus
 from feishu_stack.core.process import component_status, process_info, read_pid
@@ -12,8 +14,9 @@ from feishu_stack.core.process import component_status, process_info, read_pid
 CODEX_DESKTOP_PROCESS_NAMES = {"codex.exe", "chatgpt.exe"}
 
 
-def read_provider_status(config: StackConfig) -> ProviderStatus:
-    text = config.codex_config.read_text(encoding="utf-8", errors="replace") if config.codex_config.exists() else ""
+def read_provider_status(config: StackConfig, codex_config: Path | None = None) -> ProviderStatus:
+    config_path = codex_config or config.codex_config
+    text = config_path.read_text(encoding="utf-8", errors="replace") if config_path.exists() else ""
     model_match = re.search(r'(?m)^\s*model\s*=\s*"([^"]+)"', text)
     provider_match = re.search(r'(?m)^\s*model_provider\s*=\s*"([^"]+)"', text)
     effort_match = re.search(r'(?m)^\s*model_reasoning_effort\s*=\s*"([^"]+)"', text)
@@ -21,7 +24,14 @@ def read_provider_status(config: StackConfig) -> ProviderStatus:
     provider = provider_match.group(1) if provider_match else "openai/default"
     reasoning_effort = effort_match.group(1) if effort_match else "high"
     mode = "moonbridge" if provider == "moonbridge" else "native"
-    return ProviderStatus(model=model, provider=provider, mode=mode, config=str(config.codex_config), reasoning_effort=reasoning_effort)
+    return ProviderStatus(model=model, provider=provider, mode=mode, config=str(config_path), reasoning_effort=reasoning_effort)
+
+
+def _same_path(left, right) -> bool:
+    try:
+        return Path(left).resolve() == Path(right).resolve()
+    except OSError:
+        return Path(left) == Path(right)
 
 
 def is_codex_desktop_running() -> bool:
@@ -123,13 +133,19 @@ def get_status(config: StackConfig | None = None) -> StackStatus:
     cfg = config or load_config()
     desktop = codex_desktop_status()
     codex_agent_args = cfg.agent.codex_agent_args
+    app_provider = read_provider_status(cfg, cfg.codex_config)
+    agent_provider = read_provider_status(cfg, cfg.agent.codex_config)
+    agent_config_scope = "shared_legacy" if _same_path(cfg.agent.codex_config, cfg.codex_config) else "independent"
     return StackStatus(
-        codex=read_provider_status(cfg),
+        codex=app_provider,
+        codex_app=app_provider,
+        codex_agent_provider=agent_provider,
         openclaw=component_status("openclaw", cfg.openclaw_port, cfg.pid_openclaw),
         moonbridge=component_status("moonbridge", cfg.moonbridge_port, cfg.pid_moonbridge),
         codex_agent=component_status("codex-agent", None, cfg.pid_codex_agent),
         codex_agent_args=codex_agent_args,
-        codex_agent_follows_global_config="--profile" not in codex_agent_args,
+        codex_agent_follows_global_config=agent_config_scope == "shared_legacy" and "--profile" not in codex_agent_args,
+        codex_agent_config_scope=agent_config_scope,
         codex_desktop_running=desktop.running,
         codex_desktop=desktop,
         stack_root=str(cfg.stack_root),

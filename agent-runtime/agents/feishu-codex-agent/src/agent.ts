@@ -85,10 +85,13 @@ async function draftWithCodex(config: AppConfig, route: RouteResult): Promise<st
   const outputFile = path.join(os.tmpdir(), `feishu-codex-agent-${Date.now()}.md`);
   const codexCliBin = resolveCodexCliBin(config.codexCliBin);
   const codexEnv = { ...process.env, CODEX_CLI_BIN: codexCliBin, CODEX_CLI_PATH: codexCliBin };
+  const providerSummary = readCodexProviderSummary();
+  infoLog(`codex cli home=${providerSummary.home} model=${providerSummary.model} provider=${providerSummary.provider}`);
   const stream = createCodexStreamWriter({
     messageId: route.context?.messageId,
     chatType: route.context?.chatType
   });
+  stream.write({ phase: "start", stream: "stage", text: `Codex provider ${providerSummary.provider}/${providerSummary.model} at ${providerSummary.home}` });
   const result = await spawnCollect(
     codexCliBin,
     [...config.codexAgentArgs, "--output-last-message", outputFile, "-"],
@@ -141,6 +144,28 @@ function readCodexCliPathFromConfig(): string | null {
     return match?.[2]?.replace(/\\\\/g, "\\") || null;
   } catch {
     return null;
+  }
+}
+
+function readCodexProviderSummary(): { home: string; model: string; provider: string } {
+  const codexHome = process.env.CODEX_HOME || "";
+  const fallback = { home: codexHome || "(unset)", model: "unknown", provider: "openai/default" };
+  if (!codexHome) {
+    return fallback;
+  }
+  const configPath = path.join(codexHome, "config.toml");
+  try {
+    if (!fs.existsSync(configPath)) {
+      return fallback;
+    }
+    const text = fs.readFileSync(configPath, "utf8");
+    return {
+      home: codexHome,
+      model: /^\s*model\s*=\s*"([^"]+)"/m.exec(text)?.[1] || "unknown",
+      provider: /^\s*model_provider\s*=\s*"([^"]+)"/m.exec(text)?.[1] || "openai/default"
+    };
+  } catch {
+    return fallback;
   }
 }
 

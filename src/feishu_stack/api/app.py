@@ -289,6 +289,12 @@ async def ws_codex_agent_stream(ws: WebSocket, run_id: str = "latest") -> None:
             await asyncio.sleep(0.75)
     except WebSocketDisconnect:
         return
+    except Exception:
+        logger.exception("Codex stream WebSocket failed")
+        try:
+            await ws.close()
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -1375,7 +1381,7 @@ def restart_codex_desktop() -> dict:
 
 @app.post("/api/codex-provider/native", summary="Switch to native provider", description="Switch the codex provider to the native OpenAI backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
 def switch_native() -> dict:
-    return _run("codex-provider", "switch-native", lambda cfg: provider_switch.switch_provider("native", cfg))
+    return _run("codex-provider", "switch-native", lambda cfg: provider_switch.switch_provider("native", cfg, target="app"))
 
 @app.post("/api/codex-provider/moonbridge", summary="Switch to MoonBridge provider", description="Switch the codex provider to the MoonBridge proxy backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
 def switch_moonbridge(request: MoonBridgeModelSwitchRequest | None = Body(default=None)) -> dict:
@@ -1383,6 +1389,42 @@ def switch_moonbridge(request: MoonBridgeModelSwitchRequest | None = Body(defaul
         "codex-provider",
         "switch-moonbridge",
         lambda cfg: provider_switch.switch_provider(
+            "moonbridge",
+            cfg,
+            moonbridge_model=request.model if request else None,
+            reasoning_effort=request.reasoning_effort if request else None,
+            target="app",
+        ),
+    )
+
+@app.post("/api/codex-provider/app/native", summary="Switch App to native provider", description="Switch the ChatGPT/Codex App provider to the native OpenAI backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
+def switch_app_native() -> dict:
+    return _run("codex-provider-app", "switch-native", lambda cfg: provider_switch.switch_provider("native", cfg, target="app"))
+
+@app.post("/api/codex-provider/app/moonbridge", summary="Switch App to MoonBridge provider", description="Switch the ChatGPT/Codex App provider to the MoonBridge proxy backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
+def switch_app_moonbridge(request: MoonBridgeModelSwitchRequest | None = Body(default=None)) -> dict:
+    return _run(
+        "codex-provider-app",
+        "switch-moonbridge",
+        lambda cfg: provider_switch.switch_provider(
+            "moonbridge",
+            cfg,
+            moonbridge_model=request.model if request else None,
+            reasoning_effort=request.reasoning_effort if request else None,
+            target="app",
+        ),
+    )
+
+@app.post("/api/codex-provider/agent/native", summary="Switch Agent to native provider", description="Switch the Feishu Codex Agent provider to the native OpenAI backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
+def switch_agent_native() -> dict:
+    return _run("codex-provider-agent", "switch-native", lambda cfg: stack_actions.switch_agent_provider("native", cfg))
+
+@app.post("/api/codex-provider/agent/moonbridge", summary="Switch Agent to MoonBridge provider", description="Switch the Feishu Codex Agent provider to the MoonBridge proxy backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
+def switch_agent_moonbridge(request: MoonBridgeModelSwitchRequest | None = Body(default=None)) -> dict:
+    return _run(
+        "codex-provider-agent",
+        "switch-moonbridge",
+        lambda cfg: stack_actions.switch_agent_provider(
             "moonbridge",
             cfg,
             moonbridge_model=request.model if request else None,

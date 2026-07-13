@@ -187,12 +187,12 @@ function StackActions({
   };
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-base font-semibold text-slate-950">Stack Actions</h2>
-      <p className="mt-1 text-sm text-slate-600">真实启动/停止入口，沿用现有本地 token 校验。</p>
+      <h2 className="text-base font-semibold text-slate-950">Agent Stack Actions</h2>
+      <p className="mt-1 text-sm text-slate-600">启动/停止 Feishu Codex Agent 栈；不会改变 ChatGPT/Codex App provider。</p>
       <div className="mt-4 grid gap-2">
-        <ActionButton disabled={busy} icon={<Play size={16} />} label="Start Native Stack" onClick={() => run("/api/stack/start-native", afterStackAction)} />
-        <ActionButton disabled={busy} icon={<Play size={16} />} label="Start MoonBridge Stack" onClick={() => run("/api/stack/start-moonbridge", afterStackAction)} />
-        <ActionButton disabled={busy} danger icon={<PauseCircle size={16} />} label="Stop Stack" onClick={() => run("/api/stack/stop", afterStackAction)} />
+        <ActionButton disabled={busy} icon={<Play size={16} />} label="Start Agent Stack (Native)" onClick={() => run("/api/stack/start-native", afterStackAction)} />
+        <ActionButton disabled={busy} icon={<Play size={16} />} label="Start Agent Stack (MoonBridge)" onClick={() => run("/api/stack/start-moonbridge", afterStackAction)} />
+        <ActionButton disabled={busy} danger icon={<PauseCircle size={16} />} label="Stop Agent Stack" onClick={() => run("/api/stack/stop", afterStackAction)} />
       </div>
     </section>
   );
@@ -451,11 +451,6 @@ function App() {
   const [adventureSelectedAgent, setAdventureSelectedAgent] = React.useState<AgentProfile | null>(null);
   const [activeDetailTab, setActiveDetailTab] = React.useState<string>("概览");
 
-  const wrappedSwitchModel = React.useCallback(
-    (model: string, reasoningEffort: string) => mig.switchModel(model, reasoningEffort, setError, setResult),
-    [mig, setError, setResult],
-  );
-
   React.useEffect(() => {
     mig.loadThreads().catch(() => {});
     mig.loadMoonbridgeModels().catch(() => {});
@@ -467,7 +462,8 @@ function App() {
       .catch((exc) => console.error("Configuration status check failed", exc));
   }, []);
 
-  const providerMode = status?.codex.mode ?? "unknown";
+  const appProviderMode = status?.codex_app?.mode ?? status?.codex.mode ?? "unknown";
+  const agentProviderMode = status?.codex_agent_provider?.mode ?? status?.codex.mode ?? "unknown";
   const runAndRefresh = React.useCallback(
     (path: string) =>
       run(path, async () => {
@@ -507,7 +503,8 @@ function App() {
               <p className="mt-1 text-sm text-slate-600">{status?.stack_root ?? "Loading stack status..."}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <StatusPill active={providerMode === "moonbridge"} label={`Provider: ${providerMode}`} />
+              <StatusPill active={appProviderMode === "moonbridge"} label={`App: ${appProviderMode}`} />
+              <StatusPill active={agentProviderMode === "moonbridge"} label={`Agent: ${agentProviderMode}`} />
               <StatusPill active={Boolean(status?.codex_desktop_running)} label="Codex Desktop" />
             </div>
           </header>
@@ -619,7 +616,6 @@ function App() {
               <div className="grid gap-4 lg:grid-cols-3">
                 <CodexRuntimePanel
                   status={status}
-                  providerMode={providerMode}
                   busy={busy}
                   migrationSessionId={mig.migrationSessionId}
                   migrationTargetProvider={mig.migrationTargetProvider}
@@ -636,7 +632,6 @@ function App() {
                   run={run}
                   loadLogs={loadLogs}
                   loadDiagnostics={loadDiagnostics}
-                  switchModel={wrappedSwitchModel}
                 />
                 <StackActions busy={busy} run={run} loadDiagnostics={loadDiagnostics} refreshDashboard={refreshDashboard} />
               </div>

@@ -38,7 +38,7 @@ class StackActionsStartNativeTests(unittest.TestCase):
         with (
             patch('feishu_stack.modules.operations.stack_actions.provider_switch.switch_provider') as mock_sp,
             patch('feishu_stack.modules.operations.stack_actions.openclaw.start') as mock_oc,
-            patch('feishu_stack.modules.operations.stack_actions.codex_agent.start') as mock_ca,
+            patch('feishu_stack.modules.operations.stack_actions.codex_agent.restart') as mock_ca,
             patch('feishu_stack.modules.operations.stack_actions.typing_indicator.start') as mock_ti,
         ):
             mock_sp.return_value = OperationResult(True, 'provider', 'switch', 'ok')
@@ -51,7 +51,7 @@ class StackActionsStartNativeTests(unittest.TestCase):
             result = start_native(cfg)
             self.assertTrue(result.ok)
             self.assertEqual(result.action, 'start-native')
-            mock_sp.assert_called_once_with('native', cfg)
+            mock_sp.assert_called_once_with('native', cfg, target='agent')
 
 
 class StackActionsStartMoonbridgeTests(unittest.TestCase):
@@ -60,7 +60,7 @@ class StackActionsStartMoonbridgeTests(unittest.TestCase):
             patch('feishu_stack.modules.operations.stack_actions.moonbridge.start') as mock_mb,
             patch('feishu_stack.modules.operations.stack_actions.provider_switch.switch_provider') as mock_sp,
             patch('feishu_stack.modules.operations.stack_actions.openclaw.start') as mock_oc,
-            patch('feishu_stack.modules.operations.stack_actions.codex_agent.start') as mock_ca,
+            patch('feishu_stack.modules.operations.stack_actions.codex_agent.restart') as mock_ca,
             patch('feishu_stack.modules.operations.stack_actions.typing_indicator.start') as mock_ti,
         ):
             mock_mb.return_value = OperationResult(True, 'moonbridge', 'start', 'ok')
@@ -74,6 +74,45 @@ class StackActionsStartMoonbridgeTests(unittest.TestCase):
             result = start_moonbridge(cfg)
             self.assertTrue(result.ok)
             self.assertEqual(result.action, 'start-moonbridge')
+            mock_sp.assert_called_once_with('moonbridge', cfg, target='agent')
+
+
+class StackActionsSwitchAgentProviderTests(unittest.TestCase):
+    def test_switch_restarts_running_codex_agent(self):
+        with (
+            patch('feishu_stack.modules.operations.stack_actions.provider_switch.switch_provider') as mock_sp,
+            patch('feishu_stack.modules.operations.stack_actions.read_pid', return_value=123),
+            patch('feishu_stack.modules.operations.stack_actions.process_info', return_value=(True, 'node.exe')),
+            patch('feishu_stack.modules.operations.stack_actions.codex_agent.restart') as mock_restart,
+        ):
+            mock_sp.return_value = OperationResult(True, 'codex-provider-agent', 'switch-moonbridge', 'switched')
+            mock_restart.return_value = OperationResult(True, 'codex-agent', 'restart', 'restarted')
+
+            from feishu_stack.modules.operations.stack_actions import switch_agent_provider
+            cfg = MagicMock()
+            result = switch_agent_provider('moonbridge', cfg, moonbridge_model='bridge', reasoning_effort='xhigh')
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.action, 'switch-agent-moonbridge')
+            mock_sp.assert_called_once_with('moonbridge', cfg, moonbridge_model='bridge', reasoning_effort='xhigh', target='agent')
+            mock_restart.assert_called_once_with(cfg)
+
+    def test_switch_does_not_start_stopped_codex_agent(self):
+        with (
+            patch('feishu_stack.modules.operations.stack_actions.provider_switch.switch_provider') as mock_sp,
+            patch('feishu_stack.modules.operations.stack_actions.read_pid', return_value=None),
+            patch('feishu_stack.modules.operations.stack_actions.process_info', return_value=(False, None)),
+            patch('feishu_stack.modules.operations.stack_actions.codex_agent.restart') as mock_restart,
+        ):
+            mock_sp.return_value = OperationResult(True, 'codex-provider-agent', 'switch-native', 'switched')
+
+            from feishu_stack.modules.operations.stack_actions import switch_agent_provider
+            cfg = MagicMock()
+            result = switch_agent_provider('native', cfg)
+
+            self.assertTrue(result.ok)
+            self.assertIn('next start', result.message)
+            mock_restart.assert_not_called()
 
 
 class StackActionsStopTests(unittest.TestCase):

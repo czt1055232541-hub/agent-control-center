@@ -35,6 +35,8 @@
     "dir": "C:\\path\\to\\agent-control-center\\agent-runtime\\agents\\feishu-codex-agent",
     "entry": "dist\\src\\index.js",
     "provider": "codex",
+    "codexHome": "C:\\path\\to\\agent-control-center\\agent-runtime\\codex-home",
+    "codexConfig": "C:\\path\\to\\agent-control-center\\agent-runtime\\codex-home\\config.toml",
     "codexAgentArgs": "exec --skip-git-repo-check",
     "larkCliBin": "C:\\path\\to\\lark-cli.exe",
     "larkCliHome": "C:\\path\\to\\lark-cli-home",

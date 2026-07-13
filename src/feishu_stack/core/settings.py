@@ -243,6 +243,8 @@ class AgentSettings:
     dir: Path
     entry: Path
     provider: str
+    codex_home: Path
+    codex_config: Path
     codex_agent_args: str
     lark_cli_bin: Path
     lark_cli_home: Path | None
@@ -281,6 +283,8 @@ class StackConfig:
     openclaw_port: int
     agent_dir: Path
     agent_entry: Path
+    agent_codex_home: Path
+    agent_codex_config: Path
     lark_cli_bin: Path
     runtime_dir: Path
     log_dir: Path
@@ -352,6 +356,8 @@ class StackConfig:
                 dir=self.agent_dir,
                 entry=self.agent_entry,
                 provider=str(agent_settings.get("provider") or "codex"),
+                codex_home=self.agent_codex_home,
+                codex_config=self.agent_codex_config,
                 codex_agent_args=str(agent_settings.get("codexAgentArgs") or "exec --skip-git-repo-check"),
                 lark_cli_bin=self.lark_cli_bin,
                 lark_cli_home=self.lark_cli_home,
@@ -478,6 +484,8 @@ def load_config(path: Path | None = None) -> StackConfig:
         openclaw_port=configured_port,
         agent_dir=Path(agent["dir"]),
         agent_entry=Path(agent["dir"]) / agent["entry"],
+        agent_codex_home=Path(agent.get("codexHome") or (stack_root / "agent-runtime" / "codex-home")),
+        agent_codex_config=Path(agent.get("codexConfig") or (Path(agent.get("codexHome") or (stack_root / "agent-runtime" / "codex-home")) / "config.toml")),
         lark_cli_bin=Path(agent["larkCliBin"]),
         lark_cli_home=Path(agent["larkCliHome"]) if agent.get("larkCliHome") else infer_lark_cli_home(Path(agent["larkCliBin"]), stack_root),
         runtime_dir=Path(runtime["dir"]),

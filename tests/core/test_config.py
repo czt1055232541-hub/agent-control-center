@@ -63,6 +63,8 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.migration_summary_dir.name, "summaries")
         self.assertEqual(config.codex.native_model, "gpt-5.5")
         self.assertEqual(config.agent.codex_agent_args, "exec --skip-git-repo-check")
+        self.assertEqual(config.agent.codex_home, config.stack_root / "agent-runtime" / "codex-home")
+        self.assertEqual(config.agent.codex_config, config.stack_root / "agent-runtime" / "codex-home" / "config.toml")
         self.assertEqual(config.moonbridge.base_url, "http://127.0.0.1:38440/v1")
 
     def test_resolve_codex_bin_prefers_app_managed_cli_path(self) -> None:

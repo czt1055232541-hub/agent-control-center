@@ -26,6 +26,8 @@ def _fake_config(**overrides):
     c.lark_cli_home = Path(tempfile.gettempdir()) / '.home'
     c.agent = SimpleNamespace(
         provider="codex",
+        codex_home=Path(tempfile.gettempdir()) / 'agent-codex',
+        codex_config=Path(tempfile.gettempdir()) / 'agent-codex' / 'config.toml',
         codex_agent_args="exec --skip-git-repo-check",
         lark_bot_open_id="",
         a2a_bots=[],
@@ -116,6 +118,7 @@ class CodexAgentEnvTests(unittest.TestCase):
 
         self.assertEqual(env['CODEX_CLI_BIN'], r'C:\Codex\current\codex.exe')
         self.assertEqual(env['CODEX_CLI_PATH'], r'C:\Codex\current\codex.exe')
+        self.assertEqual(env['CODEX_HOME'], str(cfg.agent.codex_home))
         self.assertEqual(env['HOME'], str(cfg.lark_cli_home))
         self.assertEqual(env['LARK_CLI_CWD'], str(cfg.stack_root))
         self.assertNotIn('OPENCLAW_HOME', env)
@@ -141,6 +144,7 @@ class CodexAgentStartTests(unittest.TestCase):
         with (
             patch('feishu_stack.modules.model_provider.codex_agent.read_pid', return_value=None),
             patch('feishu_stack.modules.model_provider.codex_agent.process_info', return_value=(False, None)),
+            patch('feishu_stack.modules.model_provider.codex_agent.codex_config._bootstrap_agent_config'),
             patch('feishu_stack.modules.model_provider.codex_agent._build_if_needed', return_value=(False, 'build error')),
         ):
             from feishu_stack.modules.model_provider.codex_agent import start
@@ -153,6 +157,7 @@ class CodexAgentStartTests(unittest.TestCase):
         with (
             patch('feishu_stack.modules.model_provider.codex_agent.read_pid', return_value=None),
             patch('feishu_stack.modules.model_provider.codex_agent.process_info', side_effect=[(False, None), (True, 'node.exe')]),
+            patch('feishu_stack.modules.model_provider.codex_agent.codex_config._bootstrap_agent_config'),
             patch('feishu_stack.modules.model_provider.codex_agent._build_if_needed', return_value=(True, 'built')),
             patch('feishu_stack.modules.model_provider.codex_agent.start_process') as mock_sp,
             patch('feishu_stack.modules.model_provider.codex_agent.write_pid'),
@@ -167,6 +172,7 @@ class CodexAgentStartTests(unittest.TestCase):
             env = mock_sp.call_args.kwargs['env']
             self.assertEqual(env['CODEX_CLI_BIN'], str(cfg.codex_bin))
             self.assertEqual(env['CODEX_CLI_PATH'], str(cfg.codex_bin))
+            self.assertEqual(env['CODEX_HOME'], str(cfg.agent.codex_home))
             self.assertNotIn('OPENCLAW_HOME', env)
 
     def test_start_exits_during_startup(self):
@@ -174,6 +180,7 @@ class CodexAgentStartTests(unittest.TestCase):
         with (
             patch('feishu_stack.modules.model_provider.codex_agent.read_pid', return_value=None),
             patch('feishu_stack.modules.model_provider.codex_agent.process_info', side_effect=[(False, None), (False, None)]),
+            patch('feishu_stack.modules.model_provider.codex_agent.codex_config._bootstrap_agent_config'),
             patch('feishu_stack.modules.model_provider.codex_agent._build_if_needed', return_value=(True, 'built')),
             patch('feishu_stack.modules.model_provider.codex_agent.start_process') as mock_sp,
             patch('feishu_stack.modules.model_provider.codex_agent.write_pid'),

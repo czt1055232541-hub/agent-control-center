@@ -45,6 +45,8 @@ def make_config(tmp_path: Path) -> StackConfig:
         openclaw_port=18789,
         agent_dir=stack_root / "agent",
         agent_entry=stack_root / "agent" / "dist" / "src" / "index.js",
+        agent_codex_home=stack_root / "agent-codex",
+        agent_codex_config=stack_root / "agent-codex" / "config.toml",
         lark_cli_bin=stack_root / "bin" / "lark-cli.cmd",
         lark_cli_home=stack_root / ".home",
         runtime_dir=runtime_dir,

@@ -42,11 +42,14 @@ class CodexDesktopStatus:
 @dataclass
 class StackStatus:
     codex: ProviderStatus
+    codex_app: ProviderStatus
+    codex_agent_provider: ProviderStatus
     openclaw: ComponentStatus
     moonbridge: ComponentStatus
     codex_agent: ComponentStatus
     codex_agent_args: str
     codex_agent_follows_global_config: bool
+    codex_agent_config_scope: str
     codex_desktop_running: bool
     codex_desktop: CodexDesktopStatus
     stack_root: str
