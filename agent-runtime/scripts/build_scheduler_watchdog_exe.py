@@ -5,9 +5,10 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+STACK_ROOT = REPO_ROOT.parent
 ENTRY = REPO_ROOT / "scripts" / "scheduler_watchdog.py"
-DIST = REPO_ROOT / "runtime" / "tools"
-BUILD = REPO_ROOT / "runtime" / "build" / "scheduler-watchdog"
+DIST = STACK_ROOT / "runtime" / "tools"
+BUILD = STACK_ROOT / "runtime" / "build" / "scheduler-watchdog"
 
 
 def main() -> int:

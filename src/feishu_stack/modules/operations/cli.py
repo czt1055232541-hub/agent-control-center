@@ -13,6 +13,7 @@ from feishu_stack.modules.operations import typing_indicator
 from feishu_stack.modules.backup_migration import backups
 from feishu_stack.modules.logs_diagnostics import diagnostics
 from feishu_stack.modules.operations import control_center, stack_actions
+from feishu_stack.modules.operations import agent_workflows
 from feishu_stack.core.settings import load_config
 from feishu_stack.core.models import OperationResult, to_dict
 from feishu_stack.core.status import get_status
@@ -109,6 +110,12 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("stop-control-center", help="Stop Control Center API.")
     subcommands.add_parser("status-control-center", help="Show Control Center status.")
     subcommands.add_parser("install-shortcut", help="Install desktop shortcut command.")
+    watchdog = subcommands.add_parser("watchdog", help="Manage scheduler watchdogs through the unified runtime.")
+    watchdog.add_argument("action", choices=["start", "stop", "status"])
+    watchdog.add_argument("arguments", nargs=argparse.REMAINDER)
+    a2a = subcommands.add_parser("a2a", help="Synchronize or probe the Feishu multi-agent workflow.")
+    a2a.add_argument("action", choices=["sync", "probe"])
+    a2a.add_argument("arguments", nargs=argparse.REMAINDER)
     return parser
 
 
@@ -169,6 +176,23 @@ def main(argv: list[str] | None = None) -> int:
             result = control_center.install_shortcut()
             _print(result, args.json)
             return 0 if result.ok else 1
+        if args.command == "watchdog":
+            if args.action == "status":
+                _print(agent_workflows.watchdog_status(), args.json)
+                return 0
+            completed = agent_workflows.run_script(agent_workflows.WATCHDOG_SCRIPTS[args.action], args.arguments)
+            if completed.stdout:
+                print(completed.stdout, end="" if completed.stdout.endswith("\n") else "\n")
+            if completed.stderr:
+                print(completed.stderr, file=sys.stderr, end="" if completed.stderr.endswith("\n") else "\n")
+            return completed.returncode
+        if args.command == "a2a":
+            completed = agent_workflows.run_script(agent_workflows.A2A_SCRIPTS[args.action], args.arguments)
+            if completed.stdout:
+                print(completed.stdout, end="" if completed.stdout.endswith("\n") else "\n")
+            if completed.stderr:
+                print(completed.stderr, file=sys.stderr, end="" if completed.stderr.endswith("\n") else "\n")
+            return completed.returncode
     except Exception as exc:
         if args.json:
             print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False, indent=2))

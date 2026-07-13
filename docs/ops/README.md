@@ -1,6 +1,6 @@
 # ACC 运维文档
 
-ACC 是控制面，`{FEISHU_AGENT_ROOT}` 是独立运行面；两者保持独立 Git 历史和 runtime 目录。
+ACC 与飞书 Agent 已合并为单仓：控制面位于 `src/web`，飞书运行面位于 `agent-runtime`，共用根配置与 runtime。原飞书仓库只作为一个发布周期内的回滚源。
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)：组件、端口和边界
 - [STARTUP.md](STARTUP.md)：唯一启动、停止和状态命令
@@ -12,4 +12,4 @@ ACC 是控制面，`{FEISHU_AGENT_ROOT}` 是独立运行面；两者保持独立
 - [COMPATIBILITY.md](COMPATIBILITY.md)：旧入口与退役条件
 - [BASELINE-2026-07-13.md](BASELINE-2026-07-13.md)：本轮实施基线
 
-文档变量：`{ACC_ROOT}` 为控制中心仓库，`{FEISHU_AGENT_ROOT}` 为飞书 Agent 仓库。
+文档变量：`{ACC_ROOT}` 为单仓根目录，`{PROJECTS_ROOT}` 为保持外置的项目工作区。

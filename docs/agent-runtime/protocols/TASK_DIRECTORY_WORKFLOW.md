@@ -2,9 +2,9 @@
 
 ## Canonical Files
 
-- Task directory: `F:\1AI\feishu_agent\projects\task_directory.json`
-- Legacy archive index: `F:\1AI\feishu_agent\projects\projects_index.json`
-- Default project root: `F:\1AI\feishu_agent\projects\`
+- Task directory: `{PROJECTS_ROOT}/task_directory.json`
+- Legacy archive index: `{PROJECTS_ROOT}/projects_index.json`
+- Default project root: `{PROJECTS_ROOT}`
 
 `task_directory.json` is the source of truth for active task entries shown in Agent Control Center. `projects_index.json` remains an archive compatibility source and must not be treated as the only task list.
 

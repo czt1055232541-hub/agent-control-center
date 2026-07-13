@@ -451,13 +451,11 @@ def shared_config_status(check_runtime: bool = Query(default=False)) -> dict:
     primary_path = resolve_settings_path()
     primary = load_json_object(primary_path)
     validation = validate_shared_config(primary, check_runtime=check_runtime)
-    peer_path = Path(
-        os.environ.get("FEISHU_AGENT_SETTINGS_PATH")
-        or primary_path.parents[2] / "feishu_agent" / "config" / "stack.settings.json"
-    )
+    explicit_peer = os.environ.get("FEISHU_AGENT_SETTINGS_PATH")
+    peer_path = Path(explicit_peer) if explicit_peer else None
     drift: list[dict] = []
-    peer_status = "not_found"
-    if peer_path.exists():
+    peer_status = "merged" if (find_stack_root(Path(__file__)) / "agent-runtime").exists() and peer_path is None else "not_found"
+    if peer_path is not None and peer_path.exists():
         try:
             peer = load_json_object(peer_path)
             drift = compare_shared_config(primary, peer)

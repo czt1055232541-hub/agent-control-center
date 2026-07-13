@@ -39,6 +39,10 @@ export class MessageHandler {
       return;
     }
     injectBotSenderInfo(event, this.config);
+    if (isA2AResultNotification(event, this.config)) {
+      infoLog(`ignored A2A result notification message_id=${event.messageId}`);
+      return;
+    }
     const respond = shouldRespond(event, this.config);
     infoLog(
       `event message_id=${event.messageId} chat_id=${event.chatId} chat_type=${event.chatType ?? "unknown"} sender_type=${event.sender.senderType ?? "unknown"} respond=${respond} text=${preview(event.plainText)}`
@@ -119,7 +123,7 @@ export class MessageHandler {
      return "";
    }
    await this.startTypingReaction(messageId, generation);
-    const progress = { stop: () => undefined };
+    const progress = this.startProgressReporter(chatId, route, generation);
    try {
      const agentText = sanitizeAgentText(await draftAgentResponse(this.config, route));
       this.recordCodexUsageCooldownIfNeeded(agentText);
@@ -286,6 +290,7 @@ export class MessageHandler {
     const mentionPattern = buildMentionPattern(this.config.a2aBots);
     const elements: LarkPostElement[] = [];
     let cursor = 0;
+    let convertedMention = false;
     for (const match of value.matchAll(mentionPattern)) {
       const matchText = match[0];
       const index = match.index ?? 0;
@@ -293,8 +298,11 @@ export class MessageHandler {
         elements.push({ tag: "text", text: value.slice(cursor, index) });
       }
       const bot = resolveMentionBot(matchText, this.config.a2aBots);
-      if (bot) {
+      if (bot && !convertedMention) {
         elements.push({ tag: "at", user_id: bot.openId, user_name: bot.name });
+        convertedMention = true;
+      } else if (bot) {
+        elements.push({ tag: "text", text: neutralizedMentionText(matchText, bot) });
       } else {
         elements.push({ tag: "text", text: matchText });
       }
@@ -606,6 +614,11 @@ function injectBotSenderInfo(event: FeishuMessageEvent, config: AppConfig): void
   }
   const senderLabel = `[\u6765\u81ea\u673a\u5668\u4eba\u300c${senderBot.name}\u300d\u2014 \u5982\u9700 @ \u56de\u5bf9\u65b9\u8bf7\u5199\uff1a@${senderBot.name}]\n\n`;
   event.plainText = senderLabel + event.plainText;
+}
+
+function isA2AResultNotification(event: FeishuMessageEvent, config: AppConfig): boolean {
+  const senderIsA2ABot = Boolean(event.sender.openId && config.a2aBots.some((bot) => bot.openId === event.sender.openId));
+  return senderIsA2ABot && /^\s*\[(?:结果回传|仅通知)\]/.test(event.plainText);
 }
 
 function preview(value: string, max = 160): string {

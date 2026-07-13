@@ -287,6 +287,7 @@ class StackConfig:
     pid_dir: Path
     app_id: str = ""
     app_name: str = ""
+    projects_root: Path | None = None
     lark_cli_home: Path | None = None
     summary_dir: Path | None = None
     watchdog_state_dir: Path | None = None
@@ -484,6 +485,7 @@ def load_config(path: Path | None = None) -> StackConfig:
         pid_dir=Path(runtime["pids"]),
         app_id=str(raw.get("appId") or raw.get("app_id") or ""),
         app_name=str(raw.get("appName") or raw.get("app_name") or ""),
+        projects_root=Path(raw["projectsRoot"]) if raw.get("projectsRoot") else None,
         summary_dir=Path(runtime.get("summaries") or Path(runtime["dir"]) / "summaries"),
         watchdog_state_dir=Path(agent.get("watchdogStateDir") or raw["watchdogStateDir"]) if (agent.get("watchdogStateDir") or raw.get("watchdogStateDir")) else None,
     )

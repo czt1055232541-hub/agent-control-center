@@ -102,7 +102,7 @@ These scripts should read local ignored config and should not hardcode real IDs.
 Path:
 
 ```text
-F:\1AI\feishu_agent\agents\feishu-codex-agent\SKILL.md
+{ACC_ROOT}/agent-runtime/agents/feishu-codex-agent/SKILL.md
 ```
 
 Keep these rules explicit:
@@ -130,7 +130,7 @@ GIT_PRIVACY_POLICY.md
 If stored under OpenClaw, place them in a shared workspace folder and reference them from each agent's identity/skill files. If stored in this repo, keep them under:
 
 ```text
-F:\1AI\feishu_agent\docs\protocols\
+{ACC_ROOT}/docs/agent-runtime/protocols/
 ```
 
 #### B1. `A2A_MENTION_PROTOCOL.md`
@@ -392,7 +392,7 @@ Validation:
 
 ## Open Questions
 
-- Should shared protocols live primarily in `F:\1AI\feishu_agent\docs\protocols\` and be copied into OpenClaw workspaces, or should OpenClaw read them directly from a shared path?
+- Shared protocols live in `{ACC_ROOT}/docs/agent-runtime/protocols/` and are synchronized to OpenClaw workspaces by the root CLI.
 - Should OpenClaw internal agent IDs be renamed from historical ids such as `orchestrator`, or kept stable while only display names change?
 - Should the Feishu mention renderer use `A2A_BOTS` as the single canonical source for display name to group mention ID mapping?
 - Should typing status be added to codex-agent now, or kept as a later UX-only improvement after workflow stability?

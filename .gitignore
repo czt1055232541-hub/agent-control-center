@@ -21,6 +21,9 @@ runtime/pids/*
 !runtime/summaries/
 runtime/summaries/*
 !runtime/summaries/.gitkeep
+!runtime/watchdogs/
+runtime/watchdogs/*
+!runtime/watchdogs/.gitkeep
 .runtime/
 .appdata/
 .home/

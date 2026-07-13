@@ -17,10 +17,12 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-PUBLIC_STACK_CONFIG = REPO_ROOT / "config" / "stack.settings.json"
-AGENT_HOME = REPO_ROOT / ".home"
-WATCHDOG_DIR = REPO_ROOT / "runtime" / "watchdogs"
+AGENT_RUNTIME_ROOT = Path(__file__).resolve().parents[1]
+STACK_ROOT = AGENT_RUNTIME_ROOT.parent
+REPO_ROOT = STACK_ROOT
+PUBLIC_STACK_CONFIG = Path(os.environ.get("STACK_SETTINGS_PATH") or STACK_ROOT / "config" / "stack.settings.local.json")
+AGENT_HOME = AGENT_RUNTIME_ROOT / ".home"
+WATCHDOG_DIR = STACK_ROOT / "runtime" / "watchdogs"
 DEFAULT_CHAT_ID_ENV = "MULTIAGENT_DEFAULT_CHAT_ID"
 COORDINATOR_OPEN_ID_ENV = "MULTIAGENT_COORDINATOR_OPEN_ID"
 
@@ -77,7 +79,7 @@ def lark_cli_path() -> Path:
     configured = public_settings().get("agent", {}).get("larkCliBin")
     if configured:
         return Path(configured)
-    return REPO_ROOT / ".npm-global" / "node_modules" / "@larksuite" / "cli" / "bin" / "lark-cli.exe"
+    return AGENT_RUNTIME_ROOT / ".npm-global" / "node_modules" / "@larksuite" / "cli" / "bin" / "lark-cli.exe"
 
 
 def lark_env() -> dict[str, str]:
@@ -121,8 +123,8 @@ def build_prompt(task_id: str, task_text: str, elapsed_seconds: int, assignee: s
         "5. 下一步只调度一个 agent。"
         "如果任务仍在执行且未收到有效最终回报，本 watchdog 会继续周期性提醒；你必须确认仍有 active waiting watchdog。"
         "只有发现没有 active waiting watchdog 时，才立即调用 "
-        "`python scripts/start_scheduler_watchdog.py --task-id ... --assignee ... --phase ... --task-text ... --no-dispatch` 补开同一 TASK-ID 的 continuation watchdog；不要等待人工提醒。"
-        "如果已收到有效最终回报，你必须调用 `python scripts/stop_scheduler_watchdog.py --task-id ... --assignee ... --phase ...` 关闭 watchdog。"
+        "`python scripts/stack.py watchdog start --task-id ... --assignee ... --phase ... --task-text ... --no-dispatch` 补开同一 TASK-ID 的 continuation watchdog；不要等待人工提醒。"
+        "如果已收到有效最终回报，你必须调用 `python scripts/stack.py watchdog stop --task-id ... --assignee ... --phase ...` 关闭 watchdog。"
         f" 原任务摘要：{compact(task_text, 500)}"
     )
 

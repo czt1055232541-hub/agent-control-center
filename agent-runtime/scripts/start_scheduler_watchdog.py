@@ -13,10 +13,11 @@ from pathlib import Path
 
 from a2a_workflow_config import default_chat_id, require_role_open_id
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-LARK_CLI = REPO_ROOT / ".npm-global" / "node_modules" / "@larksuite" / "cli" / "bin" / "lark-cli.exe"
-AGENT_HOME = REPO_ROOT / ".home"
-SCRIPT = REPO_ROOT / "scripts" / "scheduler_watchdog.py"
+AGENT_RUNTIME_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = AGENT_RUNTIME_ROOT.parent
+LARK_CLI = AGENT_RUNTIME_ROOT / ".npm-global" / "node_modules" / "@larksuite" / "cli" / "bin" / "lark-cli.exe"
+AGENT_HOME = AGENT_RUNTIME_ROOT / ".home"
+SCRIPT = AGENT_RUNTIME_ROOT / "scripts" / "scheduler_watchdog.py"
 LOG_DIR = REPO_ROOT / "runtime" / "logs"
 WATCHDOG_DIR = REPO_ROOT / "runtime" / "watchdogs"
 

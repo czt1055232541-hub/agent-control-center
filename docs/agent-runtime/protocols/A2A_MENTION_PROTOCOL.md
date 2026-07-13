@@ -17,7 +17,7 @@
 - Only 项目调度官 may mention multiple agents in a handoff reply (for parallel task dispatch); all other agents must mention at most one agent.
 - Assignment or downstream reminder messages may only truly mention the current assignee; write the coordinator name without `@` when explaining where the assignee should report back.
 - If a delivered Feishu message has an empty `mentions` list after a supposed handoff, the handoff failed and must be retried after fixing the mapping or sender layer.
-- The coordinator must start each assignment with `python scripts/start_scheduler_watchdog.py --task-id ... --assignee ... --phase ... --task-text ...`; the script launches the watchdog only and must not send an assignment message by default.
+- The coordinator must start each assignment with `python scripts/stack.py watchdog start --task-id ... --assignee ... --phase ... --task-text ...`; the command launches the watchdog only and must not send an assignment message by default.
 - After the watchdog starts, the coordinator's final visible reply must contain the full assignment and a real `@assignee`; do not use user-identity dispatch unless a human explicitly requests `--dispatch-as-user` recovery.
 - Watchdog prompts are also sent as Feishu `post` messages with a real `at` element for 项目调度官.
 - Watchdogs run periodic coordinator checks until stopped. When a watchdog prompt fires and the downstream task is still running, 项目调度官 must confirm an active waiting watchdog exists; if none exists, start a continuation watchdog for the same TASK-ID in that same check turn.

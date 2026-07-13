@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
-from a2a_workflow_config import REPO_ROOT, collaboration_block, sanitized_inventory, team_table_markdown
+from a2a_workflow_config import REPO_ROOT, STACK_ROOT, collaboration_block, local_settings, sanitized_inventory, team_table_markdown
 
-OPENCLAW_ROOT = Path(r"E:\openclaw\clawclaw\.openclaw")
+OPENCLAW_HOME = Path(os.environ.get("OPENCLAW_HOME") or local_settings().get("openclaw", {}).get("home") or "openclaw")
+OPENCLAW_ROOT = OPENCLAW_HOME / ".openclaw"
 
 PROMPT_FILES = [
     REPO_ROOT / "agents" / "auditor" / "AGENT.md",
@@ -33,8 +35,8 @@ PROMPT_FILES = [
     OPENCLAW_ROOT / "skills" / "feishu-team-workflow" / "SKILL.md",
 ]
 
-PROTOCOL_FILE = REPO_ROOT / "docs" / "protocols" / "A2A_MENTION_PROTOCOL.md"
-INVENTORY_FILE = REPO_ROOT / "docs" / "protocols" / "A2A_WORKFLOW_LINKAGE.md"
+PROTOCOL_FILE = STACK_ROOT / "docs" / "agent-runtime" / "protocols" / "A2A_MENTION_PROTOCOL.md"
+INVENTORY_FILE = STACK_ROOT / "docs" / "agent-runtime" / "protocols" / "A2A_WORKFLOW_LINKAGE.md"
 
 
 def replace_collaboration_block(text: str) -> tuple[str, bool]:
@@ -112,7 +114,7 @@ def sync_protocol() -> bool:
             "- Only 项目调度官 may mention multiple agents in a handoff reply (for parallel task dispatch); all other agents must mention at most one agent.",
             "- Assignment or downstream reminder messages may only truly mention the current assignee; write the coordinator name without `@` when explaining where the assignee should report back.",
             "- If a delivered Feishu message has an empty `mentions` list after a supposed handoff, the handoff failed and must be retried after fixing the mapping or sender layer.",
-            "- The coordinator must start each assignment with `python scripts/start_scheduler_watchdog.py --task-id ... --assignee ... --phase ... --task-text ...`; the script launches the watchdog only and must not send an assignment message by default.",
+            "- The coordinator must start each assignment with `python scripts/stack.py watchdog start --task-id ... --assignee ... --phase ... --task-text ...`; the command launches the watchdog only and must not send an assignment message by default.",
             "- After the watchdog starts, the coordinator's final visible reply must contain the full assignment and a real `@assignee`; do not use user-identity dispatch unless a human explicitly requests `--dispatch-as-user` recovery.",
             "- Watchdog prompts are also sent as Feishu `post` messages with a real `at` element for 项目调度官.",
             "- Watchdogs run periodic coordinator checks until stopped. When a watchdog prompt fires and the downstream task is still running, 项目调度官 must confirm an active waiting watchdog exists; if none exists, start a continuation watchdog for the same TASK-ID in that same check turn.",
@@ -133,28 +135,28 @@ def sync_inventory() -> bool:
     active_files = {
         "source_config": inventory["source_of_truth"],
         "runtime_readers": [
-            str(REPO_ROOT / "scripts" / "a2a_workflow_config.py"),
-            str(REPO_ROOT / "scripts" / "print_a2a_bots_env.py"),
-            str(REPO_ROOT / "scripts" / "scheduler_watchdog.py"),
-            str(REPO_ROOT / "scripts" / "lark_multiagent_probe.py"),
+            "{ACC_ROOT}/agent-runtime/scripts/a2a_workflow_config.py",
+            "{ACC_ROOT}/agent-runtime/scripts/print_a2a_bots_env.py",
+            "{ACC_ROOT}/agent-runtime/scripts/scheduler_watchdog.py",
+            "{ACC_ROOT}/agent-runtime/scripts/lark_multiagent_probe.py",
         ],
-        "sync_tool": str(REPO_ROOT / "scripts" / "sync_a2a_workflow_files.py"),
+        "sync_tool": "python scripts/stack.py a2a sync",
         "watchdog_tools": [
-            str(REPO_ROOT / "scripts" / "start_scheduler_watchdog.py"),
-            str(REPO_ROOT / "scripts" / "stop_scheduler_watchdog.py"),
+            "python scripts/stack.py watchdog start",
+            "python scripts/stack.py watchdog stop",
         ],
-        "gateway_entry": str(OPENCLAW_ROOT / "gateway.cmd"),
-        "feishu_sender": str(OPENCLAW_ROOT / "npm" / "projects" / "openclaw-feishu-dc69f44688" / "node_modules" / "@openclaw" / "feishu" / "dist" / "send-B3kteMF8.js"),
-        "bot_chat_plugin": str(OPENCLAW_ROOT / "npm" / "projects" / "feishu-bot-chat" / "node_modules" / "feishu-bot-chat" / "index.js"),
-        "generated_prompt_files": [str(path) for path in PROMPT_FILES if path.exists()],
-        "protocol": str(PROTOCOL_FILE),
-        "operator_readme": str(REPO_ROOT / "README.md"),
-        "this_inventory": str(INVENTORY_FILE),
+        "gateway_entry": "{OPENCLAW_HOME}/.openclaw/gateway.cmd",
+        "feishu_sender": "{OPENCLAW_HOME}/.openclaw/npm/projects/openclaw-feishu/node_modules/@openclaw/feishu/dist/send.js",
+        "bot_chat_plugin": "{OPENCLAW_HOME}/.openclaw/npm/projects/feishu-bot-chat/node_modules/feishu-bot-chat/index.js",
+        "generated_prompt_files": [str(path.relative_to(STACK_ROOT)).replace("\\", "/") if path.is_relative_to(STACK_ROOT) else "{OPENCLAW_HOME}/" + path.name for path in PROMPT_FILES if path.exists()],
+        "protocol": "{ACC_ROOT}/docs/agent-runtime/protocols/A2A_MENTION_PROTOCOL.md",
+        "operator_readme": "{ACC_ROOT}/docs/agent-runtime/README.md",
+        "this_inventory": "{ACC_ROOT}/docs/agent-runtime/protocols/A2A_WORKFLOW_LINKAGE.md",
     }
     text = [
         "# A2A Workflow Linkage",
         "",
-        "This file is generated by `python scripts/sync_a2a_workflow_files.py`.",
+        "This file is generated by `python scripts/stack.py a2a sync`.",
         "",
         "## Single Source",
         "",
@@ -171,7 +173,7 @@ def sync_inventory() -> bool:
         "## Change Procedure",
         "",
         "1. Update the local Agent Control Center settings.",
-        "2. Run `python scripts/sync_a2a_workflow_files.py`.",
+        "2. Run `python scripts/stack.py a2a sync`.",
         "3. Restart the OpenClaw gateway so `OPENCLAW_FEISHU_A2A_BOTS` is regenerated.",
         "4. Verify with a Feishu post whose delivered `mentions` contains the target role.",
         "",

@@ -8,7 +8,7 @@
     "role": "任务拆解 / Agent 调度",
     "runtime": "openclaw-agent",
     "model": "deepseek-v4-flash",
-    "workspace": "F:\\1AI\\Agent control center\\workspaces\\coordinator",
+    "workspace": ".",
     "skillRoots": {
       "openclaw": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills",
       "codex": "E:\\codeX\\skills"

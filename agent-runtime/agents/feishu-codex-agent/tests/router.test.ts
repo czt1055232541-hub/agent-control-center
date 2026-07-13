@@ -440,8 +440,12 @@ test("handler starts and stops typing status around agent reply", async () => {
     a2aRelay: { enabled: false }
   };
   const fakeLark = {
-    addTypingReaction: async (_chatId: string, status: "Started" | "Stopped") => {
-      statuses.push(status);
+    addTypingReaction: async () => {
+      statuses.push("Started");
+      return { ok: true, code: 0, stdout: JSON.stringify({ data: { reaction_id: "reaction-1" } }), stderr: "" };
+    },
+    removeTypingReaction: async () => {
+      statuses.push("Stopped");
       return { ok: true, code: 0, stdout: "", stderr: "" };
     },
     sendText: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
@@ -492,8 +496,12 @@ test("handler suppresses stale replies when a newer chat request finishes first"
     a2aRelay: { enabled: false }
   };
   const fakeLark = {
-    addTypingReaction: async (_chatId: string, status: "Started" | "Stopped") => {
-      statuses.push(status);
+    addTypingReaction: async () => {
+      statuses.push("Started");
+      return { ok: true, code: 0, stdout: JSON.stringify({ data: { reaction_id: "reaction-1" } }), stderr: "" };
+    },
+    removeTypingReaction: async () => {
+      statuses.push("Stopped");
       return { ok: true, code: 0, stdout: "", stderr: "" };
     },
     sendText: async (_chatId: string, text: string) => {
@@ -536,7 +544,7 @@ test("handler suppresses stale replies when a newer chat request finishes first"
     "[代码执行官处理中] 已收到任务，开始执行。本条是进度提示；最终结果完成后再按协作流程回报项目调度官。",
     "FAST_RESPONSE_FROM_TEST"
   ]);
-  assert.deepEqual(statuses, ["Started", "Started", "Stopped"]);
+  assert.deepEqual(statuses, ["Started", "Stopped", "Started", "Stopped"]);
 });
 
 test("codex progress reporter sends only the first status message", async () => {
@@ -814,7 +822,7 @@ test("handler converts only the first A2A mention in a final reply", async () =>
   assert.ok(elements.some((item) => item.text?.includes("＠质量审计官")));
 });
 
-test("A2A result handoff does not trigger a second bot mention", async () => {
+test("A2A result handoff does not trigger a second bot reply", async () => {
   const sent: Array<{ chatId: string; content?: unknown; text?: string }> = [];
   const config = {
     ...getConfig(),
@@ -854,10 +862,7 @@ test("A2A result handoff does not trigger a second bot mention", async () => {
       }
     }
   });
-  assert.equal(sent.length, 1);
-  assert.equal(sent[0].chatId, "oc_group");
-  assert.notEqual(sent[0].text, undefined);
-  assert.equal(sent[0].content, undefined);
+  assert.equal(sent.length, 0);
 });
 
 test("long replies are persisted and shortened before sending to Feishu", async () => {
