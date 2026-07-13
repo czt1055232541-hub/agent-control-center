@@ -80,7 +80,7 @@ def test_openclaw_open_ui_uses_python_startfile(monkeypatch, tmp_path) -> None:
     assert calls == ["http://127.0.0.1:18789/#token=secret-token"]
 
 
-def test_gateway_command_uses_hidden_runtime_wrapper(tmp_path) -> None:
+def test_gateway_node_commands_strip_cmd_start_and_legacy_env(tmp_path) -> None:
     cfg = _config(tmp_path)
     cfg.openclaw_gateway_cmd.parent.mkdir(parents=True)
     cfg.openclaw_gateway_cmd.write_text(
@@ -95,10 +95,18 @@ def test_gateway_command_uses_hidden_runtime_wrapper(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    command = openclaw._gateway_command(cfg)
-    wrapper = Path(command[-1])
-    text = wrapper.read_text(encoding="utf-8")
+    commands = openclaw._gateway_node_commands(cfg)
 
-    assert wrapper == cfg.runtime_dir / "openclaw" / "gateway.hidden.cmd"
-    assert 'start "" /B E:\\node\\node.exe' in text
-    assert "feishu_agent" not in text
+    assert commands == [
+        r"E:\node\node.exe E:\openclaw\clawclaw\.openclaw\proxy.js",
+        r"E:\node\node.exe E:\openclaw\npm\node_modules\openclaw\dist\index.js gateway --port 18790",
+    ]
+    assert all("feishu_agent" not in command for command in commands)
+
+
+def test_internal_gateway_port_is_read_from_cmd(tmp_path) -> None:
+    cfg = _config(tmp_path)
+    cfg.openclaw_gateway_cmd.parent.mkdir(parents=True)
+    cfg.openclaw_gateway_cmd.write_text('set "OPENCLAW_GATEWAY_PORT=18790"\n', encoding="utf-8")
+
+    assert openclaw._internal_gateway_port(cfg) == 18790

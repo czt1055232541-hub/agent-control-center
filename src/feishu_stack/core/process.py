@@ -141,7 +141,7 @@ def component_status(name: str, port: int | None, pid_file: Path | None) -> Comp
 
 
 def start_process(
-    command: list[str],
+    command: list[str] | str,
     cwd: Path,
     stdout_log: Path,
     stderr_log: Path,

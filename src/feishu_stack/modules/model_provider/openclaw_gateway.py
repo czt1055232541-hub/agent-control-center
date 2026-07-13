@@ -201,6 +201,50 @@ def _hidden_gateway_wrapper(cfg: StackConfig) -> Path:
     return wrapper
 
 
+def _strip_cmd_start(line: str) -> str:
+    text = line.strip()
+    text = re.sub(r'^\s*start\s+"[^"]*"\s+', "", text, count=1, flags=re.IGNORECASE)
+    text = re.sub(r"^\s*/(?:B|MIN)\s+", "", text, count=1, flags=re.IGNORECASE)
+    return text.strip()
+
+
+def _gateway_node_commands(cfg: StackConfig) -> list[str]:
+    if not cfg.openclaw_gateway_cmd.exists():
+        return []
+    source = cfg.openclaw_gateway_cmd.read_text(encoding="utf-8", errors="replace")
+    commands: list[str] = []
+    for raw_line in source.splitlines():
+        line = raw_line.strip()
+        lower = line.lower()
+        if not line or lower.startswith(("rem ", "::", "@echo", "set ", "for ")):
+            continue
+        if "print_a2a_bots_env.py" in line:
+            continue
+        line = _strip_cmd_start(line)
+        lower = line.lower()
+        if "node" not in lower:
+            continue
+        if "proxy.js" in lower or ("openclaw" in lower and " gateway" in lower):
+            commands.append(line)
+    return commands
+
+
+def _internal_gateway_pid_file(cfg: StackConfig) -> Path:
+    return cfg.pid_dir / "openclaw-gateway-internal.pid"
+
+
+def _internal_gateway_port(cfg: StackConfig) -> int | None:
+    if cfg.openclaw_gateway_cmd.exists():
+        source = cfg.openclaw_gateway_cmd.read_text(encoding="utf-8", errors="replace")
+        match = re.search(r"\bOPENCLAW_GATEWAY_PORT\s*=\s*(\d+)", source)
+        if match:
+            return int(match.group(1))
+        match = re.search(r"\bgateway\s+--port\s+(\d+)", source, flags=re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+    return None
+
+
 def _gateway_command(cfg: StackConfig) -> list[str]:
     command_file = _hidden_gateway_wrapper(cfg) if os.name == "nt" and cfg.openclaw_gateway_cmd.exists() else cfg.openclaw_gateway_cmd
     return ["cmd.exe", "/d", "/c", str(command_file)]
@@ -222,23 +266,52 @@ def start(config: StackConfig | None = None) -> OperationResult:
         env.pop(proxy_key, None)
     if cfg.openclaw.a2a_bots:
         env["OPENCLAW_FEISHU_A2A_BOTS"] = json.dumps(cfg.openclaw.a2a_bots, ensure_ascii=False)
-    proc = start_process(
-        _gateway_command(cfg),
-        cwd=cfg.openclaw_home,
-        stdout_log=cfg.openclaw_stdout_log,
-        stderr_log=cfg.openclaw_stderr_log,
-        env=env,
-    )
+    node_commands = _gateway_node_commands(cfg) if os.name == "nt" else []
+    processes = []
+    if node_commands:
+        for command in node_commands:
+            processes.append(
+                (
+                    command,
+                    start_process(
+                        command,
+                        cwd=cfg.openclaw_home,
+                        stdout_log=cfg.openclaw_stdout_log,
+                        stderr_log=cfg.openclaw_stderr_log,
+                        env=env,
+                    ),
+                )
+            )
+    else:
+        processes.append(
+            (
+                " ".join(_gateway_command(cfg)),
+                start_process(
+                    _gateway_command(cfg),
+                    cwd=cfg.openclaw_home,
+                    stdout_log=cfg.openclaw_stdout_log,
+                    stderr_log=cfg.openclaw_stderr_log,
+                    env=env,
+                ),
+            )
+        )
     ready = wait_for_port(cfg.openclaw_port, True, timeout=480)
     port_pids = pids_by_port(cfg.openclaw_port) if ready else []
-    write_pid(cfg.pid_openclaw, port_pids[0] if port_pids else proc.pid)
+    proxy_proc = next((proc for command, proc in processes if "proxy.js" in command.lower()), processes[0][1])
+    write_pid(cfg.pid_openclaw, port_pids[0] if port_pids else proxy_proc.pid)
+    internal_port = _internal_gateway_port(cfg)
+    if internal_port:
+        internal_ready = wait_for_port(internal_port, True, timeout=30)
+        internal_pids = pids_by_port(internal_port) if internal_ready else []
+        gateway_proc = next((proc for command, proc in processes if " gateway" in command.lower()), processes[-1][1])
+        write_pid(_internal_gateway_pid_file(cfg), internal_pids[0] if internal_pids else gateway_proc.pid)
     duration = int((time.monotonic() - started) * 1000)
     return OperationResult(
         ok=ready,
         component="openclaw",
         action="start",
         message="OpenClaw Gateway started." if ready else "OpenClaw Gateway did not become ready.",
-        pid=port_pids[0] if port_pids else proc.pid,
+        pid=port_pids[0] if port_pids else proxy_proc.pid,
         port=cfg.openclaw_port,
         stdout_log=str(cfg.openclaw_stdout_log),
         stderr_log=str(cfg.openclaw_stderr_log),
@@ -248,12 +321,24 @@ def start(config: StackConfig | None = None) -> OperationResult:
 
 def stop(config: StackConfig | None = None) -> OperationResult:
     cfg = config or load_config()
-    return stop_component(
+    result = stop_component(
         component="openclaw",
         pid_file=cfg.pid_openclaw,
         port=cfg.openclaw_port,
-        expected_process_markers=("openclaw", "gateway.cmd"),
+        expected_process_markers=("proxy.js",),
     )
+    internal_port = _internal_gateway_port(cfg)
+    if internal_port:
+        internal = stop_component(
+            component="openclaw-internal",
+            pid_file=_internal_gateway_pid_file(cfg),
+            port=internal_port,
+            expected_process_markers=("node_modules\\openclaw\\dist\\index.js", "node_modules/openclaw/dist/index.js"),
+        )
+        result.ok = result.ok and internal.ok
+        if internal.message:
+            result.message = f"{result.message} {internal.message}"
+    return result
 
 
 def restart(config: StackConfig | None = None) -> OperationResult:
