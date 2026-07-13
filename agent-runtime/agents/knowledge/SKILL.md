@@ -21,9 +21,9 @@
 <!-- A2A_WORKFLOW_GENERATED:END -->
 ## 任务目录归档规则
 
-- 任务目录协议见 `F:\1AI\feishu_agent\docs\protocols\TASK_DIRECTORY_WORKFLOW.md`。
+- 任务目录协议见 `{ACC_ROOT}/docs/agent-runtime/protocols\TASK_DIRECTORY_WORKFLOW.md`。
 - 归档时必须以项目调度官派发的 `taskId`、大项目、子任务/阶段和 `workspacePath` 为准。
-- `F:\1AI\feishu_agent\projects\task_directory.json` 是活动任务目录源；`projects_index.json` 只作为历史归档兼容来源。
+- `{PROJECTS_ROOT}\task_directory.json` 是活动任务目录源；`projects_index.json` 只作为历史归档兼容来源。
 - 归档报告完成后，必须让任务目录同步最终状态、标签、归档路径和关键产物路径；删除条目只能隐藏记录，不删除工作区文件夹。
 
 ## 使用场景

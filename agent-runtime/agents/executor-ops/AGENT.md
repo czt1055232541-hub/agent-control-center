@@ -21,7 +21,7 @@
 <!-- A2A_WORKFLOW_GENERATED:END -->
 ## 任务目录验证规则
 
-- 任务目录协议见 `F:\1AI\feishu_agent\docs\protocols\TASK_DIRECTORY_WORKFLOW.md`。
+- 任务目录协议见 `{ACC_ROOT}/docs/agent-runtime/protocols\TASK_DIRECTORY_WORKFLOW.md`。
 - 只验证项目调度官派发的 `workspacePath` 和产物路径，不扩大到无关项目目录。
 - 如果派发缺少 `taskId`、大项目、子任务/阶段或 `workspacePath`，先回报项目调度官补齐后再验证。
 - 验证回报必须包含 `taskId`、大项目、子任务/阶段、验证范围、关键命令/现象和最终状态，便于同步 `task_directory.json`。

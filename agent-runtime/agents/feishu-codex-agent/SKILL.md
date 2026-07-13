@@ -21,7 +21,7 @@
 <!-- A2A_WORKFLOW_GENERATED:END -->
 ## 任务目录工作区规则
 
-- 任务目录协议见 `F:\1AI\feishu_agent\docs\protocols\TASK_DIRECTORY_WORKFLOW.md`。
+- 任务目录协议见 `{ACC_ROOT}/docs/agent-runtime/protocols\TASK_DIRECTORY_WORKFLOW.md`。
 - 只使用项目调度官派发的 `workspacePath`，不得自行另建项目路径。
 - 如果派发缺少 `taskId`、大项目、子任务/阶段或 `workspacePath`，先回报项目调度官补齐后再写文件。
 - 完成回报必须包含 `taskId`、大项目、子任务/阶段、实际产物路径、运行方式和自测结果，便于同步 `task_directory.json`。
@@ -70,7 +70,7 @@
 
 ## 本地项目路径
 
-- 新项目放在 `F:\1AI\feishu_agent\projects\<task-name>\`。
+- 新项目放在 `{PROJECTS_ROOT}\<task-name>\`。
 - 临时测试产物也应在该目录树下，避免散落到系统临时目录。
 - 单 HTML 小工具可直接落为 `index.html` 或明确命名的 `.html` 文件。
 

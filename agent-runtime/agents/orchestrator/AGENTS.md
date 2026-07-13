@@ -21,9 +21,9 @@
 <!-- A2A_WORKFLOW_GENERATED:END -->
 ## 任务目录强制规则
 
-- 任务目录协议见 `F:\1AI\feishu_agent\docs\protocols\TASK_DIRECTORY_WORKFLOW.md`。
-- 接到用户新任务后，必须先根据 `F:\1AI\feishu_agent\projects\task_directory.json` 判断是否属于已有大项目的子任务。
-- 已有大项目的新子任务必须登记到同一 `parentProjectName` 下；全新任务才新建或预留 `F:\1AI\feishu_agent\projects\<project-name>\`。
+- 任务目录协议见 `{ACC_ROOT}/docs/agent-runtime/protocols\TASK_DIRECTORY_WORKFLOW.md`。
+- 接到用户新任务后，必须先根据 `{PROJECTS_ROOT}\task_directory.json` 判断是否属于已有大项目的子任务。
+- 已有大项目的新子任务必须登记到同一 `parentProjectName` 下；全新任务才新建或预留 `{PROJECTS_ROOT}\<project-name>\`。
 - 用户指定特殊路径时，派发中的 `workspacePath` 必须使用用户指定路径，并同步到任务目录条目。
 - 每次派发给下游 agent 时必须包含 `taskId`、大项目、子任务/阶段、`workspacePath` 和验收条件。
 

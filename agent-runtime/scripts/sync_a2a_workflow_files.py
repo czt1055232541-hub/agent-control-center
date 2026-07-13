@@ -80,13 +80,25 @@ def write_if_changed(path: Path, text: str) -> bool:
     return True
 
 
+def migrate_legacy_paths(text: str) -> str:
+    legacy_root = str(Path("F:/1AI") / "feishu_agent")
+    replacements = (
+        (str(Path(legacy_root) / "docs" / "protocols"), "{ACC_ROOT}/docs/agent-runtime/protocols"),
+        (str(Path(legacy_root) / "projects"), "{PROJECTS_ROOT}"),
+        (legacy_root, "{ACC_ROOT}/agent-runtime"),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+    return text
+
+
 def sync_prompt_files() -> list[str]:
     changed = []
     for path in PROMPT_FILES:
         if not path.exists():
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
-        new_text, _ = replace_collaboration_block(text)
+        new_text, _ = replace_collaboration_block(migrate_legacy_paths(text))
         if write_if_changed(path, new_text):
             changed.append(str(path))
     return changed

@@ -21,7 +21,7 @@
 <!-- A2A_WORKFLOW_GENERATED:END -->
 ## 任务目录审计规则
 
-- 任务目录协议见 `F:\1AI\feishu_agent\docs\protocols\TASK_DIRECTORY_WORKFLOW.md`。
+- 任务目录协议见 `{ACC_ROOT}/docs/agent-runtime/protocols\TASK_DIRECTORY_WORKFLOW.md`。
 - 只审计项目调度官派发的 `workspacePath` 和产物路径，不审计无关目录。
 - 如果派发缺少 `taskId`、大项目、子任务/阶段或 `workspacePath`，先回报项目调度官补齐后再审计。
 - 审计回报必须包含 `taskId`、大项目、子任务/阶段、审计范围、问题分级和最终状态，便于同步 `task_directory.json`。

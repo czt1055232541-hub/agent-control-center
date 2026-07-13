@@ -10,7 +10,7 @@ MVP 阶段不把 `codex mcp add lark-mcp` 作为入口；`lark-openapi-mcp` 可�
 
 ## 当前状态
 
-- Node.js、npm/npx、Codex CLI、`lark-cli` 均安装在 `F:\1AI\feishu_agent` 下。
+- Node Agent 与本地 `lark-cli` 位于 `{ACC_ROOT}/agent-runtime`；Codex CLI 路径由根配置解析。
 - npm prefix、cache、临时目录、home/appdata 都指向 F 盘，避免下载安装到 C 盘。
 - `lark-cli config init --new` 已完成飞书应用配置。
 - `lark-cli auth status` 已验证 bot 可用；user token 如显示 `needs_refresh`，会在下一次 user API 调用时自动刷新。
@@ -21,7 +21,7 @@ MVP 阶段不把 `codex mcp add lark-mcp` 作为入口；`lark-openapi-mcp` 可�
 ## 目录结构
 
 ```text
-F:\1AI\feishu_agent
+{ACC_ROOT}/agent-runtime
 |-- .tools/                 # portable Node.js
 |-- .npm-global/            # Codex CLI and lark-cli
 |-- .npm-cache/             # npm cache
@@ -53,10 +53,10 @@ F:\1AI\feishu_agent
 运行链路优先使用 Python/Node 直接调用可执行文件，不依赖 shell shim：
 
 ```bash
-F:\1AI\feishu_agent\.tools\node-v24.16.0-win-x64\node.exe -v
-F:\1AI\feishu_agent\.tools\node-v24.16.0-win-x64\npm.cmd -v
-F:\1AI\feishu_agent\.npm-global\codex.cmd --version
-F:\1AI\feishu_agent\.npm-global\lark-cli.cmd --help
+node --version
+npm --version
+codex --version
+{ACC_ROOT}/agent-runtime/.npm-global/lark-cli.cmd --help
 ```
 
 已验证版本：
@@ -71,7 +71,7 @@ lark-cli 1.0.53
 ## 安装与测试
 
 ```bash
-cd /d F:\1AI\feishu_agent\feishu-codex-agent
+cd /d {ACC_ROOT}\agent-runtime\agents\feishu-codex-agent
 npm install
 npm test
 ```
@@ -159,7 +159,7 @@ lark-cli event consume im.message.receive_v1 --as bot
 ## 启动
 
 ```bash
-cd /d F:\1AI\feishu_agent\feishu-codex-agent
+cd /d {ACC_ROOT}\agent-runtime\agents\feishu-codex-agent
 npm run build
 npm start
 ```
