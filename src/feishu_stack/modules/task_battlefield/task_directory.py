@@ -71,7 +71,13 @@ def resolve_projects_root(config: StackConfig | None = None) -> Path:
     if override:
         return Path(override).resolve(strict=False)
     cfg = config or load_config()
-    return (cfg.agent_dir.parent.parent / "projects").resolve(strict=False)
+    configured = getattr(cfg, "projects_root", None)
+    if configured:
+        return Path(configured).resolve(strict=False)
+    stack_root = getattr(cfg, "stack_root", None)
+    if stack_root:
+        return (Path(stack_root) / "projects").resolve(strict=False)
+    return (cfg.agent_dir.parents[2] / "projects").resolve(strict=False)
 
 
 def resolve_directory_file(projects_root: Path) -> Path:

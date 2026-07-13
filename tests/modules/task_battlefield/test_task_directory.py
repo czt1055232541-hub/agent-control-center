@@ -7,13 +7,35 @@ from feishu_stack.modules.task_battlefield import task_directory
 
 
 def _config(tmp_path):
-    agent_dir = tmp_path / "feishu_agent" / "agents" / "feishu-codex-agent"
+    agent_dir = tmp_path / "agent-runtime" / "agents" / "feishu-codex-agent"
     agent_dir.mkdir(parents=True)
-    return SimpleNamespace(agent_dir=agent_dir)
+    return SimpleNamespace(
+        agent_dir=agent_dir,
+        stack_root=tmp_path,
+        projects_root=tmp_path / "projects",
+    )
 
 
 def _projects_root(cfg) -> object:
-    return cfg.agent_dir.parent.parent / "projects"
+    return cfg.projects_root
+
+
+def test_resolve_projects_root_prefers_configured_projects_root(tmp_path) -> None:
+    cfg = _config(tmp_path)
+
+    result = task_directory.resolve_projects_root(cfg)
+
+    assert result == (tmp_path / "projects").resolve(strict=False)
+    assert "agent-runtime" not in result.parts
+
+
+def test_resolve_projects_root_falls_back_to_stack_root_projects(tmp_path) -> None:
+    agent_dir = tmp_path / "agent-runtime" / "agents" / "feishu-codex-agent"
+    cfg = SimpleNamespace(agent_dir=agent_dir, stack_root=tmp_path, projects_root=None)
+
+    result = task_directory.resolve_projects_root(cfg)
+
+    assert result == (tmp_path / "projects").resolve(strict=False)
 
 
 def test_load_directory_bootstraps_from_legacy_index_and_top_level_folders(tmp_path) -> None:
