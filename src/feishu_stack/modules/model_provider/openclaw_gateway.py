@@ -234,6 +234,7 @@ def stop(config: StackConfig | None = None) -> OperationResult:
         component="openclaw",
         pid_file=cfg.pid_openclaw,
         port=cfg.openclaw_port,
+        expected_process_markers=("openclaw", "gateway.cmd"),
     )
 
 

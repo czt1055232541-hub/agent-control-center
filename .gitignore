@@ -21,6 +21,9 @@ runtime/pids/*
 !runtime/summaries/
 runtime/summaries/*
 !runtime/summaries/.gitkeep
+!runtime/watchdogs/
+runtime/watchdogs/*
+!runtime/watchdogs/.gitkeep
 .runtime/
 .appdata/
 .home/
@@ -65,3 +68,11 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# Local investigation helpers and generated multi-agent workspaces
+/_check*.py
+/_patch*.py
+/workspaces/
+
+# Local project workspaces (migrated from the former feishu_agent repository)
+/projects/

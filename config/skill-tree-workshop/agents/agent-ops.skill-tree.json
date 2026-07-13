@@ -8,7 +8,7 @@
     "role": "环境检测 / 服务验证",
     "runtime": "openclaw-agent",
     "model": "deepseek-v4-flash",
-    "workspace": "F:\\1AI\\Agent control center\\workspaces\\ops",
+    "workspace": ".",
     "skillRoots": {
       "openclaw": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills",
       "codex": "E:\\codeX\\skills"

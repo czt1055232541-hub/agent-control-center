@@ -19,7 +19,6 @@ def _candidate_watchdog_dirs(cfg: StackConfig) -> list[Path]:
     candidates.extend(
         [
             cfg.agent_dir.parent / "runtime" / "watchdogs",
-            cfg.stack_root.parent / "feishu_agent" / "runtime" / "watchdogs",
         ]
     )
     unique: list[Path] = []

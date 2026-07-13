@@ -153,7 +153,7 @@ def start(config: StackConfig | None = None) -> OperationResult:
 
 def stop(config: StackConfig | None = None) -> OperationResult:
     cfg = config or load_config()
-    return stop_component("moonbridge", cfg.pid_moonbridge, cfg.moonbridge_port)
+    return stop_component("moonbridge", cfg.pid_moonbridge, cfg.moonbridge_port, expected_process_markers=("moonbridge",))
 
 
 def restart(config: StackConfig | None = None) -> OperationResult:

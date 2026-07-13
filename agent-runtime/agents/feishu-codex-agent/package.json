@@ -1,0 +1,23 @@
+{
+  "name": "feishu-codex-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Feishu/Lark group chat AI agent powered by lark-cli and OpenAI/Codex.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/index.js",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "check:lark": "lark-cli doctor",
+    "event:schema": "lark-cli event schema im.message.receive_v1 --json",
+    "event:list": "lark-cli event list --json"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  }
+}

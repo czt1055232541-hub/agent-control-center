@@ -8,7 +8,7 @@
     "role": "代码修改 / 测试执行",
     "runtime": "codex-agent",
     "model": "gpt-5.5",
-    "workspace": "F:\\1AI\\Agent control center",
+    "workspace": ".",
     "skillRoots": {
       "codex": "E:\\codeX\\skills",
       "codexBundled": "E:\\codeX\\plugins\\cache\\openai-bundled",

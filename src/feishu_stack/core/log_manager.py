@@ -8,7 +8,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import IO
 
-MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+MAX_BYTES = 5 * 1024 * 1024
 BACKUP_COUNT = 5
 
 _log_lock = threading.Lock()
@@ -27,7 +27,7 @@ def setup_logger(name: str, log_file: Path, max_bytes: int = MAX_BYTES, backup_c
             backupCount=backup_count,
             encoding="utf-8",
         )
-        handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+        handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] [%(name)s] %(message)s"))
         logger.addHandler(handler)
     return logger
 

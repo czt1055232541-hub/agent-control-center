@@ -9,6 +9,7 @@ class ErrorResponse(PydanticBaseModel):
     error_code: str = Field(..., description="Machine-readable error code, e.g. HTTP_404")
     message: str = Field(..., description="Human-readable error message")
     detail: Any = Field(default=None, description="Optional additional detail")
+    request_id: str | None = Field(default=None, description="Request correlation identifier")
 
 @dataclass
 class ComponentStatus:

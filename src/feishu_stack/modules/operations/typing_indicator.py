@@ -66,7 +66,7 @@ def start(config: StackConfig | None = None) -> OperationResult:
 
 def stop(config: StackConfig | None = None) -> OperationResult:
     cfg = config or load_config()
-    return stop_component("typing-indicator", cfg.pid_typing_indicator, None)
+    return stop_component("typing-indicator", cfg.pid_typing_indicator, None, expected_process_markers=("typing-indicator", "launcher.py"))
 
 
 def restart(config: StackConfig | None = None) -> OperationResult:

@@ -138,7 +138,7 @@ def start(config: StackConfig | None = None) -> OperationResult:
 
 def stop(config: StackConfig | None = None) -> OperationResult:
     cfg = config or load_config()
-    return stop_component("codex-agent", cfg.pid_codex_agent, None)
+    return stop_component("codex-agent", cfg.pid_codex_agent, None, expected_process_markers=("feishu-codex-agent", "dist\\src\\index.js", "dist/src/index.js"))
 
 
 def restart(config: StackConfig | None = None) -> OperationResult:

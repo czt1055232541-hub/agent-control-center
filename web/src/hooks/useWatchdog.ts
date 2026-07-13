@@ -4,10 +4,17 @@ import type { CurrentWatchdogStatus } from "../types";
 
 export function useWatchdog() {
   const [watchdog, setWatchdog] = React.useState<CurrentWatchdogStatus | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   const refreshWatchdog = React.useCallback(async () => {
-    const next = await readJson<CurrentWatchdogStatus>("/api/watchdog/current");
-    setWatchdog(next);
+    try {
+      const next = await readJson<CurrentWatchdogStatus>("/api/watchdog/current");
+      setWatchdog(next);
+      setError(null);
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : String(exc));
+      throw exc;
+    }
   }, []);
 
   React.useEffect(() => {
@@ -18,5 +25,5 @@ export function useWatchdog() {
     return () => window.clearInterval(timer);
   }, [refreshWatchdog]);
 
-  return { watchdog, refreshWatchdog };
+  return { watchdog, error, refreshWatchdog };
 }

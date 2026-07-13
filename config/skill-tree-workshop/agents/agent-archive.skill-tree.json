@@ -8,7 +8,7 @@
     "role": "记录 / 归档 / 交付摘要",
     "runtime": "openclaw-agent",
     "model": "deepseek-v4-flash",
-    "workspace": "F:\\1AI\\Agent control center\\workspaces\\archive",
+    "workspace": ".",
     "skillRoots": {
       "openclaw": "E:\\openclaw\\npm\\node_modules\\openclaw\\skills",
       "codex": "E:\\codeX\\skills"

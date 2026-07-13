@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import shutil
+import sys
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,7 +23,7 @@ class StackConfigValidation(BaseModel):
     codex_bin: str = Field(alias="codexBin")
     codex_config: str = Field(alias="codexConfig")
     codex_switch_script: str = Field(alias="codexSwitchScript")
-    python_exe: str = Field(default="E:\\Python\\python.exe", alias="pythonExe")
+    python_exe: str = Field(default_factory=lambda: sys.executable, alias="pythonExe")
     node_exe: str | None = Field(default=None, alias="nodeExe")
     npm_exe: str | None = Field(default=None, alias="npmExe")
     codex_native_model: str = Field(alias="codexNativeModel")
@@ -96,7 +97,7 @@ def validate_config(raw: dict[str, Any]) -> StackConfigValidation:
         codexBin=raw["codexBin"],
         codexConfig=raw["codexConfig"],
         codexSwitchScript=raw["codexSwitchScript"],
-        pythonExe=raw.get("pythonExe", os.environ.get("PYTHON_EXE", "E:\\Python\\python.exe")),
+        pythonExe=raw.get("pythonExe", os.environ.get("PYTHON_EXE", sys.executable)),
         nodeExe=raw.get("nodeExe"),
         npmExe=raw.get("npmExe"),
         codexNativeModel=raw["codexNativeModel"],
@@ -284,6 +285,9 @@ class StackConfig:
     runtime_dir: Path
     log_dir: Path
     pid_dir: Path
+    app_id: str = ""
+    app_name: str = ""
+    projects_root: Path | None = None
     lark_cli_home: Path | None = None
     summary_dir: Path | None = None
     watchdog_state_dir: Path | None = None
@@ -458,7 +462,7 @@ def load_config(path: Path | None = None) -> StackConfig:
         codex_bin=resolve_codex_bin(raw["codexBin"], codex_config),
         codex_config=codex_config,
         codex_switch_script=Path(raw["codexSwitchScript"]),
-        python_exe=Path(raw.get("pythonExe") or os.environ.get("PYTHON_EXE") or "E:\\Python\\python.exe"),
+        python_exe=Path(raw.get("pythonExe") or os.environ.get("PYTHON_EXE") or sys.executable),
         node_exe=resolve_command(raw.get("nodeExe"), "NODE_EXE", "node.exe" if os.name == "nt" else "node"),
         npm_exe=resolve_command(raw.get("npmExe"), "NPM_EXE", "npm.cmd" if os.name == "nt" else "npm"),
         native_model=raw["codexNativeModel"],
@@ -479,6 +483,9 @@ def load_config(path: Path | None = None) -> StackConfig:
         runtime_dir=Path(runtime["dir"]),
         log_dir=Path(runtime["logs"]),
         pid_dir=Path(runtime["pids"]),
+        app_id=str(raw.get("appId") or raw.get("app_id") or ""),
+        app_name=str(raw.get("appName") or raw.get("app_name") or ""),
+        projects_root=Path(raw["projectsRoot"]) if raw.get("projectsRoot") else None,
         summary_dir=Path(runtime.get("summaries") or Path(runtime["dir"]) / "summaries"),
         watchdog_state_dir=Path(agent.get("watchdogStateDir") or raw["watchdogStateDir"]) if (agent.get("watchdogStateDir") or raw.get("watchdogStateDir")) else None,
     )

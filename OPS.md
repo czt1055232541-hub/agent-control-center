@@ -86,7 +86,7 @@ npm run build
 ### 3.1 启动全栈
 
 ```bash
-# 使用 Python 入口启动 MoonBridge 模式
+# 使用 Python 入口启动 MoonBridge 模式（规范命令）
 cd C:\agent-control-center
 python scripts/stack.py stack start-moonbridge
 

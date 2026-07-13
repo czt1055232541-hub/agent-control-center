@@ -1,6 +1,7 @@
 {
   "repository": "your-github-org-or-user/agent-control-center",
   "stackRoot": "C:\\path\\to\\agent-control-center",
+  "projectsRoot": "C:\\path\\to\\agent-control-center\\projects",
   "pythonExe": "C:\\path\\to\\python.exe",
   "nodeExe": "C:\\path\\to\\node.exe",
   "npmExe": "C:\\path\\to\\npm.cmd",
@@ -31,7 +32,7 @@
     ]
   },
   "agent": {
-    "dir": "C:\\path\\to\\feishu-codex-agent",
+    "dir": "C:\\path\\to\\agent-control-center\\agent-runtime\\agents\\feishu-codex-agent",
     "entry": "dist\\src\\index.js",
     "provider": "codex",
     "codexAgentArgs": "exec --skip-git-repo-check",

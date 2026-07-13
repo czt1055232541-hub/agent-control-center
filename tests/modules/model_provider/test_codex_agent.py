@@ -194,7 +194,12 @@ class CodexAgentStopTests(unittest.TestCase):
             from feishu_stack.modules.model_provider.codex_agent import stop
             result = stop(cfg)
             self.assertTrue(result.ok)
-            mock_stop.assert_called_once_with('codex-agent', cfg.pid_codex_agent, None)
+            mock_stop.assert_called_once_with(
+                'codex-agent',
+                cfg.pid_codex_agent,
+                None,
+                expected_process_markers=('feishu-codex-agent', 'dist\\src\\index.js', 'dist/src/index.js'),
+            )
 
 
 class CodexAgentRestartTests(unittest.TestCase):
