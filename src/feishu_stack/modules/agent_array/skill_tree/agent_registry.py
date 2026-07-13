@@ -192,6 +192,25 @@ def _parse_a2a_bots(raw: str) -> list[dict[str, Any]]:
     return peers
 
 
+def _configured_a2a_peers(bots: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    peers = []
+    for item in bots:
+        if not isinstance(item, dict):
+            continue
+        peers.append(
+            {
+                "name": str(item.get("name") or "--"),
+                "description": item.get("description"),
+                "hasOpenId": bool(item.get("openId")),
+            }
+        )
+    return peers
+
+
+def _codex_workspace(cfg: StackConfig) -> Path:
+    return (cfg.stack_root / "workspaces" / "dev").resolve(strict=False)
+
+
 def load_registry(
     config: StackConfig | None = None,
     *,
@@ -270,10 +289,13 @@ def load_registry(
 
     env_path = cfg.agent_dir / ".env"
     env = _read_env(env_path)
-    peers = _parse_a2a_bots(env.get("A2A_BOTS", ""))
+    peers = _parse_a2a_bots(env.get("A2A_BOTS", "")) or _configured_a2a_peers(cfg.agent.a2a_bots)
     provider = env.get("AGENT_PROVIDER") or cfg.agent.provider or "codex"
+    bot_open_id = env.get("LARK_BOT_OPEN_ID") or cfg.agent.lark_bot_open_id
+    workspace = _codex_workspace(cfg)
     code_running = _component_running(code_agent_status)
-    code_status = "running" if code_running and provider == "codex" and env_path.exists() else "warning" if code_running else "stopped"
+    code_ready = provider == "codex" and bool(bot_open_id) and len(peers) >= 5
+    code_status = "running" if code_running and code_ready else "warning" if code_running else "stopped"
     result.append(
         RegistryAgent(
             id="codex-code-agent",
@@ -284,9 +306,9 @@ def load_registry(
             status=code_status,
             provider=str(provider),
             model=str(cfg.codex.native_model),
-            workspace_path=str(cfg.agent_dir),
+            workspace_path=str(workspace),
             config_path=str(env_path),
-            binding_status="bound" if env.get("LARK_BOT_OPEN_ID") else "missing-binding",
+            binding_status="bound" if bot_open_id else "missing-binding",
             feishu_account_enabled=None,
             backing_component="codex-agent",
             session_count=0,
@@ -298,11 +320,12 @@ def load_registry(
             trigger_mode="@代码执行官 / Codex Agent",
             config_facts={
                 "envExists": env_path.exists(),
-                "hasBotOpenId": bool(env.get("LARK_BOT_OPEN_ID")),
+                "hasBotOpenId": bool(bot_open_id),
                 "agentProvider": provider,
                 "codexAgentArgs": env.get("CODEX_AGENT_ARGS") or cfg.agent.codex_agent_args,
                 "a2aPeerCount": len(peers),
                 "a2aPeerNames": [peer["name"] for peer in peers],
+                "workspaceExists": workspace.exists(),
             },
             backend_actions=_codex_actions(),
         )

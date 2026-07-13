@@ -35,3 +35,14 @@
 - 启停闭环：Native 栈从单仓成功启动，Node Agent cwd 指向新路径，随后全部正常停止。
 - Provider：冒烟后恢复为切换前的 native `gpt-5.6-sol` / `medium`。
 - 安全：Codex Desktop 未停止；未发送真实飞书测试消息；暂存内容未发现真实格式的 open ID、chat ID 或凭据赋值。
+
+## 后续目录归类建议
+
+合并后的整理应延续 ACC 的控制面逻辑：根目录只放公开入口、控制面源码、配置模板、文档、测试和本机运行边界；飞书运行面继续收敛在 `agent-runtime` 内。
+
+- 保留根级：`src/`、`web/`、`scripts/`、`config/`、`tests/`、`docs/`、`runtime/`、`projects/`、`workspaces/`。
+- 保留在 `agent-runtime/`：飞书角色定义、Node Agent package、OpenClaw/飞书工作流内部脚本、provider 辅助逻辑。
+- 继续忽略且不提交：`runtime/*`、`projects/`、`workspaces/`、`.home/`、`.npm-global/`、日志、PID、会话、真实本机配置。
+- 可下一阶段评估迁移：`agent-runtime/runtime/` 下的占位目录可并入根 `runtime/`；`agent-runtime/scripts/` 中被根 `scripts/stack.py` 包装的内部脚本可按命令组迁入 `src/feishu_stack/modules/operations/`。
+- 不建议现在移动：`agent-runtime/agents/feishu-codex-agent` 的 `package.json`、锁文件、TypeScript 源码和测试应保持为独立 Node package，避免破坏构建边界。
+- 代码执行官工作区固定为 `{ACC_ROOT}/workspaces/dev`；`agent-runtime/agents/feishu-codex-agent` 只表示 Agent 程序包，不再作为开发工作区展示。

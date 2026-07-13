@@ -78,3 +78,27 @@ def test_openclaw_open_ui_uses_python_startfile(monkeypatch, tmp_path) -> None:
     assert result.component == "openclaw"
     assert result.action == "open-ui"
     assert calls == ["http://127.0.0.1:18789/#token=secret-token"]
+
+
+def test_gateway_command_uses_hidden_runtime_wrapper(tmp_path) -> None:
+    cfg = _config(tmp_path)
+    cfg.openclaw_gateway_cmd.parent.mkdir(parents=True)
+    cfg.openclaw_gateway_cmd.write_text(
+        "\n".join(
+            [
+                "@echo off",
+                r'for /f "usebackq delims=" %%A in (`python F:\1AI\feishu_agent\scripts\print_a2a_bots_env.py`) do set "OPENCLAW_FEISHU_A2A_BOTS=%%A"',
+                r'start "OpenClaw-Proxy" E:\node\node.exe E:\openclaw\clawclaw\.openclaw\proxy.js',
+                r'E:\node\node.exe E:\openclaw\npm\node_modules\openclaw\dist\index.js gateway --port 18790',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    command = openclaw._gateway_command(cfg)
+    wrapper = Path(command[-1])
+    text = wrapper.read_text(encoding="utf-8")
+
+    assert wrapper == cfg.runtime_dir / "openclaw" / "gateway.hidden.cmd"
+    assert 'start "" /B E:\\node\\node.exe' in text
+    assert "feishu_agent" not in text

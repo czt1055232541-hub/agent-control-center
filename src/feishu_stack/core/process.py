@@ -11,6 +11,17 @@ from feishu_stack.core.log_manager import open_rotating
 from feishu_stack.core.models import ComponentStatus, OperationResult
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
+DETACHED_PROCESS = 0x00000008 if os.name == "nt" else 0
+WINDOWLESS_PROCESS_FLAGS = CREATE_NO_WINDOW | DETACHED_PROCESS
+
+
+def _hidden_startupinfo() -> subprocess.STARTUPINFO | None:
+    if os.name != "nt":
+        return None
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startupinfo.wShowWindow = 0
+    return startupinfo
 
 
 def _run_system(command: list[str], timeout: int = 30) -> subprocess.CompletedProcess[str]:
@@ -22,6 +33,7 @@ def _run_system(command: list[str], timeout: int = 30) -> subprocess.CompletedPr
         capture_output=True,
         timeout=timeout,
         creationflags=CREATE_NO_WINDOW,
+        startupinfo=_hidden_startupinfo(),
     )
 
 
@@ -148,7 +160,8 @@ def start_process(
             stdin=subprocess.DEVNULL,
             text=True,
             env=env,
-            creationflags=CREATE_NO_WINDOW,
+            creationflags=WINDOWLESS_PROCESS_FLAGS,
+            startupinfo=_hidden_startupinfo(),
         )
     except Exception:
         stdout_handle.close()
@@ -167,6 +180,7 @@ def run_capture(command: list[str], cwd: Path | None = None, env: dict[str, str]
         capture_output=True,
         timeout=timeout,
         creationflags=CREATE_NO_WINDOW,
+        startupinfo=_hidden_startupinfo(),
     )
 
 

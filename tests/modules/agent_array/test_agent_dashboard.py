@@ -112,6 +112,16 @@ def _write_codex_agent(root: Path) -> None:
     )
 
 
+def _a2a_peers() -> list[dict[str, str]]:
+    return [
+        {"name": "coordinator", "openId": "open-id-secret_1", "description": "coordinator"},
+        {"name": "developer", "openId": "open-id-secret_2", "description": "developer"},
+        {"name": "ops-validation", "openId": "open-id-secret_3", "description": "ops-validation"},
+        {"name": "quality-auditor", "openId": "open-id-secret_4", "description": "quality-auditor"},
+        {"name": "archivist", "openId": "open-id-secret_5", "description": "archivist"},
+    ]
+
+
 def _config(tmp_path: Path) -> SimpleNamespace:
     openclaw_home = tmp_path / "openclaw"
     agent_dir = tmp_path / "codex-agent"
@@ -119,7 +129,8 @@ def _config(tmp_path: Path) -> SimpleNamespace:
     _write_codex_agent(agent_dir)
     return SimpleNamespace(
         raw={"agent": {"provider": "codex", "codexAgentArgs": "exec --skip-git-repo-check"}, "codexNativeModel": "gpt-5.5"},
-        agent=SimpleNamespace(provider="codex", codex_agent_args="exec --skip-git-repo-check", lark_bot_open_id=""),
+        stack_root=tmp_path,
+        agent=SimpleNamespace(provider="codex", codex_agent_args="exec --skip-git-repo-check", lark_bot_open_id="", a2a_bots=[]),
         codex=SimpleNamespace(native_model="gpt-5.5"),
         openclaw=SimpleNamespace(home=openclaw_home),
         openclaw_home=openclaw_home,
@@ -168,6 +179,29 @@ def test_code_agent_exposes_codex_agent_controls(tmp_path: Path) -> None:
 
     assert {"/api/codex-agent/start", "/api/codex-agent/stop", "/api/codex-agent/restart"} <= endpoints
     assert len(code_agent.a2aPeers or []) == 5
+    assert code_agent.workspacePath == str((tmp_path / "workspaces" / "dev").resolve(strict=False))
+
+
+def test_code_agent_uses_stack_config_a2a_when_env_is_missing(tmp_path: Path) -> None:
+    cfg = _config(tmp_path)
+    (cfg.agent_dir / ".env").unlink()
+    cfg.agent = SimpleNamespace(
+        provider="codex",
+        codex_agent_args="exec --skip-git-repo-check",
+        lark_bot_open_id="open-id-code-secret",
+        a2a_bots=_a2a_peers(),
+    )
+
+    code_agent = next(
+        agent
+        for agent in load_registry(cfg, openclaw_status=_component("openclaw", True), codex_agent_status=_component("codex-agent", True))
+        if agent.id == "codex-code-agent"
+    )
+
+    assert code_agent.status == "running"
+    assert code_agent.binding_status == "bound"
+    assert len(code_agent.a2a_peers) == 5
+    assert code_agent.config_facts["workspaceExists"] is False
 
 
 def test_dashboard_summary_counts_real_agents_only(tmp_path: Path, monkeypatch) -> None:

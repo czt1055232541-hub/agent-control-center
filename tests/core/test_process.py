@@ -7,7 +7,7 @@ from unittest import mock
 from pathlib import Path
 
 from feishu_stack.logs import tail
-from feishu_stack.process import is_port_listening, read_pid, stop_component, write_pid
+from feishu_stack.process import is_port_listening, read_pid, start_process, stop_component, write_pid
 from feishu_stack.core import process as process_module
 
 
@@ -50,3 +50,17 @@ class ProcessTests(unittest.TestCase):
             terminate.assert_not_called()
             self.assertIn("Refused to terminate", result.message)
             self.assertFalse(pid_file.exists())
+
+    def test_start_process_uses_windowless_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fake_proc = mock.Mock(pid=1234)
+            with mock.patch.object(process_module, "open_rotating", side_effect=[mock.Mock(), mock.Mock()]), \
+                 mock.patch.object(process_module.subprocess, "Popen", return_value=fake_proc) as popen:
+                result = start_process(["node", "server.js"], root, root / "out.log", root / "err.log")
+
+            self.assertEqual(result.pid, 1234)
+            _, kwargs = popen.call_args
+            self.assertEqual(kwargs["creationflags"], process_module.WINDOWLESS_PROCESS_FLAGS)
+            if process_module.os.name == "nt":
+                self.assertIsNotNone(kwargs["startupinfo"])
