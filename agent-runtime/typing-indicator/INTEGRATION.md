@@ -4,8 +4,8 @@
 
 ## 文件
 
-- 主脚本：`typing-indicator/typing-indicator.py`
-- 启动器：`typing-indicator/launcher.py`
+- 主脚本：`agent-runtime/typing-indicator/typing-indicator.py`
+- 启动器：`agent-runtime/typing-indicator/launcher.py`
 - 控制层：`src/feishu_stack/typing_indicator.py`
 
 ## 配置

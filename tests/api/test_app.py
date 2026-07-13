@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
@@ -513,6 +515,52 @@ def test_control_center_log_route() -> None:
     response = client.get("/api/logs/control-center-api")
     assert response.status_code == 200
     assert response.json()["component"] == "control-center-api"
+
+
+def test_codex_agent_stream_routes(monkeypatch, tmp_path) -> None:
+    stream_dir = tmp_path / "runtime" / "streams" / "codex-agent"
+    stream_dir.mkdir(parents=True)
+    run_path = stream_dir / "run-1.jsonl"
+    run_path.write_text(
+        "\n".join(
+            [
+                json.dumps({"run_id": "run-1", "timestamp": "2026-07-13T00:00:00Z", "phase": "start", "stream": "stage", "text": "started", "message_id": "om_test", "chat_type": "group"}),
+                json.dumps({"run_id": "run-1", "timestamp": "2026-07-13T00:00:01Z", "phase": "stdout", "stream": "stdout", "text": "hello"}),
+                json.dumps({"run_id": "run-1", "timestamp": "2026-07-13T00:00:02Z", "phase": "complete", "stream": "stage", "text": "done"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(api_app_module, "load_config", lambda: SimpleNamespace(runtime_dir=tmp_path / "runtime"))
+
+    listed = client.get("/api/codex-agent/streams")
+    assert listed.status_code == 200
+    assert listed.json()["streams"][0]["run_id"] == "run-1"
+    assert listed.json()["streams"][0]["status"] == "complete"
+
+    read = client.get("/api/codex-agent/streams/run-1")
+    assert read.status_code == 200
+    assert [event["phase"] for event in read.json()["events"]] == ["start", "stdout", "complete"]
+
+    missing = client.get("/api/codex-agent/streams/missing")
+    assert missing.status_code == 404
+
+
+def test_codex_agent_stream_websocket_latest(monkeypatch, tmp_path) -> None:
+    stream_dir = tmp_path / "runtime" / "streams" / "codex-agent"
+    stream_dir.mkdir(parents=True)
+    (stream_dir / "run-2.jsonl").write_text(
+        json.dumps({"run_id": "run-2", "timestamp": "2026-07-13T00:00:00Z", "phase": "start", "stream": "stage", "text": "started"}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(api_app_module, "load_config", lambda: SimpleNamespace(runtime_dir=tmp_path / "runtime"))
+
+    with client.websocket_connect("/ws/codex-agent/stream?run_id=latest") as websocket:
+        message = websocket.receive_json()
+        assert message["type"] == "event"
+        assert message["run_id"] == "run-2"
+        assert message["event"]["phase"] == "start"
 
 
 def test_thread_migration_requires_token() -> None:

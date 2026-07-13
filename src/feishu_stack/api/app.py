@@ -32,6 +32,7 @@ from feishu_stack.modules import routing_rules
 from feishu_stack.modules import feishu_connection
 from feishu_stack.core.settings import StackConfig, find_stack_root, load_config
 from feishu_stack.core.logs import tail
+from feishu_stack.core import codex_streams
 from feishu_stack.core.models import ErrorResponse, OperationResult, ThreadMigrationResult, to_dict
 from feishu_stack.core.config_contract import compare_shared_config, load_json_object, redact_config, validate_shared_config
 from feishu_stack.core.settings import resolve_settings_path
@@ -262,6 +263,32 @@ async def ws_status(ws: WebSocket) -> None:
             await ws.receive_text()
     except WebSocketDisconnect:
         ws_manager.disconnect(ws)
+
+
+@app.websocket("/ws/codex-agent/stream")
+async def ws_codex_agent_stream(ws: WebSocket, run_id: str = "latest") -> None:
+    await ws.accept()
+    sent_count = 0
+    active_path: Path | None = None
+    try:
+        while True:
+            cfg = load_config()
+            payload = codex_streams.read_stream(cfg, run_id)
+            if payload is None:
+                await ws.send_json({"type": "heartbeat", "run_id": run_id, "events": []})
+                await asyncio.sleep(1)
+                continue
+            path = Path(payload["path"])
+            events = payload["events"]
+            if active_path != path:
+                active_path = path
+                sent_count = 0
+            for event in events[sent_count:]:
+                await ws.send_json({"type": "event", "run_id": payload["run_id"], "event": event})
+            sent_count = len(events)
+            await asyncio.sleep(0.75)
+    except WebSocketDisconnect:
+        return
 
 
 # ---------------------------------------------------------------------------
@@ -760,6 +787,31 @@ def logs(component: str, lines: int = 120) -> dict:
     if component not in table:
         raise HTTPException(status_code=404, detail=f"Unknown log component: {component}")
     return {"component": component, "logs": [to_dict(tail(path, lines)) for path in table[component]]}
+
+
+@app.get(
+    "/api/codex-agent/streams",
+    summary="List Codex Agent streams",
+    description="Return recent Codex Agent subprocess stream runs.",
+    tags=[LOGS_TAG],
+)
+def codex_agent_streams(limit: int = 20) -> dict:
+    cfg = load_config()
+    return {"streams": codex_streams.list_streams(cfg, limit=limit)}
+
+
+@app.get(
+    "/api/codex-agent/streams/{run_id}",
+    summary="Read a Codex Agent stream",
+    description="Return recorded JSONL events for a Codex Agent subprocess stream.",
+    tags=[LOGS_TAG],
+)
+def codex_agent_stream(run_id: str) -> dict:
+    cfg = load_config()
+    payload = codex_streams.read_stream(cfg, run_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail=f"Unknown Codex Agent stream: {run_id}")
+    return payload
 
 # ---------------------------------------------------------------------------
 # Diagnostics

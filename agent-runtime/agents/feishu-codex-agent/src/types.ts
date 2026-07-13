@@ -45,6 +45,7 @@ export type RouteResult = {
   plan: CommandPlan;
   context?: {
     chatType?: string;
+    messageId?: string;
     isPrivate: boolean;
     senderIsA2ABot: boolean;
   };

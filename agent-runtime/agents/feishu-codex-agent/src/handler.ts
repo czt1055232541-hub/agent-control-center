@@ -93,7 +93,7 @@ export class MessageHandler {
   }
 
   async handleEvent(event: FeishuMessageEvent): Promise<string> {
-    const cleanText = cleanTriggerText(event.plainText, this.config.botName);
+    const cleanText = cleanTriggerText(event.plainText, botTriggerNames(this.config));
     if (this.a2aRelay.shouldHandle(event, cleanText)) {
       return this.a2aRelay.run(event, cleanText);
     }
@@ -240,28 +240,11 @@ export class MessageHandler {
   }
 
   private startProgressReporter(chatId: string, route: RouteResult, generation: number): { stop: () => void } {
-    if (this.config.agentProvider !== "codex" || !shouldSendProgress(route)) {
-      return { stop: () => undefined };
-    }
-    let stopped = false;
-    const sendProgress = async () => {
-      if (stopped || !this.isCurrentReplyGeneration(chatId, generation)) {
-        return;
-      }
-      try {
-        const result = await this.larkCli.sendText(chatId, progressReceivedText(route));
-        if (!result.ok) {
-          debugLog(`progress send failed chat_id=${chatId} code=${result.code} stderr=${preview(result.stderr || result.stdout, 500)}`);
-        }
-      } catch (error) {
-        debugLog(`progress send threw chat_id=${chatId} error=${error instanceof Error ? error.message : String(error)}`);
-      }
-    };
-    void sendProgress();
+    void chatId;
+    void route;
+    void generation;
     return {
-      stop: () => {
-        stopped = true;
-      }
+      stop: () => undefined
     };
   }
 
@@ -376,6 +359,7 @@ function routeCommandAsAgentTask(cleanText: string): RouteResult {
 function attachConversationContext(route: RouteResult, event: FeishuMessageEvent, senderIsA2ABot: boolean): RouteResult {
   route.context = {
     chatType: event.chatType,
+    messageId: event.messageId,
     isPrivate: isPrivateChat(event.chatType),
     senderIsA2ABot
   };
@@ -384,13 +368,6 @@ function attachConversationContext(route: RouteResult, event: FeishuMessageEvent
 
 function isPrivateChat(chatType: string | undefined): boolean {
   return /^(p2p|private|single)$/i.test(chatType ?? "");
-}
-
-function shouldSendProgress(route: RouteResult): boolean {
-  if (route.intent !== "unknown") {
-    return false;
-  }
-  return route.plan.executable || /(?:Phase\s*\d+|开发|实现|修复|返工|GUI|Lumerical|FDTD|仿真|本地文件|代码|自测|产物)/i.test(route.cleanText);
 }
 
 function isCodexUsageLimitText(value: string): boolean {
@@ -418,13 +395,6 @@ function codexUsageCooldownUntil(value: string, nowMs: number): number {
     until.setDate(until.getDate() + 1);
   }
   return until.getTime();
-}
-
-function progressReceivedText(route: RouteResult): string {
-  if (route.context?.isPrivate) {
-    return "[代码执行官处理中] 已收到私聊任务，开始执行。本条是进度提示；最终结果会直接回复你。";
-  }
-  return "[代码执行官处理中] 已收到任务，开始执行。本条是进度提示；最终结果完成后再按协作流程回报项目调度官。";
 }
 
 function prepareResponseForFeishu(response: string): string {
@@ -635,4 +605,16 @@ function debugLog(message: string): void {
   if ((process.env.LOG_LEVEL || "").toLowerCase() === "debug") {
     console.error(`[agent] ${message}`);
   }
+}
+
+function botTriggerNames(config: AppConfig): string[] {
+  const names = new Set<string>([config.botName]);
+  if (config.botOpenId) {
+    for (const bot of config.a2aBots) {
+      if (bot.openId === config.botOpenId) {
+        names.add(bot.name);
+      }
+    }
+  }
+  return [...names].filter(Boolean);
 }

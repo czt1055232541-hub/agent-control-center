@@ -41,3 +41,25 @@ def test_codex_desktop_status_detects_desktop_and_ignores_cli() -> None:
     assert status.pid == 20
     assert status.process_count == 2
     assert status.executable.endswith(r"\app\Codex.exe")
+
+
+def test_codex_desktop_status_detects_chatgpt_desktop() -> None:
+    status = _codex_desktop_status_from_process_rows(
+        [
+            {
+                "Name": "codex.exe",
+                "ProcessId": "10",
+                "ExecutablePath": r"C:\Program Files\WindowsApps\OpenAI.Codex_1.0_x64__abc\app\resources\codex.exe",
+            },
+            {
+                "Name": "ChatGPT.exe",
+                "ProcessId": "20",
+                "ExecutablePath": r"C:\Program Files\WindowsApps\OpenAI.Codex_1.0_x64__abc\app\ChatGPT.exe",
+            },
+        ]
+    )
+
+    assert status.running is True
+    assert status.pid == 20
+    assert status.process_count == 1
+    assert status.executable.endswith(r"\app\ChatGPT.exe")

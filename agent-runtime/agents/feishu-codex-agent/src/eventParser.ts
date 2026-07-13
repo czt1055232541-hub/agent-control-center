@@ -59,20 +59,25 @@ export function shouldRespond(event: FeishuMessageEvent, config: AppConfig): boo
   if (!text) {
     return false;
   }
-  const botName = escapeRegExp(config.botName);
   const isPrivate = /^(p2p|private|single)$/i.test(event.chatType ?? "");
-  const mentioned = event.mentions.some((mention) => mention.toLowerCase().includes(config.botName.toLowerCase())) ||
-    new RegExp(`@\\s*${botName}`, "i").test(text);
-  const startsWithCodex = new RegExp(`^\\s*(?:/codex|${botName})\\b`, "i").test(text);
-  return isPrivate || mentioned || startsWithCodex;
+  const triggerNames = ownBotTriggerNames(config);
+  const mentioned = eventMentionsThisBot(event, config, triggerNames) ||
+    triggerNames.some((name) => new RegExp(`@\\s*${escapeRegExp(name)}`, "i").test(text));
+  const startsWithTrigger = triggerNames.some((name) => new RegExp(`^\\s*(?:/codex|${escapeRegExp(name)})\\b`, "i").test(text));
+  return isPrivate || mentioned || startsWithTrigger;
 }
 
-export function cleanTriggerText(text: string, botName = "Codex"): string {
-  const bot = escapeRegExp(botName);
-  return text
-    .replace(new RegExp(`^\\s*@\\s*${bot}\\s*`, "i"), "")
-    .replace(new RegExp(`^\\s*(?:/codex|${bot})\\b[:\\uFF1A,\\uFF0C\\s]*`, "i"), "")
-    .trim();
+export function cleanTriggerText(text: string, botName: string | string[] = "Codex"): string {
+  const names = Array.isArray(botName) ? botName : [botName];
+  let cleaned = text;
+  for (const name of names) {
+    const bot = escapeRegExp(name);
+    cleaned = cleaned
+      .replace(new RegExp(`^\\s*@\\s*${bot}\\s*`, "i"), "")
+      .replace(new RegExp(`^\\s*(?:/codex|${bot})\\b[:\\uFF1A,\\uFF0C\\s]*`, "i"), "")
+      .trim();
+  }
+  return cleaned;
 }
 
 function extractPlainText(rawContent: string): string {
@@ -122,7 +127,7 @@ function extractMentions(message: Record<string, unknown>, plainText: string): s
   const mentions = Array.isArray(message.mentions) ? message.mentions : [];
   for (const mention of mentions) {
     const item = asRecord(mention);
-    for (const key of ["name", "key", "id", "tenant_key"]) {
+    for (const key of ["name", "user_name", "key", "id", "open_id", "openId", "user_id", "userId", "union_id", "unionId", "tenant_key"]) {
       const value = stringValue(item[key]);
       if (value) {
         values.add(value);
@@ -145,4 +150,26 @@ function stringValue(value: unknown): string | undefined {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function ownBotTriggerNames(config: AppConfig): string[] {
+  const names = new Set<string>([config.botName]);
+  if (config.botOpenId) {
+    for (const bot of config.a2aBots) {
+      if (bot.openId === config.botOpenId) {
+        names.add(bot.name);
+      }
+    }
+  }
+  return [...names].filter(Boolean);
+}
+
+function eventMentionsThisBot(event: FeishuMessageEvent, config: AppConfig, triggerNames: string[]): boolean {
+  const mentionValues = event.mentions.map((mention) => mention.trim()).filter(Boolean);
+  const lowerTriggerNames = triggerNames.map((name) => name.toLowerCase());
+  const ownIds = [config.botOpenId, config.botUserId, config.botUnionId].filter(Boolean) as string[];
+  return mentionValues.some((mention) => {
+    const lower = mention.toLowerCase();
+    return lowerTriggerNames.some((name) => lower.includes(name)) || ownIds.includes(mention);
+  });
 }

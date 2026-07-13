@@ -186,21 +186,6 @@ function findNextAt(value, start) {
     send_file.write_text(text.replace(needle, replacement), encoding="utf-8")
 
 
-def _hidden_gateway_wrapper(cfg: StackConfig) -> Path:
-    source = cfg.openclaw_gateway_cmd.read_text(encoding="utf-8", errors="replace")
-    lines: list[str] = []
-    for line in source.splitlines():
-        if "print_a2a_bots_env.py" in line:
-            continue
-        if re.match(r'^\s*start\s+"[^"]*"\s+', line, flags=re.IGNORECASE):
-            line = re.sub(r'^\s*start\s+"[^"]*"\s+', 'start "" /B ', line, count=1, flags=re.IGNORECASE)
-        lines.append(line)
-    wrapper = cfg.runtime_dir / "openclaw" / "gateway.hidden.cmd"
-    wrapper.parent.mkdir(parents=True, exist_ok=True)
-    wrapper.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return wrapper
-
-
 def _strip_cmd_start(line: str) -> str:
     text = line.strip()
     text = re.sub(r'^\s*start\s+"[^"]*"\s+', "", text, count=1, flags=re.IGNORECASE)
@@ -246,8 +231,7 @@ def _internal_gateway_port(cfg: StackConfig) -> int | None:
 
 
 def _gateway_command(cfg: StackConfig) -> list[str]:
-    command_file = _hidden_gateway_wrapper(cfg) if os.name == "nt" and cfg.openclaw_gateway_cmd.exists() else cfg.openclaw_gateway_cmd
-    return ["cmd.exe", "/d", "/c", str(command_file)]
+    return ["cmd.exe", "/d", "/c", str(cfg.openclaw_gateway_cmd)]
 
 
 def start(config: StackConfig | None = None) -> OperationResult:

@@ -12,7 +12,7 @@
   "codexNativeReasoningEffort": "high",
   "codexMoonBridgeModel": "your-moonbridge-model",
   "codexMoonBridgeReasoningEffort": "high",
-  "codexSwitchScript": "C:\\path\\to\\switch-provider-script",
+  "codexSwitchScript": "C:\\path\\to\\agent-control-center\\scripts\\stack.py",
   "moonBridgeBaseUrl": "http://127.0.0.1:38440/v1",
   "moonbridge": {
     "dir": "C:\\path\\to\\moonbridge",

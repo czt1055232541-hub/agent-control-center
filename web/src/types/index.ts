@@ -76,6 +76,35 @@ export type LogTail = {
   lines: string[];
 };
 
+export type CodexStreamEvent = {
+  run_id: string;
+  timestamp: string | null;
+  phase: "start" | "stdout" | "stderr" | "complete" | "error" | string;
+  stream: "stage" | "stdout" | "stderr" | string;
+  text: string;
+  message_id?: string;
+  chat_type?: string;
+};
+
+export type CodexStreamRun = {
+  run_id: string;
+  path: string;
+  mtime: number;
+  size: number;
+  event_count: number;
+  status: string;
+  started_at: string | null;
+  updated_at: string | null;
+  message_id?: string | null;
+  chat_type?: string | null;
+};
+
+export type CodexStreamPayload = {
+  run_id: string;
+  path: string;
+  events: CodexStreamEvent[];
+};
+
 export type CommandDiagnostic = {
   ok: boolean;
   returncode?: number;

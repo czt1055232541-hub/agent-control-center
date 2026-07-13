@@ -5,8 +5,8 @@
 ## Switch Provider
 
 ```bash
-python codex/switch_provider.py native
-python codex/switch_provider.py moonbridge
+python scripts/stack.py switch-provider native
+python scripts/stack.py switch-provider moonbridge
 ```
 
 MoonBridge mode requires `http://127.0.0.1:38440/v1/models` to be reachable unless `-AllowUnavailableMoonBridge` is passed.

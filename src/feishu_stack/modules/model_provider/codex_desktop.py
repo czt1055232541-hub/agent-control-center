@@ -67,7 +67,11 @@ def _install_location_from_windowsapps() -> str | None:
     root = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "WindowsApps"
     try:
         candidates = sorted(
-            (path for path in root.glob("OpenAI.Codex_*") if (path / "app" / "Codex.exe").exists()),
+            (
+                path
+                for path in root.glob("OpenAI.Codex_*")
+                if (path / "app" / "ChatGPT.exe").exists() or (path / "app" / "Codex.exe").exists()
+            ),
             key=lambda path: path.stat().st_mtime,
             reverse=True,
         )
@@ -120,8 +124,11 @@ def _write_cached_executable(executable: str | None, config: StackConfig | None 
 def _executable_from_install_location(install: str | None) -> str | None:
     if not install:
         return None
-    candidate = Path(install) / "app" / "Codex.exe"
-    return str(candidate) if candidate.exists() else None
+    for name in ("ChatGPT.exe", "Codex.exe"):
+        candidate = Path(install) / "app" / name
+        if candidate.exists():
+            return str(candidate)
+    return None
 
 
 def _executable_path(config: StackConfig | None = None) -> str | None:
@@ -174,16 +181,24 @@ def stop(config: StackConfig | None = None) -> OperationResult:
             "Refusing to stop Codex Desktop unless AGENT_CONTROL_CENTER_ALLOW_CODEX_DESKTOP_STOP=1 is set.",
             duration_ms=int((time.monotonic() - started) * 1000),
         )
-    completed = subprocess.run(
-        ["taskkill", "/IM", "Codex.exe", "/T", "/F"],
-        text=True,
-        capture_output=True,
-        creationflags=CREATE_NO_WINDOW,
-    )
+    outputs: list[str] = []
+    ok = True
+    for image_name in ("ChatGPT.exe", "Codex.exe"):
+        completed = subprocess.run(
+            ["taskkill", "/IM", image_name, "/T", "/F"],
+            text=True,
+            capture_output=True,
+            creationflags=CREATE_NO_WINDOW,
+        )
+        if completed.returncode not in (0, 128):
+            ok = False
+        output = completed.stdout.strip() or completed.stderr.strip()
+        if output:
+            outputs.append(output)
     running = is_codex_desktop_running()
-    output = completed.stdout.strip() or completed.stderr.strip()
+    output = " ".join(outputs)
     return OperationResult(
-        ok=completed.returncode == 0 and not running,
+        ok=ok and not running,
         component="codex-desktop",
         action="stop",
         message=output or ("Codex Desktop stopped." if not running else "Codex Desktop may still be running."),

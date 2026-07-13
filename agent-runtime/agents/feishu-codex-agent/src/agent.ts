@@ -1,6 +1,7 @@
 import { spawnCollect } from "./larkCli.js";
 import type { AppConfig } from "./env.js";
 import type { RouteResult } from "./types.js";
+import { createCodexStreamWriter } from "./codexStream.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -84,21 +85,31 @@ async function draftWithCodex(config: AppConfig, route: RouteResult): Promise<st
   const outputFile = path.join(os.tmpdir(), `feishu-codex-agent-${Date.now()}.md`);
   const codexCliBin = resolveCodexCliBin(config.codexCliBin);
   const codexEnv = { ...process.env, CODEX_CLI_BIN: codexCliBin, CODEX_CLI_PATH: codexCliBin };
+  const stream = createCodexStreamWriter({
+    messageId: route.context?.messageId,
+    chatType: route.context?.chatType
+  });
   const result = await spawnCollect(
     codexCliBin,
     [...config.codexAgentArgs, "--output-last-message", outputFile, "-"],
     prompt,
     "auto",
     codexEnv,
-    config.codexCliTimeoutMs
+    config.codexCliTimeoutMs,
+    {
+      onStdout: (text) => stream.write({ phase: "stdout", stream: "stdout", text }),
+      onStderr: (text) => stream.write({ phase: "stderr", stream: "stderr", text })
+    }
   );
   if (!result.ok) {
     const failure = summarizeCodexFailure(result.stderr, result.code);
+    stream.write({ phase: "error", stream: "stage", text: failure });
     infoLog(`draft provider=codex failed code=${result.code} stderr=${preview(failure, 800)}`);
     return formatCodexFailure(route, failure);
   }
   infoLog("draft provider=codex completed");
   const finalMessage = readOutputFile(outputFile);
+  stream.write({ phase: "complete", stream: "stage", text: finalMessage ? "Codex CLI run completed with final message." : "Codex CLI run completed; using stdout/local fallback." });
   return finalMessage || result.stdout.trim() || localDraft(route);
 }
 

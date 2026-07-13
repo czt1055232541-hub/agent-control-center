@@ -193,7 +193,7 @@ http://127.0.0.1:8765/docs
 - `docs/`：规划、迁移和运维说明
 - `runtime/`：本机运行态目录，只保留 `.gitkeep`
 - `tests/`：按 `api/`、`core/`、`modules/` 分类的 Python 测试
-- `typing-indicator/`：飞书输入状态辅助组件
+- `agent-runtime/typing-indicator/`：飞书输入状态辅助组件
 
 新开发优先写入 `src/feishu_stack/modules/<功能域>/`。页面侧边栏看到的功能域应能在后端 `modules/` 中找到对应目录；顶层 `src/feishu_stack/*.py` 仅作为旧导入路径兼容层。
 

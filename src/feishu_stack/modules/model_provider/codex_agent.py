@@ -68,6 +68,7 @@ def _build_agent_env(cfg: StackConfig) -> dict[str, str]:
             "CODEX_CLI_BIN": str(cfg.codex_bin),
             "CODEX_CLI_PATH": str(cfg.codex_bin),
             "CODEX_AGENT_ARGS": cfg.agent.codex_agent_args,
+            "ACC_STACK_ROOT": str(cfg.stack_root),
             "AGENT_PROVIDER": cfg.agent.provider,
             "AGENT_NAME": "codex",
             "AGENT_MENTION": "Codex",

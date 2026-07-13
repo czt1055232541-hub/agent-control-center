@@ -50,6 +50,38 @@ test("responds to group mention and extracts core event fields", () => {
   assert.equal(cleanTriggerText(event.plainText), summarize);
 });
 
+test("responds to group mention by own A2A role name and open_id", () => {
+  const config = {
+    ...getConfig(),
+    botOpenId: "ou_bot",
+    a2aBots: [{ name: "?????", openId: "ou_bot" }]
+  };
+  const event = parseMessageEvent({
+    event: {
+      sender: { sender_id: { open_id: "ou_user" }, sender_type: "user" },
+      message: {
+        chat_id: "oc_chat",
+        message_id: "om_role_mention",
+        message_type: "post",
+        chat_type: "group",
+        content: JSON.stringify({
+          zh_cn: {
+            content: [[
+              { tag: "at", user_id: "ou_bot", user_name: "?????" },
+              { tag: "text", text: ` ${summarize}` }
+            ]]
+          }
+        }),
+        mentions: [{ open_id: "ou_bot", name: "?????" }]
+      }
+    }
+  });
+  assert.ok(event);
+  assert.equal(shouldRespond(event, config), true);
+  assert.equal(cleanTriggerText(event.plainText, [config.botName, "?????"]), summarize);
+});
+
+
 test("ignores bot self messages", () => {
   const config = getConfig();
   const event = parseMessageEvent({
@@ -269,8 +301,7 @@ test("handler strips internal lark-cli tails from codex replies", async () => {
   });
   fs.rmSync(scriptPath, { force: true });
 
-  assert.equal(sent.length, 2);
-  assert.match(sent[0], /代码执行官处理中/);
+  assert.deepEqual(sent, [response]);
   assert.match(response, /技术可行性意见/);
   assert.doesNotMatch(response, /lark-cli execution results/);
   assert.doesNotMatch(response, /chat-messages-list/);
@@ -343,9 +374,7 @@ test("private chat codex route uses direct-reply context", async () => {
   fs.rmSync(scriptPath, { force: true });
 
   assert.equal(response, "PRIVATE_CONTEXT_OK");
-  assert.match(sent[0], /私聊任务/);
-  assert.doesNotMatch(sent[0], /项目调度官/);
-  assert.equal(sent.at(-1), "PRIVATE_CONTEXT_OK");
+  assert.deepEqual(sent, ["PRIVATE_CONTEXT_OK"]);
 });
 
 test("parses flattened lark-cli event consume payload", () => {
@@ -539,15 +568,11 @@ test("handler suppresses stale replies when a newer chat request finishes first"
   await slow;
   fs.rmSync(scriptPath, { force: true });
 
-  assert.deepEqual(sent, [
-    "[代码执行官处理中] 已收到任务，开始执行。本条是进度提示；最终结果完成后再按协作流程回报项目调度官。",
-    "[代码执行官处理中] 已收到任务，开始执行。本条是进度提示；最终结果完成后再按协作流程回报项目调度官。",
-    "FAST_RESPONSE_FROM_TEST"
-  ]);
+  assert.deepEqual(sent, ["FAST_RESPONSE_FROM_TEST"]);
   assert.deepEqual(statuses, ["Started", "Stopped", "Started", "Stopped"]);
 });
 
-test("codex progress reporter sends only the first status message", async () => {
+test("codex progress reporter does not send text status messages", async () => {
   const sent: string[] = [];
   const scriptPath = path.join(os.tmpdir(), `feishu-codex-agent-single-progress-${Date.now()}.js`);
   fs.writeFileSync(
@@ -599,9 +624,7 @@ test("codex progress reporter sends only the first status message", async () => 
   });
   fs.rmSync(scriptPath, { force: true });
 
-  assert.equal(sent.length, 2);
-  assert.match(sent[0], /处理中/);
-  assert.equal(sent[1], "FINAL_RESPONSE_FROM_TEST");
+  assert.deepEqual(sent, ["FINAL_RESPONSE_FROM_TEST"]);
 });
 
 test("A2A relay sends bot-to-bot mentions as rich text posts", async () => {

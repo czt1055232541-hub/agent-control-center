@@ -68,7 +68,7 @@
 
 ## Typing Indicator
 
-你的 typing indicator 已部署在 `F:\1AI\Agent control center\typing-indicator\`，随 Agent control center 自动启动。
+你的 typing indicator 已部署在 `{ACC_ROOT}\agent-runtime\typing-indicator\`，随 Agent Control Center 自动启动。
 注意不要误杀 typing indicator 相关进程。
 
 ## 开发规范

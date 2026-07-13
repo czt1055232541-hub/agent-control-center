@@ -23,7 +23,7 @@ C:\agent-control-center\
 │   │   └── */                       # dashboard、飞书连接、路由规则、任务战场、配置中心等功能域入口
 │   └── *.py                         # 旧导入路径兼容 wrapper
 ├── tests/                           # api/core/modules 分类测试
-├── typing-indicator/                # 打字指示器独立服务
+├── agent-runtime/typing-indicator/  # 打字指示器运行面辅助服务
 ├── web/src/
 │   ├── app/
 │   ├── api/

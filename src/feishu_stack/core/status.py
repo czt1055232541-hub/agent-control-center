@@ -9,6 +9,8 @@ from feishu_stack.core.settings import StackConfig, load_config
 from feishu_stack.core.models import CodexDesktopStatus, ProviderStatus, StackStatus
 from feishu_stack.core.process import component_status, process_info, read_pid
 
+CODEX_DESKTOP_PROCESS_NAMES = {"codex.exe", "chatgpt.exe"}
+
 
 def read_provider_status(config: StackConfig) -> ProviderStatus:
     text = config.codex_config.read_text(encoding="utf-8", errors="replace") if config.codex_config.exists() else ""
@@ -35,13 +37,17 @@ def _codex_desktop_status_from_process_rows(rows: list[dict[str, str | None]]) -
             pid = int(str(row.get("ProcessId") or "0").strip())
         except ValueError:
             continue
-        if pid <= 0 or name.lower() != "codex.exe":
+        if pid <= 0 or name.lower() not in CODEX_DESKTOP_PROCESS_NAMES:
             continue
         path_lower = (path or "").replace("/", "\\").lower()
         if path and "\\resources\\codex.exe" in path_lower:
             continue
-        is_desktop_path = bool(path and "\\openai.codex_" in path_lower and path_lower.endswith("\\app\\codex.exe"))
-        if path and not is_desktop_path and "\\app\\codex.exe" not in path_lower:
+        is_desktop_path = bool(
+            path
+            and "\\openai.codex_" in path_lower
+            and (path_lower.endswith("\\app\\codex.exe") or path_lower.endswith("\\app\\chatgpt.exe"))
+        )
+        if path and not is_desktop_path and "\\app\\codex.exe" not in path_lower and "\\app\\chatgpt.exe" not in path_lower:
             continue
         matches.append({"pid": pid, "path": path, "is_desktop_path": is_desktop_path})
     if not matches:
@@ -79,7 +85,7 @@ def _process_rows_from_powershell() -> list[dict[str, str | None]]:
             "powershell",
             "-NoProfile",
             "-Command",
-            "Get-CimInstance Win32_Process -Filter \"Name = 'Codex.exe'\" "
+            "Get-CimInstance Win32_Process -Filter \"Name = 'Codex.exe' OR Name = 'ChatGPT.exe'\" "
             "| Select-Object Name,ProcessId,ExecutablePath | ConvertTo-Json -Compress",
         ],
         text=True,

@@ -81,6 +81,20 @@ class CodexDesktopExecutablePathTests(unittest.TestCase):
                 exe = _executable_path(cfg)
                 self.assertEqual(exe, str(exe_path))
 
+    def test_executable_prefers_chatgpt_in_install_location(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            install = Path(tmp)
+            app = install / "app"
+            app.mkdir()
+            chatgpt = app / "ChatGPT.exe"
+            codex = app / "Codex.exe"
+            chatgpt.write_text("stub", encoding="utf-8")
+            codex.write_text("stub", encoding="utf-8")
+
+            from feishu_stack.modules.model_provider.codex_desktop import _executable_from_install_location
+
+            self.assertEqual(_executable_from_install_location(str(install)), str(chatgpt))
+
 
 class CodexDesktopStartTests(unittest.TestCase):
     def test_already_running(self):
@@ -144,6 +158,7 @@ class CodexDesktopStopTests(unittest.TestCase):
             from feishu_stack.modules.model_provider.codex_desktop import stop
             result = stop(_fake_config())
             self.assertTrue(result.ok)
+            self.assertEqual(mock_run.call_count, 2)
 
     def test_stop_failure(self):
         import subprocess

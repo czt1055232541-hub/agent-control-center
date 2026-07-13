@@ -407,7 +407,7 @@ class StackConfig:
 
     @property
     def typing_indicator_dir(self) -> Path:
-        return self.stack_root / "typing-indicator"
+        return self.stack_root / "agent-runtime" / "typing-indicator"
 
     @property
     def typing_indicator_launcher(self) -> Path:

@@ -32,7 +32,8 @@ import { useLogs } from "../hooks/useLogs";
 import { useMigration } from "../hooks/useMigration";
 import { useCommandDashboard } from "../hooks/useCommandDashboard";
 import { useWatchdog } from "../hooks/useWatchdog";
-import type { AgentConfig, CurrentWatchdogStatus } from "../types";
+import { useCodexStream } from "../hooks/useCodexStream";
+import type { AgentConfig, CodexStreamEvent, CodexStreamRun, CurrentWatchdogStatus } from "../types";
 import { AppErrorBoundary } from "../components/common/AppErrorBoundary";
 import { readJson } from "../api";
 
@@ -302,6 +303,56 @@ function LogsPanel({
   );
 }
 
+function CodexLiveStreamPanel({
+  runs,
+  runId,
+  events,
+  connected,
+  error,
+  setRunId,
+  refresh,
+}: {
+  runs: CodexStreamRun[];
+  runId: string;
+  events: CodexStreamEvent[];
+  connected: boolean;
+  error: string | null;
+  setRunId: (runId: string) => void;
+  refresh: () => Promise<void>;
+}) {
+  const latest = runs[0];
+  const lastEvent = events.at(-1);
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-slate-950">Codex Live Stream</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            {connected ? "WebSocket connected" : "WebSocket reconnecting"} · {lastEvent?.timestamp ?? latest?.updated_at ?? "no stream yet"}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <select className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm" value={runId} onChange={(event) => setRunId(event.target.value)}>
+            <option value="latest">latest</option>
+            {runs.map((run) => <option key={run.run_id} value={run.run_id}>{run.run_id} · {run.status}</option>)}
+          </select>
+          <ActionButton disabled={false} icon={<RefreshCcw size={16} />} label="Refresh" onClick={refresh} />
+        </div>
+      </div>
+      {error ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{error}</div> : null}
+      <div className="mt-3 max-h-96 overflow-auto rounded-md bg-slate-950 p-3 font-mono text-xs text-slate-100">
+        {events.length ? events.map((event, index) => (
+          <div key={`${event.run_id}-${event.timestamp}-${index}`} className={event.stream === "stderr" || event.phase === "error" ? "text-rose-300" : event.stream === "stdout" ? "text-sky-200" : "text-emerald-200"}>
+            <span className="text-slate-500">{event.timestamp ?? "--"} </span>
+            <span>[{event.phase}/{event.stream}] </span>
+            <span className="whitespace-pre-wrap">{event.text}</span>
+          </div>
+        )) : <pre className="text-slate-400">No Codex subprocess stream has been recorded yet.</pre>}
+      </div>
+    </div>
+  );
+}
+
 function OperationLog({ operations }: { operations: ReturnType<typeof useOperations>["operations"] }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -393,6 +444,7 @@ function App() {
   const mig = useMigration(token, refresh);
   const { summary, agents, infrastructure, explainedDiagnostics, refreshDashboard } = useCommandDashboard();
   const { watchdog, error: watchdogError, refreshWatchdog } = useWatchdog();
+  const codexStream = useCodexStream();
   const [configStatus, setConfigStatus] = React.useState<ConfigContractStatus | null>(null);
   const [selectedAgent, setSelectedAgent] = React.useState<AgentConfig | null>(null);
   const [activePage, setActivePage] = React.useState<CommandPage>("dashboard");
@@ -605,6 +657,21 @@ function App() {
                   loadLogs={loadLogs}
                   setSelectedLog={setSelectedLog}
                   setLogLines={setLogLines}
+                />
+                <CodexLiveStreamPanel
+                  runs={codexStream.runs}
+                  runId={codexStream.runId}
+                  events={codexStream.events}
+                  connected={codexStream.connected}
+                  error={codexStream.error}
+                  setRunId={(next) => {
+                    codexStream.setRunId(next);
+                    codexStream.loadStream(next).catch(() => {});
+                  }}
+                  refresh={async () => {
+                    await codexStream.loadRuns();
+                    await codexStream.loadStream(codexStream.runId);
+                  }}
                 />
               </section>
             </>

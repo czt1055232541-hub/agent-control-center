@@ -93,7 +93,8 @@ export function spawnCollect(
   input?: string,
   outputEncoding = "auto",
   env: NodeJS.ProcessEnv = process.env,
-  timeoutMs = 60_000
+  timeoutMs = 60_000,
+  events: { onStdout?: (text: string) => void; onStderr?: (text: string) => void } = {}
 ): Promise<CliResult> {
   return new Promise((resolve) => {
     const child = spawn(command, args, {
@@ -120,10 +121,14 @@ export function spawnCollect(
           }, timeoutMs)
         : undefined;
     child.stdout.on("data", (chunk: Buffer | string) => {
-      stdout += decodeCliChunk(chunk, outputEncoding);
+      const text = decodeCliChunk(chunk, outputEncoding);
+      stdout += text;
+      events.onStdout?.(text);
     });
     child.stderr.on("data", (chunk: Buffer | string) => {
-      stderr += decodeCliChunk(chunk, outputEncoding);
+      const text = decodeCliChunk(chunk, outputEncoding);
+      stderr += text;
+      events.onStderr?.(text);
     });
     child.on("error", (error) => {
       finish({ ok: false, code: null, stdout, stderr: `${stderr}${error.message}` });
