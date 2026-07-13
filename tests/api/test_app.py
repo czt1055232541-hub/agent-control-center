@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from feishu_stack import app as app_module
+from feishu_stack.api import app as api_app_module
 from feishu_stack.models import AgentConfig, DashboardSummary, ExplainedDiagnosticItem, OperationResult, ThreadMigrationResult
 from feishu_stack.operations import _lock
 
@@ -29,6 +30,48 @@ def test_status_is_read_only_without_token() -> None:
     data = response.json()
     assert "codex" in data
     assert "codex_desktop_running" in data
+
+
+def test_response_has_request_id() -> None:
+    response = client.get("/api/health", headers={"X-Request-ID": "test-request-123"})
+    assert response.status_code == 200
+    assert response.headers["X-Request-ID"] == "test-request-123"
+
+
+def test_http_error_is_structured_and_correlated() -> None:
+    response = client.get("/api/agents/missing-request-id")
+    assert response.status_code == 404
+    data = response.json()
+    assert data["error_code"] == "HTTP_404"
+    assert data["message"]
+    assert data["request_id"] == response.headers["X-Request-ID"]
+
+
+def test_config_status_reports_redacted_drift(tmp_path, monkeypatch) -> None:
+    primary = {
+        "codexHome": "C:/codex", "codexBin": "C:/codex.exe", "codexConfig": "C:/config.toml",
+        "codexNativeModel": "native", "codexMoonBridgeModel": "bridge", "codexSwitchScript": "C:/switch.py",
+        "moonbridge": {"port": 38440},
+        "openclaw": {"port": 18789, "token": "must-not-leak"},
+        "agent": {"dir": "C:/agent", "larkCliBin": "C:/lark.exe", "larkBotOpenId": "ou_private"},
+        "runtime": {"dir": "C:/runtime", "logs": "C:/runtime/logs", "pids": "C:/runtime/pids"},
+    }
+    peer = {**primary, "openclaw": {"port": 18790, "token": "peer-secret"}}
+    primary_path = tmp_path / "control" / "config" / "stack.json"
+    peer_path = tmp_path / "agent" / "stack.json"
+    primary_path.parent.mkdir(parents=True)
+    peer_path.parent.mkdir(parents=True)
+    primary_path.write_text(__import__("json").dumps(primary), encoding="utf-8")
+    peer_path.write_text(__import__("json").dumps(peer), encoding="utf-8")
+    monkeypatch.setattr(api_app_module, "resolve_settings_path", lambda: primary_path)
+    monkeypatch.setenv("FEISHU_AGENT_SETTINGS_PATH", str(peer_path))
+    response = client.get("/api/config/status")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ok"] is True
+    assert data["drift"][0]["field"] == "openclaw.port"
+    assert "must-not-leak" not in response.text
+    assert "ou_private" not in response.text
 
 
 def test_dashboard_summary_is_read_only_without_token(monkeypatch) -> None:

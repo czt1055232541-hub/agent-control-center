@@ -20,10 +20,10 @@ const navItems: Array<{
   { key: "dashboard", label: "Dashboard 总览", icon: LayoutDashboard, status: "已实现" },
   { key: "agents", label: "Agent 阵列", icon: Swords, status: "已实现" },
   { key: "tasks", label: "任务战场", icon: CalendarClock, status: "已实现" },
-  { key: "feishu", label: "飞书连接", icon: Send, status: "后续" },
+  { key: "feishu", label: "飞书连接", icon: Send, status: "已实现" },
   { key: "provider", label: "模型与 Provider", icon: ServerCog, status: "已实现" },
-  { key: "routing", label: "路由规则", icon: Route, status: "后续" },
-  { key: "config", label: "配置中心", icon: FileCog, status: "开发中" },
+  { key: "routing", label: "路由规则", icon: Route, status: "已实现" },
+  { key: "config", label: "配置中心", icon: FileCog, status: "已实现" },
   { key: "diagnostics", label: "日志与诊断", icon: FileText, status: "已实现" },
   { key: "backup", label: "备份与迁移", icon: Archive, status: "后续" },
 ];

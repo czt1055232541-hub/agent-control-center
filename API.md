@@ -5,6 +5,21 @@
 Control Center 基于 **FastAPI** 构建，提供 RESTful API 管理 Feishu Codex Agent 栈。
 所有可写操作（启动/停止/重启/迁移等）需携带 `X-Control-Token` 请求头进行鉴权。
 
+所有 HTTP 响应包含 `X-Request-ID`。客户端也可发送不超过 128 字符的 `X-Request-ID` 以便跨前后端关联日志。错误响应保持兼容并统一包含：
+
+```json
+{
+  "error_code": "HTTP_404",
+  "message": "Human-readable message",
+  "detail": null,
+  "request_id": "correlation-id"
+}
+```
+
+现有成功响应结构不变；如未来统一成功信封，将通过版本化 API 提供。
+
+`GET /api/config/status` 返回共享配置契约校验和脱敏漂移；附加 `?check_runtime=true` 时检查配置路径和端口占用。该接口不会返回 token 或真实飞书身份标识。
+
 ---
 
 ## 基本信息

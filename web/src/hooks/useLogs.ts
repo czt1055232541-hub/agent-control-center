@@ -6,6 +6,7 @@ export function useLogs() {
   const [logs, setLogs] = React.useState<{ component: string; logs: LogTail[] } | null>(null);
   const [selectedLog, setSelectedLog] = React.useState("operations");
   const [logLines, setLogLines] = React.useState(120);
+  const [error, setError] = React.useState<string | null>(null);
 
   const selectedLogRef = React.useRef(selectedLog);
   selectedLogRef.current = selectedLog;
@@ -20,15 +21,16 @@ export function useLogs() {
     );
     setSelectedLog(comp);
     setLogs(result);
+    setError(null);
   }, []);
 
   // Periodic log polling
   React.useEffect(() => {
     const logTimer = window.setInterval(() => {
-      loadLogs().catch(() => {});
+      loadLogs().catch((exc) => setError(exc instanceof Error ? exc.message : String(exc)));
     }, 3000);
     return () => window.clearInterval(logTimer);
   }, [loadLogs]);
 
-  return { logs, selectedLog, logLines, loadLogs, setSelectedLog, setLogLines };
+  return { logs, selectedLog, logLines, error, loadLogs, setSelectedLog, setLogLines };
 }

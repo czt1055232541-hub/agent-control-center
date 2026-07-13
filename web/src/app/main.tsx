@@ -11,6 +11,9 @@ import { SkillWorkshopPage } from "../modules/agent-array/skill-tree/SkillWorksh
 import { RecentRunsTable } from "../modules/agent-array/skill-tree/RecentRunsTable";
 import { TaskTraceMap } from "../modules/agent-array/skill-tree/TaskTraceMap";
 import TaskDashboardPage from "../modules/task-battlefield/TaskDashboardPage";
+import { ConfigCenterPage } from "../modules/config-center";
+import { RoutingRulesPage } from "../modules/routing-rules";
+import { FeishuConnectionPage } from "../modules/feishu-connection";
 import { recentRunsFromOperations, taskTraceFromAgents, toAgentProfiles } from "../modules/agent-array/skill-tree/viewModels";
 import { ActionButton } from "../components/common/ActionButton";
 import { StatusPill } from "../components/common/StatusPill";
@@ -30,6 +33,17 @@ import { useMigration } from "../hooks/useMigration";
 import { useCommandDashboard } from "../hooks/useCommandDashboard";
 import { useWatchdog } from "../hooks/useWatchdog";
 import type { AgentConfig, CurrentWatchdogStatus } from "../types";
+import { AppErrorBoundary } from "../components/common/AppErrorBoundary";
+import { readJson } from "../api";
+
+type ConfigContractStatus = {
+  ok: boolean;
+  contract_version: number;
+  peer_status: string;
+  errors: Array<{ code: string; message: string }>;
+  warnings: Array<{ code: string; message: string }>;
+  drift: Array<{ field: string }>;
+};
 
 function formatCountdown(seconds: number | null): string {
   if (seconds === null || seconds === undefined) {
@@ -102,6 +116,28 @@ function WatchdogCard({
           {watchdog?.assignee ? ` · ${watchdog.assignee}` : ""}
         </div>
       </div>
+    </section>
+  );
+}
+
+function ConfigHealthCard({ status }: { status: ConfigContractStatus | null }) {
+  const healthy = Boolean(status?.ok && status.peer_status === "available" && status.drift.length === 0);
+  return (
+    <section className={`rounded-md border p-4 ${healthy ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-950">共享配置契约</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {status ? `v${status.contract_version} · Agent 配置 ${status.peer_status}` : "正在校验控制面与 Agent 运行配置…"}
+          </p>
+        </div>
+        <span className="rounded border border-current px-2 py-1 text-xs">
+          {status ? `${status.errors.length} 错误 / ${status.warnings.length} 警告 / ${status.drift.length} 漂移` : "检查中"}
+        </span>
+      </div>
+      {status?.drift.length ? (
+        <p className="mt-2 text-xs text-amber-900">漂移字段：{status.drift.map((item) => item.field).join("、")}。详细值仅在配置中心以脱敏形式提供。</p>
+      ) : null}
     </section>
   );
 }
@@ -351,12 +387,13 @@ function PlannedPage({ page }: { page: CommandPage }) {
 }
 
 function App() {
-  const { token, status, diagnostics, refresh, loadDiagnostics } = useStatus();
+  const { token, status, diagnostics, error: statusError, refresh, loadDiagnostics } = useStatus();
   const { operations, result, error, busy, run, setError, setResult } = useOperations(token, refresh);
-  const { logs, selectedLog, logLines, loadLogs, setSelectedLog, setLogLines } = useLogs();
+  const { logs, selectedLog, logLines, error: logsError, loadLogs, setSelectedLog, setLogLines } = useLogs();
   const mig = useMigration(token, refresh);
   const { summary, agents, infrastructure, explainedDiagnostics, refreshDashboard } = useCommandDashboard();
-  const { watchdog, refreshWatchdog } = useWatchdog();
+  const { watchdog, error: watchdogError, refreshWatchdog } = useWatchdog();
+  const [configStatus, setConfigStatus] = React.useState<ConfigContractStatus | null>(null);
   const [selectedAgent, setSelectedAgent] = React.useState<AgentConfig | null>(null);
   const [activePage, setActivePage] = React.useState<CommandPage>("dashboard");
   const [adventureSelectedAgent, setAdventureSelectedAgent] = React.useState<AgentProfile | null>(null);
@@ -370,6 +407,12 @@ function App() {
   React.useEffect(() => {
     mig.loadThreads().catch(() => {});
     mig.loadMoonbridgeModels().catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    readJson<ConfigContractStatus>("/api/config/status")
+      .then(setConfigStatus)
+      .catch((exc) => console.error("Configuration status check failed", exc));
   }, []);
 
   const providerMode = status?.codex.mode ?? "unknown";
@@ -417,10 +460,10 @@ function App() {
             </div>
           </header>
 
-          {error ? (
+          {error ?? statusError ?? watchdogError ?? logsError ? (
             <div className="flex items-start gap-2 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900">
               <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-              <span>{error}</span>
+              <span>{error ?? statusError ?? watchdogError ?? logsError}</span>
             </div>
           ) : null}
 
@@ -433,6 +476,7 @@ function App() {
           {activePage === "dashboard" ? (
             <>
               <SummaryCards summary={summary} />
+              <ConfigHealthCard status={configStatus} />
               <WatchdogCard
                 watchdog={watchdog}
                 busy={busy}
@@ -566,7 +610,15 @@ function App() {
             </>
           ) : null}
 
-          {["feishu", "routing", "config", "backup"].includes(activePage) ? <PlannedPage page={activePage} /> : null}
+          {activePage === "config" ? (
+            <ConfigCenterPage token={token} />
+          ) : activePage === "routing" ? (
+            <RoutingRulesPage token={token} />
+          ) : activePage === "feishu" ? (
+            <FeishuConnectionPage token={token} />
+          ) : activePage === "backup" ? (
+            <PlannedPage page={activePage} />
+          ) : null}
 
           <footer className="flex items-center gap-2 pb-2 text-xs text-slate-500">
             <ShieldCheck size={14} />
@@ -580,6 +632,10 @@ function App() {
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <React.Suspense fallback={<main className="min-h-screen bg-slate-100 p-6 text-slate-600">正在加载控制中心…</main>}>
+        <App />
+      </React.Suspense>
+    </AppErrorBoundary>
   </React.StrictMode>,
 );

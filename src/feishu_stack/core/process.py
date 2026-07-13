@@ -93,6 +93,27 @@ def pids_by_port(port: int) -> list[int]:
     return sorted(pids)
 
 
+def process_matches(pid: int, expected_markers: tuple[str, ...]) -> bool:
+    """Confirm a PID belongs to the expected component before termination."""
+    if not expected_markers:
+        return False
+    try:
+        import psutil
+
+        process = psutil.Process(pid)
+        text = " ".join(
+            [
+                process.name() or "",
+                process.exe() or "",
+                " ".join(process.cmdline() or []),
+                process.cwd() or "",
+            ]
+        ).lower()
+    except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
+        return False
+    return any(marker.lower() in text for marker in expected_markers)
+
+
 def component_status(name: str, port: int | None, pid_file: Path | None) -> ComponentStatus:
     pid = read_pid(pid_file) if pid_file else None
     running, process_name = process_info(pid)
@@ -166,6 +187,7 @@ def stop_component(
     pre_stop: list[str] | None = None,
     pre_stop_cwd: Path | None = None,
     pre_stop_env: dict[str, str] | None = None,
+    expected_process_markers: tuple[str, ...] | None = None,
 ) -> OperationResult:
     started = time.monotonic()
     messages: list[str] = []
@@ -180,14 +202,21 @@ def stop_component(
             messages.append(f"pre-stop command timed out after 30s: {' '.join(pre_stop)}")
     pid = read_pid(pid_file)
     stopped = False
+    markers = expected_process_markers or (component,)
+    skipped_pids: list[int] = []
     if pid is not None:
         running, _ = process_info(pid)
-        if running:
+        if running and process_matches(pid, markers):
             stopped = terminate_pid(pid) or stopped
+        elif running:
+            skipped_pids.append(pid)
         remove_pid(pid_file)
     if port is not None:
         for port_pid in pids_by_port(port):
-            stopped = terminate_pid(port_pid) or stopped
+            if process_matches(port_pid, markers):
+                stopped = terminate_pid(port_pid) or stopped
+            else:
+                skipped_pids.append(port_pid)
     duration = int((time.monotonic() - started) * 1000)
     still_listening = is_port_listening(port) if port else False
     ok = not still_listening
@@ -199,6 +228,8 @@ def stop_component(
         message = f"{component} may still be running."
     if messages:
         message = message + " " + " ".join(messages)
+    if skipped_pids:
+        message += f" Refused to terminate unverified PIDs: {', '.join(str(item) for item in sorted(set(skipped_pids)))}."
     return OperationResult(ok=ok, component=component, action=action, message=message, pid=pid, port=port, duration_ms=duration)
 
 

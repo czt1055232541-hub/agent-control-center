@@ -86,7 +86,12 @@ class TypingIndicatorStopTests(unittest.TestCase):
             from feishu_stack.modules.operations.typing_indicator import stop
             result = stop(cfg)
             self.assertTrue(result.ok)
-            mock_stop.assert_called_once_with('typing-indicator', cfg.pid_typing_indicator, None)
+            mock_stop.assert_called_once_with(
+                'typing-indicator',
+                cfg.pid_typing_indicator,
+                None,
+                expected_process_markers=('typing-indicator', 'launcher.py'),
+            )
 
 
 class TypingIndicatorRestartTests(unittest.TestCase):

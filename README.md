@@ -1,5 +1,7 @@
 # Agent Control Center
 
+运维命令、端口、配置、日志和恢复流程以 [docs/ops/README.md](docs/ops/README.md) 为唯一导航。两个仓库保持独立，ACC 作为控制面通过共享配置契约检查飞书 Agent 运行配置。
+
 本项目是一个本机桌面控制中心，用来统一管理这台机器上的 Agent 运行栈：Control Center API、React GUI、OpenClaw Gateway、MoonBridge、Feishu Codex Agent、Codex provider 切换、Codex Desktop 状态检测、日志、PID 和诊断。
 
 它的定位是“控制面板”，不是 OpenClaw、飞书应用或 Codex 本体。真实的飞书认证、OpenClaw 凭据、Codex 登录态、MoonBridge 上游密钥都应留在各自组件的本机目录中，不应提交到本仓库。

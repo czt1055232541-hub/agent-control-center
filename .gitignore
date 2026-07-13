@@ -65,3 +65,8 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# Local investigation helpers and generated multi-agent workspaces
+/_check*.py
+/_patch*.py
+/workspaces/

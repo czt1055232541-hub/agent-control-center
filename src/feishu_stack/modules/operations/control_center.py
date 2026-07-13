@@ -56,7 +56,7 @@ def start(config: StackConfig | None = None, open_browser: bool = False, build: 
         if build_result.returncode != 0:
             return OperationResult(False, "control-center", "start", build_result.stderr or build_result.stdout, duration_ms=int((time.monotonic() - started) * 1000))
     proc = subprocess.Popen(
-        [str(cfg.python_exe), "-m", "uvicorn", "feishu_stack.app:app", "--host", "127.0.0.1", "--port", str(PORT)],
+        [str(cfg.python_exe), "-m", "uvicorn", "src.feishu_stack.api.app:app", "--host", "127.0.0.1", "--port", str(PORT)],
         cwd=str(control_dir),
         env=_pythonpath_env(cfg),
         stdin=subprocess.DEVNULL,
@@ -214,7 +214,7 @@ def _is_control_center_process(row: dict[str, object], cfg: StackConfig) -> bool
         "serve-control-center" in text
         or "stop-control-center" in text
         or "status-control-center" in text
-        or "feishu_stack.app:app" in text
+        or "src.feishu_stack.api.app:app" in text
         or "control-center" in text
         or f"--port {PORT}" in text
     )

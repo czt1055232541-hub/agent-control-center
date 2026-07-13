@@ -6,10 +6,17 @@ export function useStatus() {
   const [token, setToken] = React.useState("");
   const [status, setStatus] = React.useState<StackStatus | null>(null);
   const [diagnostics, setDiagnostics] = React.useState<Diagnostics | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(async () => {
-    const nextStatus = await readJson<StackStatus>("/api/status");
-    setStatus(nextStatus);
+    try {
+      const nextStatus = await readJson<StackStatus>("/api/status");
+      setStatus(nextStatus);
+      setError(null);
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : String(exc));
+      throw exc;
+    }
   }, []);
 
   const loadDiagnostics = React.useCallback(async () => {
@@ -21,7 +28,7 @@ export function useStatus() {
   React.useEffect(() => {
     readJson<{ token: string }>("/api/session")
       .then((session) => setToken(session.token))
-      .catch(() => {});
+      .catch((exc) => setError(exc instanceof Error ? exc.message : String(exc)));
     refresh().catch(() => {});
     loadDiagnostics().catch(() => {});
 
@@ -75,5 +82,5 @@ export function useStatus() {
     };
   }, [refresh, loadDiagnostics]);
 
-  return { token, status, diagnostics, refresh, loadDiagnostics };
+  return { token, status, diagnostics, error, refresh, loadDiagnostics };
 }
