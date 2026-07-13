@@ -18,10 +18,12 @@
 - 唯一配置：`{ACC_ROOT}/config/stack.settings.local.json`
 - 唯一公开入口：`python scripts/stack.py`
 - 统一状态：`{ACC_ROOT}/runtime/{logs,pids,watchdogs,summaries}`
-- 外置项目：由 `projectsRoot` 指向原项目目录，不纳入 Git
-- 原飞书仓库和本地运行资产保持不变，至少保留一个稳定发布周期用于回滚。
+- 项目工作区：`{ACC_ROOT}/projects`，由 `projectsRoot` 指向并通过 `.gitignore` 排除
+- 原飞书仓库在项目文件完成清单校验、配置验证及 bundle 恢复验证后删除；其提交历史仍保留在当前仓库和完整 bundle 中。
 
 本机 lark-cli 与认证 profile 已复制到被 Git 忽略的 `agent-runtime/.npm-global` 和 `agent-runtime/.home`。根配置通过原子替换迁移并保留有限备份。桌面启动器已更新，未发现引用旧仓路径的计划任务。
+
+2026-07-13 后续收口中，原 `projects` 的 5,598 个文件迁入 `{ACC_ROOT}/projects`，迁移前后路径与大小清单摘要一致；本机 `projectsRoot` 随后原子更新。旧 `feishu_agent` 工作区在恢复 bundle 验证通过后删除。
 
 ## 验收结果
 

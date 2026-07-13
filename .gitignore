@@ -73,3 +73,6 @@ Thumbs.db
 /_check*.py
 /_patch*.py
 /workspaces/
+
+# Local project workspaces (migrated from the former feishu_agent repository)
+/projects/

@@ -116,7 +116,7 @@ class Category(BaseModel):
 
 ### 4.2 自动扫描（file_watch）
 
-- 配置监控目录列表（如 F:/1AI/feishu_agent/docs/、项目 docs 目录）
+- 配置监控目录列表（如 `{ACC_ROOT}/docs/`、`{PROJECTS_ROOT}` 下的项目 docs 目录）
 - 基于 watchdog 库监听文件变更（创建、修改、删除）
 - 文件 hash 比对实现增量同步，避免重复索引
 - 支持 glob 过滤（默认 **/*.md、**/*.txt）
