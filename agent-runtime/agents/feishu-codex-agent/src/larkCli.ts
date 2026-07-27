@@ -71,6 +71,23 @@ export class LarkCli {
     ]);
   }
 
+  downloadMessageResource(messageId: string, fileKey: string, type: "image" | "file", output: string): Promise<CliResult> {
+    return this.run([
+      "im",
+      "+messages-resources-download",
+      "--message-id",
+      messageId,
+      "--file-key",
+      fileKey,
+      "--type",
+      type,
+      "--output",
+      output,
+      "--as",
+      this.config.larkIdentity
+    ]);
+  }
+
   commandPreview(args: string[]): string {
     return [this.config.larkCliBin, ...args].map(quoteArg).join(" ");
   }

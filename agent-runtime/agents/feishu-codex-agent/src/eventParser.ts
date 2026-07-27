@@ -1,5 +1,5 @@
 import type { AppConfig } from "./env.js";
-import type { FeishuMessageEvent } from "./types.js";
+import type { FeishuMessageEvent, MessageAttachment } from "./types.js";
 
 export function parseMessageEvent(raw: unknown): FeishuMessageEvent | null {
   const root = asRecord(raw);
@@ -14,6 +14,7 @@ export function parseMessageEvent(raw: unknown): FeishuMessageEvent | null {
   }
   const rawContent = stringValue(message.content ?? event.content) ?? "";
   const plainText = extractPlainText(rawContent);
+  const attachments = extractAttachments(rawContent, stringValue(message.message_type ?? message.messageType));
   const mentions = extractMentions(message, plainText);
   return {
     chatId,
@@ -27,6 +28,7 @@ export function parseMessageEvent(raw: unknown): FeishuMessageEvent | null {
     content: rawContent,
     plainText,
     messageType: stringValue(message.message_type ?? message.messageType) ?? "unknown",
+    attachments,
     createTime: stringValue(message.create_time ?? message.createTime ?? event.create_time),
     chatType: stringValue(message.chat_type ?? message.chatType ?? event.chat_type),
     mentions,
@@ -56,7 +58,7 @@ export function shouldRespond(event: FeishuMessageEvent, config: AppConfig): boo
     return false;
   }
   const text = event.plainText.trim();
-  if (!text) {
+  if (!text && (event.attachments ?? []).length === 0) {
     return false;
   }
   const isPrivate = /^(p2p|private|single)$/i.test(event.chatType ?? "");
@@ -150,6 +152,70 @@ function stringValue(value: unknown): string | undefined {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractAttachments(rawContent: string, messageType: string | undefined): MessageAttachment[] {
+  if (!rawContent) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(rawContent) as unknown;
+    const found: MessageAttachment[] = [];
+    collectAttachments(parsed, messageType, found);
+    return dedupeAttachments(found);
+  } catch {
+    return [];
+  }
+}
+
+function collectAttachments(value: unknown, messageType: string | undefined, found: MessageAttachment[]): void {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectAttachments(item, messageType, found);
+    }
+    return;
+  }
+  const record = asRecord(value);
+  if (Object.keys(record).length === 0) {
+    return;
+  }
+  const tag = stringValue(record.tag);
+  const imageKey = stringValue(record.image_key ?? record.imageKey);
+  if (imageKey) {
+    found.push({
+      kind: "image",
+      key: imageKey,
+      name: stringValue(record.file_name ?? record.fileName ?? record.name),
+      mimeType: stringValue(record.mime_type ?? record.mimeType)
+    });
+  }
+  const fileKey = stringValue(record.file_key ?? record.fileKey);
+  if (fileKey) {
+    found.push({
+      kind: /image/i.test(messageType ?? "") || tag === "img" ? "image" : "file",
+      key: fileKey,
+      name: stringValue(record.file_name ?? record.fileName ?? record.name),
+      mimeType: stringValue(record.mime_type ?? record.mimeType)
+    });
+  }
+  for (const item of Object.values(record)) {
+    if (item && typeof item === "object") {
+      collectAttachments(item, messageType, found);
+    }
+  }
+}
+
+function dedupeAttachments(items: MessageAttachment[]): MessageAttachment[] {
+  const seen = new Set<string>();
+  const deduped: MessageAttachment[] = [];
+  for (const item of items) {
+    const id = `${item.kind}:${item.key}`;
+    if (!seen.has(id)) {
+      seen.add(id);
+      deduped.push(item);
+    }
+  }
+  return deduped;
 }
 
 function ownBotTriggerNames(config: AppConfig): string[] {

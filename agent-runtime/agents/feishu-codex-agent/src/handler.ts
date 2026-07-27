@@ -5,7 +5,7 @@ import { cleanTriggerText, parseMessageEvent, shouldRespond } from "./eventParse
 import { routeCommand } from "./router.js";
 import { draftAgentResponse } from "./agent.js";
 import { ConfirmationStore } from "./confirmationStore.js";
-import type { CliResult, FeishuMessageEvent, RouteResult } from "./types.js";
+import type { CliResult, FeishuMessageEvent, MessageAttachment, RouteResult } from "./types.js";
 import { LarkCli, type LarkPostContent, type LarkPostElement } from "./larkCli.js";
 import { A2ARelay } from "./a2aRelay.js";
 
@@ -93,6 +93,7 @@ export class MessageHandler {
   }
 
   async handleEvent(event: FeishuMessageEvent): Promise<string> {
+    const attachments = await this.prepareAttachments(event);
     const cleanText = cleanTriggerText(event.plainText, botTriggerNames(this.config));
     if (this.a2aRelay.shouldHandle(event, cleanText)) {
       return this.a2aRelay.run(event, cleanText);
@@ -106,7 +107,7 @@ export class MessageHandler {
     const route = senderIsA2ABot
       ? routeCommandAsAgentTask(cleanText)
       : routeCommand(cleanText);
-    attachConversationContext(route, event, senderIsA2ABot);
+    attachConversationContext(route, event, senderIsA2ABot, attachments);
     if (route.plan.requiresConfirmation) {
       this.confirmations.create(event.chatId, senderKey, route);
       const response = formatConfirmation(route);
@@ -115,6 +116,30 @@ export class MessageHandler {
    }
     return this.executeAndReply(event.chatId, event.messageId, route, false);
  }
+
+  private async prepareAttachments(event: FeishuMessageEvent): Promise<MessageAttachment[]> {
+    if ((event.attachments ?? []).length === 0) {
+      return [];
+    }
+    const selected = (event.attachments ?? []).slice(0, Math.max(1, this.config.maxAttachments));
+    const prepared: MessageAttachment[] = [];
+    for (const attachment of selected) {
+      prepared.push(await this.downloadAttachment(event.messageId, attachment));
+    }
+    return prepared;
+  }
+
+  private async downloadAttachment(messageId: string, attachment: MessageAttachment): Promise<MessageAttachment> {
+    const output = safeAttachmentOutput(this.config.attachmentDownloadDir, messageId, attachment);
+    const absoluteOutput = path.resolve(process.cwd(), output);
+    fs.mkdirSync(path.dirname(absoluteOutput), { recursive: true });
+    const result = await this.larkCli.downloadMessageResource(messageId, attachment.key, attachment.kind, output);
+    if (!result.ok) {
+      return { ...attachment, downloadError: preview(result.stderr || result.stdout || "download failed", 500) };
+    }
+    const localPath = findDownloadedPath(result.stdout, absoluteOutput);
+    return { ...attachment, localPath };
+  }
 
   private async executeAndReply(chatId: string, messageId: string, route: RouteResult, confirmed: boolean): Promise<string> {
    const generation = this.nextReplyGeneration(chatId);
@@ -356,12 +381,13 @@ function routeCommandAsAgentTask(cleanText: string): RouteResult {
   return route;
 }
 
-function attachConversationContext(route: RouteResult, event: FeishuMessageEvent, senderIsA2ABot: boolean): RouteResult {
+function attachConversationContext(route: RouteResult, event: FeishuMessageEvent, senderIsA2ABot: boolean, attachments: MessageAttachment[] = []): RouteResult {
   route.context = {
     chatType: event.chatType,
     messageId: event.messageId,
     isPrivate: isPrivateChat(event.chatType),
-    senderIsA2ABot
+    senderIsA2ABot,
+    attachments
   };
   return route;
 }
@@ -605,6 +631,88 @@ function debugLog(message: string): void {
   if ((process.env.LOG_LEVEL || "").toLowerCase() === "debug") {
     console.error(`[agent] ${message}`);
   }
+}
+
+function safeAttachmentOutput(baseDir: string, messageId: string, attachment: MessageAttachment): string {
+  const safeBase = normalizeRelativeOutputDir(baseDir);
+  const safeMessageId = sanitizePathPart(messageId || "message");
+  const safeKey = sanitizePathPart(attachment.key);
+  const ext = extensionForAttachment(attachment);
+  return path.posix.join(safeBase, safeMessageId, `${safeKey}${ext}`);
+}
+
+function normalizeRelativeOutputDir(value: string): string {
+  const normalized = value.replace(/\\/g, "/").split("/").filter((part) => part && part !== "." && part !== ".." && !part.includes(":"));
+  return normalized.join("/") || "runtime/attachments";
+}
+
+function sanitizePathPart(value: string): string {
+  return value.replace(/[^A-Za-z0-9_.-]+/g, "_").slice(0, 120) || "resource";
+}
+
+function extensionForAttachment(attachment: MessageAttachment): string {
+  const nameExt = attachment.name ? path.extname(attachment.name) : "";
+  if (/^\.[A-Za-z0-9]{1,8}$/.test(nameExt)) {
+    return nameExt;
+  }
+  if (attachment.kind === "image") {
+    if (/webp/i.test(attachment.mimeType ?? "")) {
+      return ".webp";
+    }
+    if (/jpe?g/i.test(attachment.mimeType ?? "")) {
+      return ".jpg";
+    }
+    return ".png";
+  }
+  return "";
+}
+
+function findDownloadedPath(stdout: string, fallback: string): string {
+  try {
+    const parsed = JSON.parse(stdout) as unknown;
+    const found = findPathValue(parsed);
+    if (found) {
+      return path.resolve(process.cwd(), found);
+    }
+  } catch {
+    // Use the requested output path when the CLI returns non-JSON or no path field.
+  }
+  return fallback;
+}
+
+function findPathValue(value: unknown): string | null {
+  if (typeof value === "string") {
+    return looksLikeLocalPath(value) ? value : null;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findPathValue(item);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
+  }
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    for (const key of ["path", "file", "file_path", "filePath", "output", "saved_path", "savedPath"]) {
+      const found = findPathValue(record[key]);
+      if (found) {
+        return found;
+      }
+    }
+    for (const item of Object.values(record)) {
+      const found = findPathValue(item);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return null;
+}
+
+function looksLikeLocalPath(value: string): boolean {
+  return /[\\/]/.test(value) || /\.(?:png|jpe?g|webp|gif|bmp|pdf|txt|md|csv|xlsx?|pptx?|docx?)$/i.test(value);
 }
 
 function botTriggerNames(config: AppConfig): string[] {

@@ -12,10 +12,20 @@ export type FeishuMessageEvent = {
   content: string;
   plainText: string;
   messageType: string;
+  attachments?: MessageAttachment[];
   createTime?: string;
   chatType?: string;
   mentions: string[];
   raw: unknown;
+};
+
+export type MessageAttachment = {
+  kind: "image" | "file";
+  key: string;
+  name?: string;
+  mimeType?: string;
+  localPath?: string;
+  downloadError?: string;
 };
 
 export type RouteIntent =
@@ -48,6 +58,7 @@ export type RouteResult = {
     messageId?: string;
     isPrivate: boolean;
     senderIsA2ABot: boolean;
+    attachments?: MessageAttachment[];
   };
 };
 

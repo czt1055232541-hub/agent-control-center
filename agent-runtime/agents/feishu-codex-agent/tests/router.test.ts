@@ -50,6 +50,26 @@ test("responds to group mention and extracts core event fields", () => {
   assert.equal(cleanTriggerText(event.plainText), summarize);
 });
 
+test("extracts image attachments from Feishu image messages", () => {
+  const config = getConfig();
+  const event = parseMessageEvent({
+    event: {
+      sender: { sender_id: { open_id: "ou_user" }, sender_type: "user" },
+      message: {
+        chat_id: "oc_private",
+        message_id: "om_image",
+        message_type: "image",
+        chat_type: "p2p",
+        content: JSON.stringify({ image_key: "img_v3_test" })
+      }
+    }
+  });
+  assert.ok(event);
+  assert.equal(event.plainText, JSON.stringify({ image_key: "img_v3_test" }));
+  assert.deepEqual(event.attachments, [{ kind: "image", key: "img_v3_test", name: undefined, mimeType: undefined }]);
+  assert.equal(shouldRespond(event, config), true);
+});
+
 test("responds to group mention by own A2A role name and open_id", () => {
   const config = {
     ...getConfig(),

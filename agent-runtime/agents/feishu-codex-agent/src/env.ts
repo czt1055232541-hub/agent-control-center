@@ -18,9 +18,11 @@ import path from "node:path";
    openaiModel: string;
     codexCliBin: string;
     codexAgentArgs: string[];
-    codexCliTimeoutMs: number;
-    codexProgressInitialMs: number;
-    codexProgressIntervalMs: number;
+   codexCliTimeoutMs: number;
+   codexProgressInitialMs: number;
+   codexProgressIntervalMs: number;
+   attachmentDownloadDir: string;
+   maxAttachments: number;
    confirmTimeoutMs: number;
    maxContextMessages: number;
    a2aBots: Array<{ name: string; openId: string; description?: string }>;
@@ -76,6 +78,8 @@ export function getConfig(): AppConfig {
       codexCliTimeoutMs: numberEnv("CODEX_CLI_TIMEOUT_MS", 0, { allowZero: true }),
       codexProgressInitialMs: numberEnv("CODEX_PROGRESS_INITIAL_MS", 15_000),
       codexProgressIntervalMs: numberEnv("CODEX_PROGRESS_INTERVAL_MS", 120_000),
+      attachmentDownloadDir: process.env.ATTACHMENT_DOWNLOAD_DIR || path.join("runtime", "attachments"),
+      maxAttachments: numberEnv("MAX_ATTACHMENTS", 8),
       confirmTimeoutMs: numberEnv("CONFIRM_TIMEOUT_MS", 600_000),
      maxContextMessages: numberEnv("MAX_CONTEXT_MESSAGES", 30),
      a2aBots: parseA2ABots(process.env.A2A_BOTS || ""),

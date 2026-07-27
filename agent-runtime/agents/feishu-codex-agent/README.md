@@ -109,9 +109,18 @@ LARK_CLI_OUTPUT_ENCODING=utf-8
 AGENT_PROVIDER=local
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
+ATTACHMENT_DOWNLOAD_DIR=runtime\attachments
+MAX_ATTACHMENTS=8
 CONFIRM_TIMEOUT_MS=600000
 MAX_CONTEXT_MESSAGES=30
 ```
+
+## 图片理解与生成
+
+- Agent 会从飞书图片消息、文件消息和富文本图片块中提取 `image_key` / `file_key`。
+- 收到可处理附件后，会调用 `lark-cli im +messages-resources-download` 下载到本地 `ATTACHMENT_DOWNLOAD_DIR`，并把本地绝对路径注入 Codex/OpenAI 上下文。
+- Codex provider 会在 prompt 中要求直接检查本地图片路径；OpenAI provider 会把下载后的图片作为 `input_image` 发送到 Responses API。
+- OpenAI provider 会启用 Responses API 的 `image_generation` 工具；生成结果会保存到 `agent-runtime/runtime/generated/images` 并在回复里给出路径。
 
 生产或真实飞书回复测试时，将 `DRY_RUN=false`。
 

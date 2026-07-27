@@ -1,6 +1,6 @@
 import { spawnCollect } from "./larkCli.js";
 import type { AppConfig } from "./env.js";
-import type { RouteResult } from "./types.js";
+import type { MessageAttachment, RouteResult } from "./types.js";
 import { createCodexStreamWriter } from "./codexStream.js";
 import fs from "node:fs";
 import os from "node:os";
@@ -31,6 +31,7 @@ function localDraft(route: RouteResult): string {
   }
   const lines = [
     route.plan.responsePreview,
+    formatAttachmentSummary(route),
     "",
     "Execution policy: prefer lark-cli shortcuts; use API commands when needed; fallback to `lark-cli api METHOD /open-apis/...` only when necessary.",
     route.plan.commands.length
@@ -41,6 +42,7 @@ function localDraft(route: RouteResult): string {
 }
 
 async function draftWithOpenAI(config: AppConfig, route: RouteResult): Promise<string> {
+  const inputContent = await buildOpenAIUserContent(route);
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -49,14 +51,15 @@ async function draftWithOpenAI(config: AppConfig, route: RouteResult): Promise<s
     },
     body: JSON.stringify({
       model: config.openaiModel,
+      ...(wantsImageGeneration(route.cleanText) ? { tools: [{ type: "image_generation" }] } : {}),
       input: [
         {
           role: "system",
-          content: `You are ${developer} in a Feishu group. Reply concisely in Chinese. Do not fabricate execution results. Ask for explicit confirmation before high-risk actions.`
+          content: `You are ${developer} in a Feishu group. Reply concisely in Chinese. You can understand attached images. When the user asks to create or edit an image, use the image_generation tool and mention the saved local image path in the final Chinese reply. Do not fabricate execution results. Ask for explicit confirmation before high-risk actions.`
         },
         {
           role: "user",
-          content: JSON.stringify(route, null, 2)
+          content: inputContent
         }
       ]
     })
@@ -65,7 +68,8 @@ async function draftWithOpenAI(config: AppConfig, route: RouteResult): Promise<s
     return `${localDraft(route)}\n\nOpenAI call failed: HTTP ${response.status}`;
   }
   const json = (await response.json()) as { output_text?: string };
-  return json.output_text || localDraft(route);
+  const imagePaths = saveOpenAIImages(json);
+  return [json.output_text || localDraft(route), formatGeneratedImagePaths(imagePaths)].filter(Boolean).join("\n\n");
 }
 
 async function draftWithCodex(config: AppConfig, route: RouteResult): Promise<string> {
@@ -76,6 +80,8 @@ async function draftWithCodex(config: AppConfig, route: RouteResult): Promise<st
     "Do not fabricate lark-cli execution results. Ask the user to reply with confirmation before high-risk actions.",
     "Do not try to send Feishu group messages with lark-cli, and do not decide whether the Feishu bot needs auth login. The outer Feishu handler sends your final reply.",
     "For A2A collaboration tasks, report only task results, artifact paths, self-test results, and the next agent to notify. Never suggest running `lark-cli auth login`.",
+    "You can understand images attached to the Feishu message when local attachment paths are present in the route context. Inspect those local files directly when the user asks about their visual content.",
+    "When the user asks to generate or edit images, create bitmap image files in the workspace or runtime generated-images directory and include the absolute output path in your reply.",
     "For Lumerical, MODE, FDTD, lumapi, GUI startup, or license checkout tasks, expect long waits. Prefer small observable steps, write the script first, run only the requested step, and report any long-running GUI/license wait as progress instead of assuming failure.",
     "Do not kill GUI, Lumerical, MODE, FDTD, license, or simulation processes just because they are slow. If a process appears to be waiting, report the script path, command, visible output, elapsed time, and likely blocker.",
     conversationSection,
@@ -91,7 +97,6 @@ async function draftWithCodex(config: AppConfig, route: RouteResult): Promise<st
     messageId: route.context?.messageId,
     chatType: route.context?.chatType
   });
-  stream.write({ phase: "start", stream: "stage", text: `Codex provider ${providerSummary.provider}/${providerSummary.model} at ${providerSummary.home}` });
   const result = await spawnCollect(
     codexCliBin,
     [...config.codexAgentArgs, "--output-last-message", outputFile, "-"],
@@ -114,6 +119,122 @@ async function draftWithCodex(config: AppConfig, route: RouteResult): Promise<st
   const finalMessage = readOutputFile(outputFile);
   stream.write({ phase: "complete", stream: "stage", text: finalMessage ? "Codex CLI run completed with final message." : "Codex CLI run completed; using stdout/local fallback." });
   return finalMessage || result.stdout.trim() || localDraft(route);
+}
+
+async function buildOpenAIUserContent(route: RouteResult): Promise<Array<Record<string, unknown>> | string> {
+  const content: Array<Record<string, unknown>> = [
+    { type: "input_text", text: JSON.stringify(route, null, 2) }
+  ];
+  for (const attachment of route.context?.attachments ?? []) {
+    if (attachment.kind !== "image" || !attachment.localPath || attachment.downloadError) {
+      continue;
+    }
+    const dataUrl = await imageDataUrl(attachment);
+    if (dataUrl) {
+      content.push({ type: "input_image", image_url: dataUrl });
+    }
+  }
+  return content.length > 1 ? content : JSON.stringify(route, null, 2);
+}
+
+async function imageDataUrl(attachment: MessageAttachment): Promise<string | null> {
+  if (!attachment.localPath) {
+    return null;
+  }
+  try {
+    const data = await fs.promises.readFile(attachment.localPath);
+    return `data:${mimeTypeForImage(attachment)};base64,${data.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+function mimeTypeForImage(attachment: MessageAttachment): string {
+  if (attachment.mimeType) {
+    return attachment.mimeType;
+  }
+  const ext = path.extname(attachment.localPath || attachment.name || "").toLowerCase();
+  if (ext === ".jpg" || ext === ".jpeg") {
+    return "image/jpeg";
+  }
+  if (ext === ".webp") {
+    return "image/webp";
+  }
+  if (ext === ".gif") {
+    return "image/gif";
+  }
+  return "image/png";
+}
+
+function saveOpenAIImages(value: unknown): string[] {
+  const images = findBase64Images(value);
+  if (images.length === 0) {
+    return [];
+  }
+  const dir = path.resolve(process.cwd(), "..", "runtime", "generated", "images");
+  fs.mkdirSync(dir, { recursive: true });
+  return images.map((image, index) => {
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filePath = path.join(dir, `${stamp}-${index + 1}.png`);
+    fs.writeFileSync(filePath, Buffer.from(image, "base64"));
+    return filePath;
+  });
+}
+
+function findBase64Images(value: unknown): string[] {
+  const found: string[] = [];
+  collectBase64Images(value, found);
+  return found;
+}
+
+function collectBase64Images(value: unknown, found: string[]): void {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectBase64Images(item, found);
+    }
+    return;
+  }
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  const record = value as Record<string, unknown>;
+  if (record.type === "image_generation_call" && typeof record.result === "string") {
+    found.push(record.result);
+  }
+  if (typeof record.b64_json === "string") {
+    found.push(record.b64_json);
+  }
+  for (const item of Object.values(record)) {
+    collectBase64Images(item, found);
+  }
+}
+
+function formatGeneratedImagePaths(paths: string[]): string {
+  if (paths.length === 0) {
+    return "";
+  }
+  return ["生成的图片已保存：", ...paths.map((item) => `- ${item}`)].join("\n");
+}
+
+function formatAttachmentSummary(route: RouteResult): string {
+  const attachments = route.context?.attachments ?? [];
+  if (attachments.length === 0) {
+    return "";
+  }
+  return [
+    "收到附件：",
+    ...attachments.map((item) => {
+      const label = item.name ? `${item.kind}:${item.name}` : `${item.kind}:${item.key}`;
+      if (item.localPath) {
+        return `- ${label} -> ${item.localPath}`;
+      }
+      return `- ${label}${item.downloadError ? ` (download failed: ${item.downloadError})` : ""}`;
+    })
+  ].join("\n");
+}
+
+function wantsImageGeneration(text: string): boolean {
+  return /(?:generate|create|draw|make|edit|revise|image|picture|illustration|photo|生成|创建|画|绘制|出图|修图|改图|编辑图片|图片|图像|照片|插画)/i.test(text);
 }
 
 export function resolveCodexCliBin(configuredBin: string): string {
