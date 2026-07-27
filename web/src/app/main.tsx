@@ -19,6 +19,7 @@ import { ActionButton } from "../components/common/ActionButton";
 import { StatusPill } from "../components/common/StatusPill";
 import { DiagnosticCard } from "../components/common/DiagnosticCard";
 import { CodexRuntimePanel } from "../components/common/CodexRuntimePanel";
+import { SortableGrid, type SortableGridItem } from "../components/common/SortableGrid";
 import { AgentCard } from "../modules/agent-array/AgentCard";
 import { AgentDrawer } from "../modules/agent-array/AgentDrawer";
 import { AgentTopology } from "../modules/agent-array/AgentTopology";
@@ -479,6 +480,55 @@ function App() {
   );
   const recentRuns = React.useMemo(() => recentRunsFromOperations(operations), [operations]);
   const currentTrace = React.useMemo(() => taskTraceFromAgents(agents), [agents]);
+  const dashboardPanelItems = React.useMemo<SortableGridItem[]>(() => [
+    {
+      id: "config-health",
+      node: <ConfigHealthCard status={configStatus} />,
+    },
+    {
+      id: "watchdog",
+      node: (
+        <WatchdogCard
+          watchdog={watchdog}
+          busy={busy}
+          run={(path, after) =>
+            run(path, async () => {
+              await refreshDashboard();
+              await refreshWatchdog();
+              await after?.();
+            })
+          }
+        />
+      ),
+    },
+    {
+      id: "agent-diagnostics",
+      className: "xl:col-span-2",
+      node: (
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
+          <AgentTopology agents={agents} onSelect={setSelectedAgent} />
+          <DiagnosticCenter items={explainedDiagnostics} busy={busy} onRun={runAndRefresh} onLogs={(component) => loadLogs(component)} />
+        </section>
+      ),
+    },
+    {
+      id: "infrastructure",
+      className: "xl:col-span-2",
+      node: <InfrastructureHealth infrastructure={infrastructure} onSelect={setSelectedAgent} />,
+    },
+  ], [
+    agents,
+    busy,
+    configStatus,
+    explainedDiagnostics,
+    infrastructure,
+    loadLogs,
+    refreshDashboard,
+    refreshWatchdog,
+    run,
+    runAndRefresh,
+    watchdog,
+  ]);
 
   React.useEffect(() => {
     if (!adventureAgents.length) {
@@ -525,23 +575,12 @@ function App() {
           {activePage === "dashboard" ? (
             <>
               <SummaryCards summary={summary} />
-              <ConfigHealthCard status={configStatus} />
-              <WatchdogCard
-                watchdog={watchdog}
-                busy={busy}
-                run={(path, after) =>
-                  run(path, async () => {
-                    await refreshDashboard();
-                    await refreshWatchdog();
-                    await after?.();
-                  })
-                }
+              <SortableGrid
+                ariaLabel="Dashboard panels"
+                className="grid gap-4 xl:grid-cols-2"
+                items={dashboardPanelItems}
+                storageKey="acc.dashboard.panelOrder"
               />
-              <section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
-                <AgentTopology agents={agents} onSelect={setSelectedAgent} />
-                <DiagnosticCenter items={explainedDiagnostics} busy={busy} onRun={runAndRefresh} onLogs={(component) => loadLogs(component)} />
-              </section>
-              <InfrastructureHealth infrastructure={infrastructure} onSelect={setSelectedAgent} />
             </>
           ) : null}
 
