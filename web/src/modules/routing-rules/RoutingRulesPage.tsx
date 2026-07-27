@@ -1,6 +1,7 @@
 import React from "react";
 import { Download, FileUp, Plus, RefreshCcw, Save, Trash2, ToggleLeft, ToggleRight, X } from "lucide-react";
 import { readJson } from "../../api";
+import { SortableGrid, type SortableGridItem } from "../../components/common/SortableGrid";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                             */
@@ -255,6 +256,35 @@ export default function RoutingRulesPage({ token }: { token: string }) {
     };
     input.click();
   };
+  const statsItems = React.useMemo<SortableGridItem[]>(() => [
+    {
+      id: "total",
+      node: (
+        <div className="h-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="text-xl font-semibold text-slate-950">{rules.length}</div>
+          <div className="text-xs text-slate-500">规则总数</div>
+        </div>
+      ),
+    },
+    {
+      id: "enabled",
+      node: (
+        <div className="h-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="text-xl font-semibold text-slate-950">{rules.filter((r) => r.enabled).length}</div>
+          <div className="text-xs text-slate-500">已启用</div>
+        </div>
+      ),
+    },
+    {
+      id: "disabled",
+      node: (
+        <div className="h-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="text-xl font-semibold text-slate-950">{rules.filter((r) => !r.enabled).length}</div>
+          <div className="text-xs text-slate-500">已禁用</div>
+        </div>
+      ),
+    },
+  ], [rules]);
 
   /* ---- render ---- */
 
@@ -304,20 +334,13 @@ export default function RoutingRulesPage({ token }: { token: string }) {
         </div>
 
         {/* Stats */}
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-            <div className="text-xl font-semibold text-slate-950">{rules.length}</div>
-            <div className="text-xs text-slate-500">规则总数</div>
-          </div>
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-            <div className="text-xl font-semibold text-slate-950">{rules.filter((r) => r.enabled).length}</div>
-            <div className="text-xs text-slate-500">已启用</div>
-          </div>
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-            <div className="text-xl font-semibold text-slate-950">{rules.filter((r) => !r.enabled).length}</div>
-            <div className="text-xs text-slate-500">已禁用</div>
-          </div>
-        </div>
+        <SortableGrid
+          ariaLabel="Routing stats cards"
+          className="mt-4 grid gap-2 sm:grid-cols-3"
+          items={statsItems}
+          maxColSpan={3}
+          storageKey="acc.routing.statsLayout"
+        />
 
         {/* Search */}
         <div className="mt-3">

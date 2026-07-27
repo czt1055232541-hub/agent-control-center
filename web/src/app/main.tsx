@@ -145,28 +145,36 @@ function ConfigHealthCard({ status }: { status: ConfigContractStatus | null }) {
 }
 
 function InfrastructureHealth({ infrastructure, onSelect }: { infrastructure: AgentConfig[]; onSelect: (agent: AgentConfig) => void }) {
+  const infrastructureItems = React.useMemo<SortableGridItem[]>(() => infrastructure.map((item) => ({
+    id: item.id,
+    node: (
+      <button
+        className="h-full w-full rounded-md border border-slate-200 bg-slate-50 p-3 text-left hover:bg-slate-100"
+        onClick={() => onSelect(item)}
+        type="button"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-sm font-medium text-slate-900">{item.name}</span>
+          <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[11px] ${statusClasses(item.status)}`}>{statusLabel(item.status)}</span>
+        </div>
+        <div className="mt-2 text-xs text-slate-500">{item.pid ? `PID ${item.pid}` : "无进程"} · {item.port ? `Port ${item.port}` : "无端口"}</div>
+      </button>
+    ),
+  })), [infrastructure, onSelect]);
+
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3">
         <h2 className="text-base font-semibold text-slate-950">基础设施健康摘要</h2>
         <p className="mt-1 text-sm text-slate-600">这些组件承载真实 Agent 能力，详细控制在“模型与 Provider”。</p>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        {infrastructure.map((item) => (
-          <button
-            className="rounded-md border border-slate-200 bg-slate-50 p-3 text-left hover:bg-slate-100"
-            key={item.id}
-            onClick={() => onSelect(item)}
-            type="button"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="truncate text-sm font-medium text-slate-900">{item.name}</span>
-              <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[11px] ${statusClasses(item.status)}`}>{statusLabel(item.status)}</span>
-            </div>
-            <div className="mt-2 text-xs text-slate-500">{item.pid ? `PID ${item.pid}` : "无进程"} · {item.port ? `Port ${item.port}` : "无端口"}</div>
-          </button>
-        ))}
-      </div>
+      <SortableGrid
+        ariaLabel="Infrastructure cards"
+        className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4"
+        items={infrastructureItems}
+        maxColSpan={3}
+        storageKey="acc.dashboard.infrastructureLayout"
+      />
     </section>
   );
 }
@@ -411,6 +419,31 @@ function PlannedPage({ page }: { page: CommandPage }) {
     },
   };
   const plan = plans[page];
+  const plannedItems = React.useMemo<SortableGridItem[]>(() => [
+    {
+      id: "dependencies",
+      node: (
+        <div className="h-full rounded-md border border-slate-200 bg-slate-50 p-3">
+          <h3 className="text-sm font-medium text-slate-900">依赖数据源</h3>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+            {plan.dependencies.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </div>
+      ),
+    },
+    {
+      id: "next",
+      node: (
+        <div className="h-full rounded-md border border-slate-200 bg-slate-50 p-3">
+          <h3 className="text-sm font-medium text-slate-900">阶段任务</h3>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+            {plan.next.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </div>
+      ),
+    },
+  ], [plan]);
+
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -420,20 +453,13 @@ function PlannedPage({ page }: { page: CommandPage }) {
         </div>
         <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">{plan.stage}</span>
       </div>
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-          <h3 className="text-sm font-medium text-slate-900">依赖数据源</h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
-            {plan.dependencies.map((item) => <li key={item}>{item}</li>)}
-          </ul>
-        </div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-          <h3 className="text-sm font-medium text-slate-900">阶段任务</h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
-            {plan.next.map((item) => <li key={item}>{item}</li>)}
-          </ul>
-        </div>
-      </div>
+      <SortableGrid
+        ariaLabel="Planned page cards"
+        className="mt-4 grid gap-4 lg:grid-cols-2"
+        items={plannedItems}
+        maxColSpan={2}
+        storageKey={`acc.${page}.plannedLayout`}
+      />
     </section>
   );
 }
@@ -529,6 +555,69 @@ function App() {
     runAndRefresh,
     watchdog,
   ]);
+  const adventureAgentItems = React.useMemo<SortableGridItem[]>(() => adventureAgents.map((agent) => ({
+    id: agent.id,
+    node: (
+      <AdventureAgentCard
+        agent={agent}
+        selected={adventureSelectedAgent?.id === agent.id}
+        onSelect={(nextAgent) => setAdventureSelectedAgent(nextAgent)}
+      />
+    ),
+  })), [adventureAgents, adventureSelectedAgent?.id]);
+  const providerInfrastructureItems = React.useMemo<SortableGridItem[]>(() => providerInfrastructure.map((agent) => ({
+    id: agent.id,
+    node: (
+      <AgentCard
+        agent={agent}
+        busy={busy}
+        onRun={runAndRefresh}
+        onLogs={(component) => loadLogs(component)}
+        onSelect={setSelectedAgent}
+      />
+    ),
+  })), [busy, loadLogs, providerInfrastructure, runAndRefresh]);
+  const diagnosticsItems = React.useMemo<SortableGridItem[]>(() => [
+    {
+      id: "operation-log",
+      node: <OperationLog operations={operations} />,
+    },
+    {
+      id: "logs-panel",
+      node: (
+        <LogsPanel
+          busy={busy}
+          logs={logs}
+          selectedLog={selectedLog}
+          logLines={logLines}
+          loadLogs={loadLogs}
+          setSelectedLog={setSelectedLog}
+          setLogLines={setLogLines}
+        />
+      ),
+    },
+    {
+      id: "codex-live-stream",
+      defaultSize: { colSpan: 2, rowSpan: 1 },
+      node: (
+        <CodexLiveStreamPanel
+          runs={codexStream.runs}
+          runId={codexStream.runId}
+          events={codexStream.events}
+          connected={codexStream.connected}
+          error={codexStream.error}
+          setRunId={(next) => {
+            codexStream.setRunId(next);
+            codexStream.loadStream(next).catch(() => {});
+          }}
+          refresh={async () => {
+            await codexStream.loadRuns();
+            await codexStream.loadStream(codexStream.runId);
+          }}
+        />
+      ),
+    },
+  ], [busy, codexStream, loadLogs, logLines, logs, operations, selectedLog]);
 
   React.useEffect(() => {
     if (!adventureAgents.length) {
@@ -602,18 +691,13 @@ function App() {
                     {adventureAgents.length} 个真实角色
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-3">
-                  {adventureAgents.map((agent) => (
-                    <AdventureAgentCard
-                      key={agent.id}
-                      agent={agent}
-                      selected={adventureSelectedAgent?.id === agent.id}
-                      onSelect={(a) => {
-                        setAdventureSelectedAgent(a);
-                      }}
-                    />
-                  ))}
-                </div>
+                <SortableGrid
+                  ariaLabel="Agent cards"
+                  className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+                  items={adventureAgentItems}
+                  maxColSpan={3}
+                  storageKey="acc.agents.cardLayout"
+                />
               </div>
               <AgentDetailPanel
                 agent={adventureSelectedAgent}
@@ -640,18 +724,12 @@ function App() {
 
           {activePage === "provider" ? (
             <>
-              <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-4">
-                {providerInfrastructure.map((agent) => (
-                  <AgentCard
-                    key={agent.id}
-                    agent={agent}
-                    busy={busy}
-                    onRun={runAndRefresh}
-                    onLogs={(component) => loadLogs(component)}
-                    onSelect={setSelectedAgent}
-                  />
-                ))}
-              </div>
+              <SortableGrid
+                ariaLabel="Provider cards"
+                className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-4"
+                items={providerInfrastructureItems}
+                storageKey="acc.provider.cardLayout"
+              />
               <div className="grid gap-4 lg:grid-cols-3">
                 <CodexRuntimePanel
                   status={status}
@@ -681,33 +759,12 @@ function App() {
             <>
               <DiagnosticCenter items={explainedDiagnostics} busy={busy} onRun={runAndRefresh} onLogs={(component) => loadLogs(component)} />
               <RawDiagnostics busy={busy} diagnostics={diagnostics} loadDiagnostics={loadDiagnostics} run={run} />
-              <section className="grid gap-4 lg:grid-cols-2">
-                <OperationLog operations={operations} />
-                <LogsPanel
-                  busy={busy}
-                  logs={logs}
-                  selectedLog={selectedLog}
-                  logLines={logLines}
-                  loadLogs={loadLogs}
-                  setSelectedLog={setSelectedLog}
-                  setLogLines={setLogLines}
-                />
-                <CodexLiveStreamPanel
-                  runs={codexStream.runs}
-                  runId={codexStream.runId}
-                  events={codexStream.events}
-                  connected={codexStream.connected}
-                  error={codexStream.error}
-                  setRunId={(next) => {
-                    codexStream.setRunId(next);
-                    codexStream.loadStream(next).catch(() => {});
-                  }}
-                  refresh={async () => {
-                    await codexStream.loadRuns();
-                    await codexStream.loadStream(codexStream.runId);
-                  }}
-                />
-              </section>
+              <SortableGrid
+                ariaLabel="Diagnostics panels"
+                className="grid gap-4 lg:grid-cols-2"
+                items={diagnosticsItems}
+                storageKey="acc.diagnostics.panelLayout"
+              />
             </>
           ) : null}
 

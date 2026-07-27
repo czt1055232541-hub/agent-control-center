@@ -1,6 +1,7 @@
-﻿import React from "react";
+import React from "react";
 import { Download, FileUp, Plus, RefreshCcw, Save, Trash2, X } from "lucide-react";
 import { readJson } from "../../api";
+import { SortableGrid, type SortableGridItem } from "../../components/common/SortableGrid";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                              */
@@ -100,6 +101,18 @@ export default function ConfigCenterPage({ token }: { token: string }) {
         c.description.toLowerCase().includes(q),
     );
   }, [configs, searchTerm]);
+
+  const statsItems = React.useMemo<SortableGridItem[]>(() => [
+    {
+      id: "total",
+      node: (
+        <div className="h-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="text-xl font-semibold text-slate-950">{configs.length}</div>
+          <div className="text-xs text-slate-500">配置项总数</div>
+        </div>
+      ),
+    },
+  ], [configs.length]);
 
   /* ---- CRUD helpers ---- */
 
@@ -257,12 +270,13 @@ export default function ConfigCenterPage({ token }: { token: string }) {
         </div>
 
         {/* Stats */}
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-            <div className="text-xl font-semibold text-slate-950">{configs.length}</div>
-            <div className="text-xs text-slate-500">配置项总数</div>
-          </div>
-        </div>
+        <SortableGrid
+          ariaLabel="Config stats cards"
+          className="mt-4 grid gap-2 sm:grid-cols-3"
+          items={statsItems}
+          maxColSpan={3}
+          storageKey="acc.config.statsLayout"
+        />
 
         {/* Search */}
         <div className="mt-3">

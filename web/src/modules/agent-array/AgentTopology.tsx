@@ -1,5 +1,6 @@
 import { ArrowRight, Bot, MessageSquare } from "lucide-react";
 import type { AgentConfig, AgentStatus } from "../../types";
+import { SortableGrid, type SortableGridItem } from "../../components/common/SortableGrid";
 
 function availabilityClasses(status: AgentStatus | "normal" | "unknown") {
   const classes: Record<string, string> = {
@@ -84,6 +85,18 @@ export function AgentTopology({
   const downstream = ["codex-code-agent", "openclaw-orchestrator", "openclaw-main", "openclaw-archivist"]
     .map((id) => byId.get(id))
     .filter((agent): agent is AgentConfig => Boolean(agent));
+  const downstreamItems: SortableGridItem[] = downstream.map((agent) => ({
+    id: agent.id,
+    node: (
+      <Node
+        label={agent.name}
+        status={agent.status}
+        currentTask={agent.currentTask}
+        icon={<Bot size={18} />}
+        onClick={() => onSelect(agent)}
+      />
+    ),
+  }));
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -106,18 +119,13 @@ export function AgentTopology({
         />
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {downstream.map((agent) => (
-          <Node
-            key={agent.id}
-            label={agent.name}
-            status={agent.status}
-            currentTask={agent.currentTask}
-            icon={<Bot size={18} />}
-            onClick={() => onSelect(agent)}
-          />
-        ))}
-      </div>
+      <SortableGrid
+        ariaLabel="Agent topology cards"
+        className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        items={downstreamItems}
+        maxColSpan={3}
+        storageKey="acc.dashboard.agentTopologyLayout"
+      />
     </section>
   );
 }

@@ -1,6 +1,7 @@
 import React from "react";
 import { AlertTriangle, CheckCircle2, RefreshCcw, Shield, Users, XCircle } from "lucide-react";
 import { readJson } from "../../api";
+import { SortableGrid, type SortableGridItem } from "../../components/common/SortableGrid";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                              */
@@ -137,6 +138,15 @@ export default function FeishuConnectionPage({ token }: { token: string }) {
       setRefreshing(false);
     }
   };
+  const statusItems = React.useMemo<SortableGridItem[]>(() => {
+    if (!status) return [];
+    return [
+      { id: "tenant", node: <div className="h-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-xs text-slate-500">租户名</div><div className="mt-1 text-sm font-medium text-slate-900">{status.tenantName}</div></div> },
+      { id: "app", node: <div className="h-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-xs text-slate-500">应用名</div><div className="mt-1 text-sm font-medium text-slate-900">{status.appName}</div></div> },
+      { id: "app-id", node: <div className="h-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-xs text-slate-500">App ID</div><div className="mt-1 text-sm font-mono font-medium text-slate-900">{status.appIdMasked}</div></div> },
+      { id: "duration", node: <div className="h-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2"><div className="text-xs text-slate-500">响应时长</div><div className="mt-1 text-sm font-medium text-slate-900">{status.durationMs} ms</div></div> },
+    ];
+  }, [status]);
 
   /* ---- render ---- */
 
@@ -201,24 +211,13 @@ export default function FeishuConnectionPage({ token }: { token: string }) {
         </div>
 
         {status ? (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-xs text-slate-500">租户名</div>
-              <div className="mt-1 text-sm font-medium text-slate-900">{status.tenantName}</div>
-            </div>
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-xs text-slate-500">应用名</div>
-              <div className="mt-1 text-sm font-medium text-slate-900">{status.appName}</div>
-            </div>
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-xs text-slate-500">App ID</div>
-              <div className="mt-1 text-sm font-mono font-medium text-slate-900">{status.appIdMasked}</div>
-            </div>
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-xs text-slate-500">响应时长</div>
-              <div className="mt-1 text-sm font-medium text-slate-900">{status.durationMs} ms</div>
-            </div>
-          </div>
+          <SortableGrid
+            ariaLabel="Feishu status cards"
+            className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+            items={statusItems}
+            maxColSpan={3}
+            storageKey="acc.feishu.statusLayout"
+          />
         ) : (
           <div className="mt-4 text-sm text-slate-400">无法获取连接状态</div>
         )}

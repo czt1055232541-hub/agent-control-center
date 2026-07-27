@@ -1,6 +1,7 @@
 import React from "react";
 import { Edit3, Plus, RefreshCcw, Save, Search, Trash2, X } from "lucide-react";
 import { readJson } from "../../api";
+import { SortableGrid, type SortableGridItem } from "../../components/common/SortableGrid";
 
 type TaskEntry = {
   taskId: string;
@@ -305,6 +306,26 @@ export default function TaskDashboardPage({ token }: { token: string }) {
   };
 
   const total = directory?.tasks.length ?? 0;
+  const statsItems = React.useMemo<SortableGridItem[]>(() => [
+    {
+      id: "total",
+      node: (
+        <div className="h-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="text-xl font-semibold text-slate-950">{total}</div>
+          <div className="text-xs text-slate-500">任务条目</div>
+        </div>
+      ),
+    },
+    ...STATUS_OPTIONS.filter((status) => stats[status]).slice(0, 3).map((status) => ({
+      id: status,
+      node: (
+        <div className="h-full rounded-md border border-slate-200 bg-white px-3 py-2">
+          <div className="text-xl font-semibold text-slate-950">{stats[status]}</div>
+          <div className="text-xs text-slate-500">{status}</div>
+        </div>
+      ),
+    })),
+  ], [stats, total]);
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-4">
@@ -337,18 +358,13 @@ export default function TaskDashboardPage({ token }: { token: string }) {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-4">
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-            <div className="text-xl font-semibold text-slate-950">{total}</div>
-            <div className="text-xs text-slate-500">任务条目</div>
-          </div>
-          {STATUS_OPTIONS.filter((status) => stats[status]).slice(0, 3).map((status) => (
-            <div key={status} className="rounded-md border border-slate-200 bg-white px-3 py-2">
-              <div className="text-xl font-semibold text-slate-950">{stats[status]}</div>
-              <div className="text-xs text-slate-500">{status}</div>
-            </div>
-          ))}
-        </div>
+        <SortableGrid
+          ariaLabel="Task stats cards"
+          className="mt-4 grid gap-2 sm:grid-cols-4"
+          items={statsItems}
+          maxColSpan={3}
+          storageKey="acc.tasks.statsLayout"
+        />
 
         {directory?.sync.addedFolders.length ? (
           <div className="mt-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
