@@ -462,6 +462,25 @@ test("sendPost uses Feishu rich text post content for mentions", async () => {
   ]);
 });
 
+test("sendText can reply in the source Feishu thread", async () => {
+  const config = { ...getConfig(), dryRun: true };
+  const lark = new LarkCli(config);
+  const result = await lark.sendText("oc_chat", "hello", { replyToMessageId: "om_source", replyInThread: true });
+  assert.equal(result.ok, true);
+  const payload = JSON.parse(result.stdout) as { command: string[] };
+  assert.deepEqual(payload.command.slice(1), [
+    "im",
+    "+messages-reply",
+    "--message-id",
+    "om_source",
+    "--text",
+    "hello",
+    "--reply-in-thread",
+    "--as",
+    "bot"
+  ]);
+});
+
 test("addTypingReaction uses Feishu reaction OpenAPI", async () => {
   const config = { ...getConfig(), dryRun: true };
   const lark = new LarkCli(config);
@@ -701,7 +720,7 @@ test("A2A relay sends bot-to-bot mentions as rich text posts", async () => {
 });
 
 test("known A2A bot sender can receive a rich text mention reply", async () => {
-  const sent: Array<{ chatId: string; content?: unknown; text?: string }> = [];
+  const sent: Array<{ chatId: string; content?: unknown; text?: string; options?: unknown }> = [];
   const config = {
     ...getConfig(),
     dryRun: false,
@@ -710,12 +729,12 @@ test("known A2A bot sender can receive a rich text mention reply", async () => {
     a2aRelay: { enabled: false }
   };
   const fakeLark = {
-    sendText: async (chatId: string, text: string) => {
-      sent.push({ chatId, text });
+    sendText: async (chatId: string, text: string, options?: unknown) => {
+      sent.push({ chatId, text, options });
       return { ok: true, code: 0, stdout: "", stderr: "" };
     },
-    sendPost: async (chatId: string, content: unknown) => {
-      sent.push({ chatId, content });
+    sendPost: async (chatId: string, content: unknown, options?: unknown) => {
+      sent.push({ chatId, content, options });
       return { ok: true, code: 0, stdout: "", stderr: "" };
     },
     run: async () => ({ ok: true, code: 0, stdout: "", stderr: "" })
@@ -736,6 +755,7 @@ test("known A2A bot sender can receive a rich text mention reply", async () => {
   });
   assert.equal(sent.length, 1);
   assert.equal(sent[0].chatId, "oc_group");
+  assert.deepEqual(sent[0].options, { replyToMessageId: "om_peer", replyInThread: true });
   assert.equal(sent[0].text, undefined);
   assert.deepEqual(
     (sent[0].content as { zh_cn: { content: Array<Array<{ tag: string; user_id?: string }>> } }).zh_cn.content[0][1],

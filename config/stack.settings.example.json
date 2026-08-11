@@ -62,5 +62,50 @@
     "logs": "C:\\path\\to\\agent-control-center\\runtime\\logs",
     "pids": "C:\\path\\to\\agent-control-center\\runtime\\pids",
     "summaries": "C:\\path\\to\\agent-control-center\\runtime\\summaries"
+  },
+  "localTools": {
+    "tools": [
+      {
+        "id": "calendar-tool",
+        "name": "日历工具",
+        "description": "Local calendar, memo, todo, countdown and Gantt tool developed under TOOLS.",
+        "dir": "C:\\path\\to\\agent-control-center\\TOOLS\\calendar-tool",
+        "manifest": "acc.local-tool.json",
+        "entry": "app.py",
+        "runtime": "python",
+        "host": "127.0.0.1",
+        "port": 8010,
+        "url": "http://127.0.0.1:8010",
+        "healthPath": "/api/health",
+        "openPath": "/",
+        "enabled": true,
+        "embed": true,
+        "tags": [
+          "calendar",
+          "planning",
+          "local"
+        ],
+        "env": {
+          "CALENDAR_DATA_DIR": "data"
+        }
+      },
+      {
+        "id": "planning-manager",
+        "name": "Planning Manager",
+        "description": "Local planning, memo, todo, date countdown and Gantt tool.",
+        "dir": "C:\\path\\to\\agent-control-center\\projects\\planning-manager",
+        "entry": "app.py",
+        "host": "127.0.0.1",
+        "port": 8011,
+        "url": "http://127.0.0.1:8011",
+        "healthPath": "/api/health",
+        "enabled": false,
+        "embed": true,
+        "tags": [
+          "planning",
+          "legacy"
+        ]
+      }
+    ]
   }
 }

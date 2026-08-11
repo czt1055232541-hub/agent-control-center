@@ -47,6 +47,21 @@ class ConfigTests(unittest.TestCase):
     "logs": "__ROOT__\\\\runtime\\\\logs",
     "pids": "__ROOT__\\\\runtime\\\\pids",
     "summaries": "__ROOT__\\\\runtime\\\\summaries"
+  },
+  "localTools": {
+    "tools": [
+      {
+        "id": "demo-tool",
+        "name": "Demo Tool",
+        "dir": "__ROOT__\\\\projects\\\\demo-tool",
+        "entry": "app.py",
+        "host": "127.0.0.1",
+        "port": 8123,
+        "url": "http://127.0.0.1:8123",
+        "healthPath": "/api/health",
+        "tags": ["demo"]
+      }
+    ]
   }
 }
 """.replace("__ROOT__", str(root).replace("\\", "\\\\")).strip(),
@@ -66,6 +81,69 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.agent.codex_home, config.stack_root / "agent-runtime" / "codex-home")
         self.assertEqual(config.agent.codex_config, config.stack_root / "agent-runtime" / "codex-home" / "config.toml")
         self.assertEqual(config.moonbridge.base_url, "http://127.0.0.1:38440/v1")
+        self.assertEqual(config.local_tools[0].id, "demo-tool")
+        self.assertEqual(config.local_tools[0].command[-1], "app.py")
+        self.assertEqual(config.local_tools[0].entry.name, "app.py")
+
+    def test_local_tool_manifest_adapts_calendar_tool_code(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tool_dir = root / "TOOLS" / "calendar-tool"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "acc.local-tool.json").write_text(
+                """
+{
+  "id": "calendar-tool",
+  "name": "日历工具",
+  "description": "本地日历、待办和时间线工具。",
+  "runtime": "python",
+  "entry": "calendar_app.py",
+  "host": "127.0.0.1",
+  "port": 8012,
+  "healthPath": "/api/health",
+  "openPath": "/calendar",
+  "tags": ["calendar", "planning"],
+  "env": {"CALENDAR_DATA_DIR": "data"}
+}
+""".strip(),
+                encoding="utf-8",
+            )
+            settings = root / "stack.settings.json"
+            settings.write_text(
+                """
+{
+  "stackRoot": "__ROOT__",
+  "pythonExe": "__ROOT__\\\\python.exe",
+  "nodeExe": "__ROOT__\\\\node.exe",
+  "npmExe": "__ROOT__\\\\npm.cmd",
+  "codexHome": "__ROOT__\\\\codex",
+  "codexBin": "__ROOT__\\\\codex\\\\codex.exe",
+  "codexConfig": "__ROOT__\\\\codex\\\\config.toml",
+  "codexNativeModel": "gpt-5.5",
+  "codexMoonBridgeModel": "moonbridge",
+  "codexSwitchScript": "__ROOT__\\\\codex\\\\Switch-CodexProvider.ps1",
+  "moonbridge": {"dir": "__ROOT__\\\\moonbridge", "exe": "__ROOT__\\\\moonbridge\\\\moonbridge.exe", "config": "__ROOT__\\\\moonbridge\\\\config.yml", "port": 38440},
+  "openclaw": {"home": "__ROOT__\\\\openclaw", "gatewayCmd": "__ROOT__\\\\openclaw\\\\gateway.cmd", "port": 18789},
+  "agent": {"dir": "__ROOT__\\\\agent", "entry": "dist\\\\src\\\\index.js", "larkCliBin": "__ROOT__\\\\agent\\\\lark-cli.exe"},
+  "runtime": {"dir": "__ROOT__\\\\runtime", "logs": "__ROOT__\\\\runtime\\\\logs", "pids": "__ROOT__\\\\runtime\\\\pids"},
+  "localTools": {"tools": [{"dir": "__ROOT__\\\\TOOLS\\\\calendar-tool", "port": 8013}]}
+}
+""".replace("__ROOT__", str(root).replace("\\", "\\\\")).strip(),
+                encoding="utf-8",
+            )
+
+            config = load_config(settings)
+
+        tool = config.local_tools[0]
+        self.assertEqual(tool.id, "calendar-tool")
+        self.assertEqual(tool.name, "日历工具")
+        self.assertEqual(tool.port, 8013)
+        self.assertEqual(tool.open_path, "/calendar")
+        self.assertEqual(tool.entry, tool_dir / "calendar_app.py")
+        self.assertEqual(tool.command[-1], "calendar_app.py")
+        self.assertEqual(tool.env["CALENDAR_DATA_DIR"], "data")
+        self.assertEqual(tool.source, "manifest")
+        self.assertEqual(tool.manifest_path, tool_dir / "acc.local-tool.json")
 
     def test_resolve_codex_bin_prefers_app_managed_cli_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

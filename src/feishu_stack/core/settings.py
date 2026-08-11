@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shlex
 import shutil
 import sys
 import tomllib
@@ -191,6 +192,105 @@ def resolve_settings_path(path: Path | None = None) -> Path:
     return config_dir / "stack.settings.json"
 
 
+def _resolve_local_tool_path(value: Any, base: Path) -> Path:
+    path = Path(str(value))
+    return path if path.is_absolute() else base / path
+
+
+def _read_local_tool_manifest(tool_dir: Path, manifest_value: Any = None) -> dict[str, Any]:
+    candidates: list[Path] = []
+    if manifest_value:
+        manifest_path = Path(str(manifest_value))
+        candidates.append(manifest_path if manifest_path.is_absolute() else tool_dir / manifest_path)
+    candidates.extend([tool_dir / "acc.local-tool.json", tool_dir / "local-tool.json"])
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        try:
+            data = json.loads(candidate.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError) as exc:
+            _log.warning("failed to read local tool manifest %s: %s", candidate, exc)
+            continue
+        if isinstance(data, dict):
+            return {**data, "_manifest_path": str(candidate)}
+    return {}
+
+
+def _first_tool_value(item: dict[str, Any], manifest: dict[str, Any], *keys: str, default: Any = None) -> Any:
+    for key in keys:
+        if key in item and item[key] not in (None, ""):
+            return item[key]
+    for key in keys:
+        if key in manifest and manifest[key] not in (None, ""):
+            return manifest[key]
+    return default
+
+
+def _local_tool_settings(raw: dict[str, Any], stack_root: Path, default_python: Path) -> list["LocalToolSettings"]:
+    local_tools = raw.get("localTools", {}) if isinstance(raw.get("localTools", {}), dict) else {}
+    tools = local_tools.get("tools", []) if isinstance(local_tools.get("tools", []), list) else []
+    parsed: list[LocalToolSettings] = []
+    for item in tools:
+        if not isinstance(item, dict):
+            continue
+        provisional_id = str(item.get("id") or "").strip()
+        tool_dir = Path(str(item.get("dir") or stack_root / "projects" / provisional_id))
+        if not tool_dir.is_absolute():
+            tool_dir = stack_root / tool_dir
+        manifest = _read_local_tool_manifest(tool_dir, item.get("manifest"))
+        tool_id = str(_first_tool_value(item, manifest, "id", default="")).strip()
+        if not tool_id:
+            continue
+        entry = str(_first_tool_value(item, manifest, "entry", default="app.py"))
+        runtime = str(_first_tool_value(item, manifest, "runtime", "kind", default="python"))
+        command = _first_tool_value(item, manifest, "command")
+        if isinstance(command, list) and command:
+            command_parts = [str(part) for part in command]
+        elif isinstance(command, str) and command.strip():
+            command_parts = shlex.split(command, posix=os.name != "nt")
+        else:
+            python_exe = _first_tool_value(item, manifest, "pythonExe", default=default_python)
+            node_exe = _first_tool_value(item, manifest, "nodeExe", default=raw.get("nodeExe") or "node")
+            if runtime in {"node", "javascript", "js"}:
+                command_parts = [str(node_exe), entry]
+            else:
+                command_parts = [str(python_exe), entry]
+        host = str(_first_tool_value(item, manifest, "host", default="127.0.0.1"))
+        port = int(_first_tool_value(item, manifest, "port", default=0) or 0)
+        url = str(_first_tool_value(item, manifest, "url", default=f"http://{host}:{port}"))
+        env = item.get("env", {}) if isinstance(item.get("env", {}), dict) else {}
+        manifest_env = manifest.get("env", {}) if isinstance(manifest.get("env", {}), dict) else {}
+        merged_env = {**{str(k): str(v) for k, v in manifest_env.items()}, **{str(k): str(v) for k, v in env.items()}}
+        open_path = str(_first_tool_value(item, manifest, "openPath", "open_path", default="/"))
+        if not open_path.startswith("/"):
+            open_path = f"/{open_path}"
+        source = str(_first_tool_value(item, manifest, "source", default="manifest" if manifest else "stack-settings"))
+        raw_tags = _first_tool_value(item, manifest, "tags", default=[])
+        parsed.append(
+            LocalToolSettings(
+                id=tool_id,
+                name=str(_first_tool_value(item, manifest, "name", default=tool_id)),
+                description=str(_first_tool_value(item, manifest, "description", default="")),
+                dir=tool_dir,
+                entry=_resolve_local_tool_path(entry, tool_dir),
+                command=command_parts,
+                host=host,
+                port=port,
+                url=url.rstrip("/"),
+                health_path=str(_first_tool_value(item, manifest, "healthPath", "health_path", default="/api/health")),
+                open_path=open_path,
+                runtime=runtime,
+                source=source,
+                manifest_path=Path(manifest["_manifest_path"]) if manifest.get("_manifest_path") else None,
+                enabled=bool(_first_tool_value(item, manifest, "enabled", default=True)),
+                embed=bool(_first_tool_value(item, manifest, "embed", default=True)),
+                tags=[str(tag) for tag in raw_tags] if isinstance(raw_tags, list) else [],
+                env=merged_env,
+            )
+        )
+    return parsed
+
+
 @dataclass(frozen=True)
 class ToolchainSettings:
     python_exe: Path
@@ -263,6 +363,28 @@ class RuntimeSettings:
 
 
 @dataclass(frozen=True)
+class LocalToolSettings:
+    id: str
+    name: str
+    description: str
+    dir: Path
+    entry: Path
+    command: list[str]
+    host: str
+    port: int
+    url: str
+    health_path: str
+    open_path: str = "/"
+    runtime: str = "python"
+    source: str = "stack-settings"
+    manifest_path: Path | None = None
+    enabled: bool = True
+    embed: bool = True
+    tags: list[str] = field(default_factory=list)
+    env: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class StackConfig:
     raw: dict[str, Any]
     stack_root: Path
@@ -298,6 +420,7 @@ class StackConfig:
     node_exe: Path | str = "node"
     npm_exe: Path | str = "npm"
     moonbridge_reasoning_effort: str = "high"
+    local_tools: list[LocalToolSettings] = field(default_factory=list)
     toolchain: ToolchainSettings = field(init=False)
     codex: CodexSettings = field(init=False)
     moonbridge: MoonBridgeSettings = field(init=False)
@@ -441,6 +564,15 @@ class StackConfig:
         self.pid_dir.mkdir(parents=True, exist_ok=True)
         self.migration_summary_dir.mkdir(parents=True, exist_ok=True)
 
+    def local_tool_pid(self, tool_id: str) -> Path:
+        return self.pid_dir / f"local-tool-{tool_id}.pid"
+
+    def local_tool_stdout_log(self, tool_id: str) -> Path:
+        return self.log_dir / f"local-tool-{tool_id}-out.log"
+
+    def local_tool_stderr_log(self, tool_id: str) -> Path:
+        return self.log_dir / f"local-tool-{tool_id}-err.log"
+
 
 def load_config(path: Path | None = None) -> StackConfig:
     settings_path = resolve_settings_path(path)
@@ -496,6 +628,7 @@ def load_config(path: Path | None = None) -> StackConfig:
         projects_root=Path(raw["projectsRoot"]) if raw.get("projectsRoot") else None,
         summary_dir=Path(runtime.get("summaries") or Path(runtime["dir"]) / "summaries"),
         watchdog_state_dir=Path(agent.get("watchdogStateDir") or raw["watchdogStateDir"]) if (agent.get("watchdogStateDir") or raw.get("watchdogStateDir")) else None,
+        local_tools=_local_tool_settings(raw, stack_root, Path(raw.get("pythonExe") or os.environ.get("PYTHON_EXE") or sys.executable)),
     )
     config.ensure_runtime_dirs()
     return config

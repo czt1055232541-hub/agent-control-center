@@ -161,6 +161,44 @@ def test_infrastructure_route_is_read_only_without_token(monkeypatch) -> None:
     assert response.json()["agents"] == []
 
 
+def test_local_tools_route_is_read_only_without_token(monkeypatch) -> None:
+    monkeypatch.setattr(app_module.local_tools, "list_tools", lambda: [{"id": "demo-tool", "name": "Demo Tool"}])
+    response = client.get("/api/local-tools")
+    assert response.status_code == 200
+    assert response.json()["tools"][0]["id"] == "demo-tool"
+
+
+def test_local_tools_scan_requires_token() -> None:
+    response = client.get("/api/local-tools/scan")
+    assert response.status_code == 401
+
+
+def test_local_tools_scan_route_uses_registry(monkeypatch) -> None:
+    monkeypatch.setattr(app_module.local_tools, "scan", lambda root=None: [{"id": "calendar-tool", "registered": False, "root": root}])
+    response = client.get("/api/local-tools/scan?root=TOOLS", headers={"X-Control-Token": _token()})
+    assert response.status_code == 200
+    assert response.json()["candidates"][0]["id"] == "calendar-tool"
+    assert response.json()["candidates"][0]["root"] == "TOOLS"
+
+
+def test_local_tools_register_route_uses_registry(monkeypatch) -> None:
+    payloads = []
+
+    def fake_register(payload):
+        payloads.append(payload)
+        return {"ok": True, "registered": payload, "settings_path": "F:/settings.json", "updated": False}
+
+    monkeypatch.setattr(app_module.local_tools, "register", fake_register)
+    response = client.post(
+        "/api/local-tools/register",
+        headers={"X-Control-Token": _token()},
+        json={"id": "calendar-tool", "name": "日历工具", "dir": "F:/TOOLS/calendar-tool", "port": 8010},
+    )
+    assert response.status_code == 200
+    assert response.json()["registered"]["id"] == "calendar-tool"
+    assert payloads[0]["dir"] == "F:/TOOLS/calendar-tool"
+
+
 def test_current_watchdog_route_is_read_only_without_token(monkeypatch) -> None:
     monkeypatch.setattr(
         app_module.watchdog,

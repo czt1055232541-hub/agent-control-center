@@ -111,8 +111,8 @@ export class MessageHandler {
     if (route.plan.requiresConfirmation) {
       this.confirmations.create(event.chatId, senderKey, route);
       const response = formatConfirmation(route);
-     await this.larkCli.sendText(event.chatId, response);
-     return response;
+      await this.larkCli.sendText(event.chatId, response, replyOptions(event.messageId));
+      return response;
    }
     return this.executeAndReply(event.chatId, event.messageId, route, false);
  }
@@ -182,7 +182,7 @@ export class MessageHandler {
         infoLog(`suppressed stale reply chat_id=${chatId} generation=${generation}`);
         return response;
       }
-      const sendResult = await this.sendResponse(chatId, response, route);
+      const sendResult = await this.sendResponse(chatId, messageId, response, route);
       if (!sendResult.ok) {
         console.error(`[agent] failed to reply chat_id=${chatId} code=${sendResult.code} stderr=${preview(sendResult.stderr || sendResult.stdout, 1000)}`);
       } else {
@@ -273,7 +273,7 @@ export class MessageHandler {
     };
   }
 
-  private async sendResponse(chatId: string, response: string, route: RouteResult): Promise<CliResult> {
+  private async sendResponse(chatId: string, messageId: string, response: string, route: RouteResult): Promise<CliResult> {
     const outbound = ensureCoordinatorMentionForA2AReply(response, route, this.config.a2aBots);
     const chunks = splitResponseForFeishu(outbound, this.config.a2aBots);
     let lastResult: CliResult = { ok: true, code: 0, stdout: "", stderr: "" };
@@ -282,8 +282,8 @@ export class MessageHandler {
       const chunk = chunks[index];
       const richResponse = isLast ? this.toRichTextWithA2AMentions(chunk) : null;
       lastResult = richResponse
-        ? await this.larkCli.sendPost(chatId, richResponse)
-        : await this.larkCli.sendText(chatId, isLast ? chunk : neutralizeA2AMentions(chunk, this.config.a2aBots));
+        ? await this.larkCli.sendPost(chatId, richResponse, replyOptions(messageId))
+        : await this.larkCli.sendText(chatId, isLast ? chunk : neutralizeA2AMentions(chunk, this.config.a2aBots), replyOptions(messageId));
       if (!lastResult.ok) {
         return lastResult;
       }
@@ -321,6 +321,10 @@ export class MessageHandler {
     }
     return { zh_cn: { content: [elements] } };
   }
+}
+
+function replyOptions(messageId: string): { replyToMessageId: string; replyInThread: true } {
+  return { replyToMessageId: messageId, replyInThread: true };
 }
 
 function buildMentionPattern(bots: Array<{ name: string; openId: string }>): RegExp {

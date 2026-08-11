@@ -14,6 +14,7 @@ from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request, Respo
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse
 from pydantic import BaseModel
 
@@ -27,6 +28,7 @@ from feishu_stack.modules.logs_diagnostics import metrics
 from feishu_stack.modules.operations import control_center, stack_actions
 from feishu_stack.modules.logs_diagnostics import diagnostics as diagnostics_module
 from feishu_stack.modules.task_battlefield import task_directory, watchdog
+from feishu_stack.modules.local_tools import registry as local_tools
 from feishu_stack.modules import config_center
 from feishu_stack.modules import routing_rules
 from feishu_stack.modules import feishu_connection
@@ -57,6 +59,7 @@ SKILL_WORKSHOP_TAG = "Skill Workshop"
 CONFIG_CENTER_TAG = "Config Center"
 ROUTING_RULES_TAG = "Routing Rules"
 FEISHU_CONNECTION_TAG = "Feishu Connection"
+LOCAL_TOOLS_TAG = "Local Tools"
 
 
 _main_loop: asyncio.AbstractEventLoop | None = None
@@ -88,7 +91,16 @@ app = FastAPI(
         {"name": CONFIG_CENTER_TAG, "description": "Config center CRUD and import/export endpoints"},
         {"name": ROUTING_RULES_TAG, "description": "Routing rules CRUD and batch import endpoints"},
         {"name": FEISHU_CONNECTION_TAG, "description": "Feishu/Lark connection status, accounts, permissions, and auth refresh"},
+        {"name": LOCAL_TOOLS_TAG, "description": "Registry and process control for local embedded tools"},
     ],
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"^http://(127\.0\.0\.1|localhost)(:\d+)?$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ---------------------------------------------------------------------------
@@ -109,6 +121,25 @@ class ThreadMigrationFolderRequest(BaseModel):
 class LogLevelSetRequest(BaseModel):
     logger: str = "root"
     level: str
+
+
+class LocalToolRegisterRequest(BaseModel):
+    id: str | None = None
+    name: str | None = None
+    description: str | None = None
+    dir: str
+    manifest: str | None = None
+    entry: str | None = None
+    runtime: str | None = None
+    host: str | None = None
+    port: int | None = None
+    url: str | None = None
+    healthPath: str | None = None
+    openPath: str | None = None
+    enabled: bool = True
+    embed: bool = True
+    tags: list[str] = []
+    env: dict[str, str] | None = None
 
 
 class MoonBridgeModelSwitchRequest(BaseModel):
@@ -384,6 +415,96 @@ def agents() -> dict:
 )
 def infrastructure() -> dict:
     return {"agents": to_dict(agent_dashboard.list_infrastructure())}
+
+
+@app.get(
+    "/api/local-tools",
+    summary="Local tool registry",
+    description="Return local tools registered in stack settings with runtime status.",
+    tags=[LOCAL_TOOLS_TAG],
+)
+def list_local_tools() -> dict:
+    return {"tools": local_tools.list_tools()}
+
+
+@app.get(
+    "/api/local-tools/scan",
+    summary="Scan local tools",
+    description="Scan common local tool folders or a specified root for tool manifests.",
+    tags=[LOCAL_TOOLS_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def scan_local_tools(root: str | None = None) -> dict:
+    return {"candidates": local_tools.scan(root)}
+
+
+@app.post(
+    "/api/local-tools/register",
+    summary="Register local tool",
+    description="Register a local tool into the writable stack settings file.",
+    tags=[LOCAL_TOOLS_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def register_local_tool(request: LocalToolRegisterRequest) -> dict:
+    try:
+        return local_tools.register(request.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get(
+    "/api/local-tools/{tool_id}",
+    summary="Local tool status",
+    description="Return one registered local tool with runtime status.",
+    tags=[LOCAL_TOOLS_TAG],
+)
+def get_local_tool(tool_id: str) -> dict:
+    try:
+        return local_tools.get_tool_status(tool_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"local tool not found: {tool_id}") from exc
+
+
+@app.post(
+    "/api/local-tools/{tool_id}/start",
+    summary="Start local tool",
+    description="Start a registered local tool. Requires control token.",
+    tags=[LOCAL_TOOLS_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def start_local_tool(tool_id: str) -> dict:
+    try:
+        return _run(f"local-tool:{tool_id}", "start", lambda cfg: local_tools.start(tool_id, cfg))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"local tool not found: {tool_id}") from exc
+
+
+@app.post(
+    "/api/local-tools/{tool_id}/stop",
+    summary="Stop local tool",
+    description="Stop a registered local tool. Requires control token.",
+    tags=[LOCAL_TOOLS_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def stop_local_tool(tool_id: str) -> dict:
+    try:
+        return _run(f"local-tool:{tool_id}", "stop", lambda cfg: local_tools.stop(tool_id, cfg))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"local tool not found: {tool_id}") from exc
+
+
+@app.post(
+    "/api/local-tools/{tool_id}/restart",
+    summary="Restart local tool",
+    description="Restart a registered local tool. Requires control token.",
+    tags=[LOCAL_TOOLS_TAG],
+    dependencies=[Depends(require_control_token)],
+)
+def restart_local_tool(tool_id: str) -> dict:
+    try:
+        return _run(f"local-tool:{tool_id}", "restart", lambda cfg: local_tools.restart(tool_id, cfg))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"local tool not found: {tool_id}") from exc
 
 
 @app.get(
@@ -790,6 +911,13 @@ def logs(component: str, lines: int = 120) -> dict:
         "control-center-api": [cfg.log_dir / "control-center-api-out.log", cfg.log_dir / "control-center-api-err.log"],
         "operations": [cfg.log_dir / "operations.jsonl"],
     }
+    if component.startswith("local-tool:"):
+        tool_id = component.split(":", 1)[1]
+        try:
+            local_tools.get_tool_status(tool_id, cfg)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=f"Unknown local tool: {tool_id}") from exc
+        table[component] = [cfg.local_tool_stdout_log(tool_id), cfg.local_tool_stderr_log(tool_id)]
     if component not in table:
         raise HTTPException(status_code=404, detail=f"Unknown log component: {component}")
     return {"component": component, "logs": [to_dict(tail(path, lines)) for path in table[component]]}

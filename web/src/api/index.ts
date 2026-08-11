@@ -21,11 +21,20 @@ export function isRunning(component: ComponentStatus): boolean {
 }
 
 export async function readJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
+  const requestInit: RequestInit = url.startsWith("/api") || url.includes("://127.0.0.1:8765/api")
+    ? { cache: "no-store", ...init }
+    : { ...init };
+  const response = await fetch(url, requestInit);
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().includes("application/json")) {
     const body = await response.text().catch(() => "");
     const preview = body.replace(/\s+/g, " ").trim().slice(0, 120);
+    if (url.startsWith("/api") && preview.toLowerCase().startsWith("<!doctype html")) {
+      if (typeof window !== "undefined" && window.location.origin !== "http://127.0.0.1:8765") {
+        return readJson<T>(`http://127.0.0.1:8765${url}`, init);
+      }
+      throw new Error(`API route ${url} returned the frontend page. Restart the ACC backend or check that the dev proxy points to http://127.0.0.1:8765.`);
+    }
     throw new Error(preview ? `Expected JSON from ${url}, got ${contentType}: ${preview}` : `Expected JSON from ${url}, got ${contentType || "unknown content type"}`);
   }
   const data = await response.json().catch(() => ({}));

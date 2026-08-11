@@ -19,7 +19,20 @@ export class LarkCli {
     return spawnCollect(this.config.larkCliBin, args, options.input, this.config.larkCliOutputEncoding, options.env, options.timeoutMs);
   }
 
-  sendText(chatId: string, text: string): Promise<CliResult> {
+  sendText(chatId: string, text: string, options: SendOptions = {}): Promise<CliResult> {
+    if (options.replyToMessageId) {
+      return this.run([
+        "im",
+        "+messages-reply",
+        "--message-id",
+        options.replyToMessageId,
+        "--text",
+        text,
+        ...(options.replyInThread ? ["--reply-in-thread"] : []),
+        "--as",
+        options.identity ?? this.config.larkIdentity
+      ]);
+    }
     return this.run([
       "im",
       "+messages-send",
@@ -28,11 +41,29 @@ export class LarkCli {
       "--text",
       text,
       "--as",
-      this.config.larkIdentity
+      options.identity ?? this.config.larkIdentity
     ]);
   }
 
-  sendPost(chatId: string, content: LarkPostContent, options: { env?: NodeJS.ProcessEnv; identity?: "bot" | "user" } = {}): Promise<CliResult> {
+  sendPost(chatId: string, content: LarkPostContent, options: SendOptions = {}): Promise<CliResult> {
+    if (options.replyToMessageId) {
+      return this.run(
+        [
+          "im",
+          "+messages-reply",
+          "--message-id",
+          options.replyToMessageId,
+          "--content",
+          JSON.stringify(content),
+          "--msg-type",
+          "post",
+          ...(options.replyInThread ? ["--reply-in-thread"] : []),
+          "--as",
+          options.identity ?? this.config.larkIdentity
+        ],
+        { env: options.env }
+      );
+    }
     return this.run(
       [
         "im",
@@ -98,6 +129,13 @@ export type LarkPostContent = {
     title?: string;
     content: Array<Array<LarkPostElement>>;
   };
+};
+
+type SendOptions = {
+  env?: NodeJS.ProcessEnv;
+  identity?: "bot" | "user";
+  replyToMessageId?: string;
+  replyInThread?: boolean;
 };
 
 export type LarkPostElement =

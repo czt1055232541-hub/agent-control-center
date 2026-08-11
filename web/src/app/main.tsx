@@ -14,6 +14,7 @@ import TaskDashboardPage from "../modules/task-battlefield/TaskDashboardPage";
 import { ConfigCenterPage } from "../modules/config-center";
 import { RoutingRulesPage } from "../modules/routing-rules";
 import { FeishuConnectionPage } from "../modules/feishu-connection";
+import { LocalToolsPage } from "../modules/local-tools/LocalToolsPage";
 import { recentRunsFromOperations, taskTraceFromAgents, toAgentProfiles } from "../modules/agent-array/skill-tree/viewModels";
 import { ActionButton } from "../components/common/ActionButton";
 import { StatusPill } from "../components/common/StatusPill";
@@ -720,6 +721,10 @@ function App() {
 
           {activePage === "tasks" ? (
             <TaskDashboardPage token={token} />
+          ) : null}
+
+          {activePage === "tools" ? (
+            <LocalToolsPage token={token} />
           ) : null}
 
           {activePage === "provider" ? (
