@@ -213,6 +213,8 @@ http://127.0.0.1:8765/docs
 
 ## 下一步规划
 
+DSH 外置集成位于 [`integrations/dsh-plugin-acc/`](integrations/dsh-plugin-acc/README.md)。它通过 bundle 安装，不修改 DSH 源码，并为 `acc_overview` 工具提供可点击的 DSH 原生卡片。
+
 短期：
 
 - 继续收敛脚本与服务启动入口，让 Python、Node、lark-cli 等运行时都通过配置或环境变量解析。

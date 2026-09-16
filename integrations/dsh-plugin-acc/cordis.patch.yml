@@ -1,0 +1,6 @@
+- insert:
+    - id: acc-integration
+      name: dsh-plugin-acc
+      config:
+        baseUrl: http://127.0.0.1:8765
+        requestTimeoutMs: 5000
