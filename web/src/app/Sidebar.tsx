@@ -1,42 +1,22 @@
 import { Archive, CalendarClock, FileCog, FileText, LayoutDashboard, PackageOpen, Route, Send, ServerCog, ScrollText, Swords } from "lucide-react";
+import type { AccPlugin } from "../plugins/types";
 
-export type CommandPage =
-  | "dashboard"
-  | "agents"
-  | "tasks"
-  | "feishu"
-  | "provider"
-  | "routing"
-  | "tools"
-  | "config"
-  | "diagnostics"
-  | "backup";
+export type CommandPage = string;
 
-const navItems: Array<{
-  key: CommandPage;
-  label: string;
-  icon: typeof LayoutDashboard;
-  status: "已实现" | "开发中" | "后续";
-}> = [
-  { key: "dashboard", label: "Dashboard 总览", icon: LayoutDashboard, status: "已实现" },
-  { key: "agents", label: "Agent 阵列", icon: Swords, status: "已实现" },
-  { key: "tasks", label: "任务战场", icon: CalendarClock, status: "已实现" },
-  { key: "feishu", label: "飞书连接", icon: Send, status: "已实现" },
-  { key: "provider", label: "模型与 Provider", icon: ServerCog, status: "已实现" },
-  { key: "routing", label: "路由规则", icon: Route, status: "已实现" },
-  { key: "tools", label: "本地工具", icon: PackageOpen, status: "已实现" },
-  { key: "config", label: "配置中心", icon: FileCog, status: "已实现" },
-  { key: "diagnostics", label: "日志与诊断", icon: FileText, status: "已实现" },
-  { key: "backup", label: "备份与迁移", icon: Archive, status: "后续" },
-];
+const icons = { "layout-dashboard": LayoutDashboard, swords: Swords, "calendar-clock": CalendarClock, send: Send, "server-cog": ServerCog, route: Route, "package-open": PackageOpen, "file-cog": FileCog, "file-text": FileText, archive: Archive };
 
 export function Sidebar({
   activePage,
   onNavigate,
+  plugins,
 }: {
   activePage: CommandPage;
   onNavigate: (page: CommandPage) => void;
+  plugins: AccPlugin[];
 }) {
+  const navItems = plugins
+    .flatMap((plugin) => plugin.cards.map((card) => ({ plugin, card })))
+    .sort((left, right) => left.card.order - right.card.order || left.card.id.localeCompare(right.card.id));
   return (
     <aside className="temple-sidebar parchment-panel p-3 lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]"
       style={{
@@ -51,12 +31,12 @@ export function Sidebar({
         <p className="mt-1 text-xs" style={{color: "var(--text-muted)"}}>Agent Control Center</p>
       </div>
       <nav className="grid gap-1">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = activePage === item.key;
+        {navItems.map(({ plugin, card }) => {
+          const Icon = icons[card.icon as keyof typeof icons] ?? PackageOpen;
+          const active = activePage === card.page;
           return (
             <button
-              key={item.label}
+              key={card.id}
               className={`nav-item flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${
                 active ? "nav-item-active" : ""
               }`}
@@ -67,15 +47,15 @@ export function Sidebar({
                 border: "1px solid",
                 boxShadow: active ? "0 2px 0 rgba(79, 52, 22, 0.28)" : "none"
               }}
-              onClick={() => onNavigate(item.key)}
+              onClick={() => onNavigate(card.page)}
               type="button"
             >
               <Icon size={16} />
-              <span className="truncate">{item.label}</span>
+              <span className="truncate">{card.title}</span>
               <span className={`ml-auto shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
-                active ? "bg-white/15 text-white" : item.status === "已实现" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
+                active ? "bg-white/15 text-white" : plugin.state === "native" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
               }`}>
-                {item.status}
+                {plugin.state === "native" ? "插件" : "迁移中"}
               </span>
             </button>
           );

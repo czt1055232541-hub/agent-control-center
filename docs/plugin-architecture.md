@@ -71,6 +71,10 @@ def create_plugin() -> AccPlugin:
 
 DSH 适配器只依赖 `/api/plugins` 与后续稳定的 `/api/integrations/dsh/*`，不得 import ACC 源码或依赖 ACC 私有文件结构。
 
+## Web 插件投影
+
+ACC Web 不再维护第二份硬编码导航表。`usePluginInventory` 读取 `/api/plugins`，侧边栏按卡片 `order` 自动排序并显示插件迁移状态。内置页面继续使用各自的 React 组件；外部插件或尚无专属组件的页面使用统一插件详情页展示描述、版本和 capabilities。这样新增功能只需注册插件与卡片，不需要修改应用外壳。
+
 ## 阶段验收
 
 1. 插件内核：依赖顺序、重复 id、缺失依赖、循环依赖、惰性路由和清单 API 均有测试。

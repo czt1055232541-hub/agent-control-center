@@ -35,6 +35,8 @@ import { useMigration } from "../hooks/useMigration";
 import { useCommandDashboard } from "../hooks/useCommandDashboard";
 import { useWatchdog } from "../hooks/useWatchdog";
 import { useCodexStream } from "../hooks/useCodexStream";
+import { usePluginInventory } from "../hooks/usePluginInventory";
+import { PluginDetailPage } from "../modules/plugin-catalog/PluginDetailPage";
 import type { AgentConfig, CodexStreamEvent, CodexStreamRun, CurrentWatchdogStatus } from "../types";
 import { AppErrorBoundary } from "../components/common/AppErrorBoundary";
 import { readJson } from "../api";
@@ -480,6 +482,7 @@ function App() {
   const [configStatus, setConfigStatus] = React.useState<ConfigContractStatus | null>(null);
   const [selectedAgent, setSelectedAgent] = React.useState<AgentConfig | null>(null);
   const [activePage, setActivePage] = React.useState<CommandPage>("dashboard");
+  const { plugins, pluginsError } = usePluginInventory();
   const [adventureSelectedAgent, setAdventureSelectedAgent] = React.useState<AgentProfile | null>(null);
   const [activeDetailTab, setActiveDetailTab] = React.useState<string>("概览");
 
@@ -639,7 +642,7 @@ function App() {
     <main className="min-h-screen bg-slate-100 text-slate-950">
       <AgentDrawer agent={selectedAgent} token={token} onClose={() => setSelectedAgent(null)} onSaved={refreshDashboard} />
       <div className="grid w-full gap-5 px-5 py-5 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <Sidebar activePage={activePage} onNavigate={setActivePage} />
+        <Sidebar activePage={activePage} onNavigate={setActivePage} plugins={plugins} />
         <div className="flex min-w-0 flex-col gap-5">
           <header className="flex flex-col gap-4 border-b border-slate-300 pb-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -653,10 +656,10 @@ function App() {
             </div>
           </header>
 
-          {error ?? statusError ?? watchdogError ?? logsError ? (
+          {error ?? statusError ?? watchdogError ?? logsError ?? pluginsError ? (
             <div className="flex items-start gap-2 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900">
               <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-              <span>{error ?? statusError ?? watchdogError ?? logsError}</span>
+              <span>{error ?? statusError ?? watchdogError ?? logsError ?? pluginsError}</span>
             </div>
           ) : null}
 
@@ -785,6 +788,10 @@ function App() {
             <FeishuConnectionPage token={token} />
           ) : activePage === "backup" ? (
             <PlannedPage page={activePage} />
+          ) : null}
+
+          {!new Set(["dashboard", "agents", "tasks", "tools", "provider", "diagnostics", "config", "routing", "feishu", "backup"]).has(activePage) ? (
+            <PluginDetailPage plugin={plugins.find((plugin) => plugin.cards.some((card) => card.page === activePage)) ?? null} />
           ) : null}
 
           <footer className="flex items-center gap-2 pb-2 text-xs text-slate-500">
