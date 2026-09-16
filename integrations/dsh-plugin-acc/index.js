@@ -38,13 +38,12 @@ export function apply(ctx, config) {
       schema: {
         type: 'object',
         properties: {
-          online: { type: 'boolean' },
-          url: { type: 'string' },
-          count: { type: 'integer' },
-          plugins: { type: 'array', items: { type: 'string' } },
+          online: { type: 'boolean', required: true },
+          url: { type: 'string', required: true },
+          count: { type: 'integer', required: true },
+          plugins: { type: 'array', items: { type: 'string' }, required: true },
           error: { type: 'string' },
         },
-        required: ['online', 'url', 'count', 'plugins'],
         additionalProperties: false,
       },
       render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
