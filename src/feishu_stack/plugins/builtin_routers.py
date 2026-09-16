@@ -5,9 +5,7 @@ from fastapi import APIRouter, FastAPI
 
 agent_array_router = APIRouter()
 model_provider_router = APIRouter()
-local_tools_router = APIRouter()
 logs_diagnostics_router = APIRouter()
-backup_migration_router = APIRouter()
 
 
 _ROUTE_OWNERS = (
@@ -16,9 +14,7 @@ _ROUTE_OWNERS = (
         model_provider_router,
         ("/api/openclaw", "/api/deepseek", "/api/codex-agent", "/api/codex-desktop", "/api/codex-provider", "/api/stack"),
     ),
-    (local_tools_router, ("/api/local-tools",)),
     (logs_diagnostics_router, ("/api/logs", "/api/doctor", "/api/lark", "/api/diagnostics")),
-    (backup_migration_router, ("/api/backups", "/api/thread-migration")),
 )
 
 
@@ -44,8 +40,6 @@ def adopt_builtin_feature_routes(app: FastAPI) -> None:
 
 __all__ = [
     "agent_array_router",
-    "backup_migration_router",
-    "local_tools_router",
     "logs_diagnostics_router",
     "model_provider_router",
     "adopt_builtin_feature_routes",

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from feishu_stack import app as app_module
+from feishu_stack.modules.backup_migration import plugin as backup_plugin
 from feishu_stack.api import app as api_app_module
 from feishu_stack.modules.config_center import plugin as config_center_plugin
 from feishu_stack.models import AgentConfig, DashboardSummary, ExplainedDiagnosticItem, OperationResult, ThreadMigrationResult
@@ -527,7 +528,7 @@ def test_backup_cleanup_route_uses_mock(monkeypatch) -> None:
         called["clean"] = True
         return OperationResult(True, "backups", "clean", "mock clean")
 
-    monkeypatch.setattr(app_module.backups, "clean", fake_clean)
+    monkeypatch.setattr(backup_plugin.backups, "clean", fake_clean)
     response = client.post("/api/backups/clean", headers={"X-Control-Token": token})
     assert response.status_code == 200
     assert response.json()["component"] == "backups"
@@ -663,7 +664,7 @@ def test_thread_migration_route_uses_mock(monkeypatch) -> None:
             launch_mode="cli-session-fallback",
         )
 
-    monkeypatch.setattr(app_module.thread_migration, "migrate_thread", fake_migrate)
+    monkeypatch.setattr(backup_plugin.thread_migration, "migrate_thread", fake_migrate)
     response = client.post(
         "/api/thread-migration/migrate",
         headers={"X-Control-Token": token},
@@ -690,7 +691,7 @@ def test_thread_migration_open_summary_folder_route_uses_mock(monkeypatch) -> No
             summary_dir="F:/summaries",
         )
 
-    monkeypatch.setattr(app_module.thread_migration, "open_summary_folder", fake_open)
+    monkeypatch.setattr(backup_plugin.thread_migration, "open_summary_folder", fake_open)
     response = client.post(
         "/api/thread-migration/open-summary-folder",
         headers={"X-Control-Token": token},
@@ -703,7 +704,7 @@ def test_thread_migration_open_summary_folder_route_uses_mock(monkeypatch) -> No
 
 def test_thread_migration_threads_route_uses_mock(monkeypatch) -> None:
     monkeypatch.setattr(
-        app_module.thread_migration,
+        backup_plugin.thread_migration,
         "list_recent_threads",
         lambda limit=20: [
             {

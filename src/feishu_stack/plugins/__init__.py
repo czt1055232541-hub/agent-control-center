@@ -13,10 +13,10 @@ from feishu_stack.modules.feishu_connection.plugin import create_plugin as creat
 from feishu_stack.modules.routing_rules.plugin import create_plugin as create_routing_rules_plugin
 from feishu_stack.modules.task_battlefield.plugin import create_plugin as create_task_battlefield_plugin
 from feishu_stack.modules.dashboard.plugin import create_plugin as create_dashboard_plugin
+from feishu_stack.modules.local_tools.plugin import create_plugin as create_local_tools_plugin
+from feishu_stack.modules.backup_migration.plugin import create_plugin as create_backup_migration_plugin
 from feishu_stack.plugins.builtin_routers import (
     agent_array_router,
-    backup_migration_router,
-    local_tools_router,
     logs_diagnostics_router,
     model_provider_router,
 )
@@ -67,10 +67,10 @@ BUILTIN_PLUGINS = (
     create_feishu_connection_plugin(),
     _feature("acc.model-provider", "模型与 Provider", "模型提供方、Codex 与 OpenClaw 运行控制。", "provider", "providers.manage", order=50, icon="server-cog", router=model_provider_router),
     create_routing_rules_plugin(),
-    _feature("acc.local-tools", "本地工具", "本地工具发现、注册与进程控制。", "tools", "tools.manage", order=70, icon="package-open", router=local_tools_router),
+    create_local_tools_plugin(),
     create_config_center_plugin(),
     _feature("acc.logs-diagnostics", "日志与诊断", "日志、指标与诊断工具。", "diagnostics", "diagnostics.read", order=90, icon="file-text", router=logs_diagnostics_router),
-    _feature("acc.backup-migration", "备份与迁移", "备份保留与跨 Provider 线程迁移。", "backup", "backups.manage", order=100, icon="archive", router=backup_migration_router),
+    create_backup_migration_plugin(),
 )
 
 

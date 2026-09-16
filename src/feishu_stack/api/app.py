@@ -19,10 +19,8 @@ from starlette.responses import FileResponse
 from pydantic import BaseModel
 
 from feishu_stack.modules.agent_array.skill_tree import agent_config_editor, agent_dashboard, skill_baseline, skill_registry, skill_drift, tree_config
-from feishu_stack.modules.backup_migration import thread_migration
 from feishu_stack.modules.model_provider import codex_agent, codex_desktop, provider_switch
 from feishu_stack.modules.model_provider import openclaw_gateway as openclaw
-from feishu_stack.modules.backup_migration import backups
 from feishu_stack.modules.logs_diagnostics import metrics
 from feishu_stack.modules.operations import control_center, stack_actions
 from feishu_stack.modules.logs_diagnostics import diagnostics as diagnostics_module
@@ -109,14 +107,8 @@ app.include_router(create_plugin_router())
 # ---------------------------------------------------------------------------
 
 
-class ThreadMigrationRequest(BaseModel):
-    session_id: str
-    target_provider: str
-    prompt: str = thread_migration.DEFAULT_CONTINUATION_PROMPT
 
 
-class ThreadMigrationFolderRequest(BaseModel):
-    summary_path: str
 
 
 class LogLevelSetRequest(BaseModel):
@@ -124,23 +116,6 @@ class LogLevelSetRequest(BaseModel):
     level: str
 
 
-class LocalToolRegisterRequest(BaseModel):
-    id: str | None = None
-    name: str | None = None
-    description: str | None = None
-    dir: str
-    manifest: str | None = None
-    entry: str | None = None
-    runtime: str | None = None
-    host: str | None = None
-    port: int | None = None
-    url: str | None = None
-    healthPath: str | None = None
-    openPath: str | None = None
-    enabled: bool = True
-    embed: bool = True
-    tags: list[str] = []
-    env: dict[str, str] | None = None
 
 
 class ProviderModelSwitchRequest(BaseModel):
@@ -181,6 +156,9 @@ def _run(component: str, action: str, fn: Callable[[StackConfig], OperationResul
     if _main_loop is not None:
         asyncio.run_coroutine_threadsafe(ws_manager.broadcast_status(), _main_loop)
     return result
+
+
+app.state.operation_runner = _run
 
 
 # ---------------------------------------------------------------------------
@@ -371,94 +349,18 @@ def agents() -> dict:
 
 
 
-@app.get(
-    "/api/local-tools",
-    summary="Local tool registry",
-    description="Return local tools registered in stack settings with runtime status.",
-    tags=[LOCAL_TOOLS_TAG],
-)
-def list_local_tools() -> dict:
-    return {"tools": local_tools.list_tools()}
 
 
-@app.get(
-    "/api/local-tools/scan",
-    summary="Scan local tools",
-    description="Scan common local tool folders or a specified root for tool manifests.",
-    tags=[LOCAL_TOOLS_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def scan_local_tools(root: str | None = None) -> dict:
-    return {"candidates": local_tools.scan(root)}
 
 
-@app.post(
-    "/api/local-tools/register",
-    summary="Register local tool",
-    description="Register a local tool into the writable stack settings file.",
-    tags=[LOCAL_TOOLS_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def register_local_tool(request: LocalToolRegisterRequest) -> dict:
-    try:
-        return local_tools.register(request.model_dump(exclude_none=True))
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.get(
-    "/api/local-tools/{tool_id}",
-    summary="Local tool status",
-    description="Return one registered local tool with runtime status.",
-    tags=[LOCAL_TOOLS_TAG],
-)
-def get_local_tool(tool_id: str) -> dict:
-    try:
-        return local_tools.get_tool_status(tool_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=f"local tool not found: {tool_id}") from exc
 
 
-@app.post(
-    "/api/local-tools/{tool_id}/start",
-    summary="Start local tool",
-    description="Start a registered local tool. Requires control token.",
-    tags=[LOCAL_TOOLS_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def start_local_tool(tool_id: str) -> dict:
-    try:
-        return _run(f"local-tool:{tool_id}", "start", lambda cfg: local_tools.start(tool_id, cfg))
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=f"local tool not found: {tool_id}") from exc
 
 
-@app.post(
-    "/api/local-tools/{tool_id}/stop",
-    summary="Stop local tool",
-    description="Stop a registered local tool. Requires control token.",
-    tags=[LOCAL_TOOLS_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def stop_local_tool(tool_id: str) -> dict:
-    try:
-        return _run(f"local-tool:{tool_id}", "stop", lambda cfg: local_tools.stop(tool_id, cfg))
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=f"local tool not found: {tool_id}") from exc
 
 
-@app.post(
-    "/api/local-tools/{tool_id}/restart",
-    summary="Restart local tool",
-    description="Restart a registered local tool. Requires control token.",
-    tags=[LOCAL_TOOLS_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def restart_local_tool(tool_id: str) -> dict:
-    try:
-        return _run(f"local-tool:{tool_id}", "restart", lambda cfg: local_tools.restart(tool_id, cfg))
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=f"local tool not found: {tool_id}") from exc
 
 
 
@@ -1083,49 +985,10 @@ def skill_workshop_scan() -> dict:
 # ---------------------------------------------------------------------------
 
 
-@app.get(
-    "/api/thread-migration/threads",
-    summary="List recent threads",
-    description="List recent codex sessions available for thread migration.",
-    tags=[THREAD_MIGRATION_TAG],
-)
-def thread_migration_threads(limit: int = 20) -> dict:
-    return {"threads": to_dict(thread_migration.list_recent_threads(limit=limit))}
 
 
-@app.post(
-    "/api/thread-migration/migrate",
-    summary="Migrate thread",
-    description="Migrate a codex session from one provider to another.",
-    tags=[THREAD_MIGRATION_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def migrate_thread(request: ThreadMigrationRequest) -> dict:
-    return _run(
-        "thread-migration",
-        "migrate",
-        lambda cfg: thread_migration.migrate_thread(
-            request.session_id,
-            request.target_provider,
-            request.prompt,
-            cfg,
-        ),
-    )
 
 
-@app.post(
-    "/api/thread-migration/open-summary-folder",
-    summary="Open summary folder",
-    description="Open the summary folder for a thread migration in the file explorer.",
-    tags=[THREAD_MIGRATION_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def open_thread_migration_summary_folder(request: ThreadMigrationFolderRequest) -> dict:
-    return _run(
-        "thread-migration",
-        "open-summary-folder",
-        lambda _cfg: thread_migration.open_summary_folder(request.summary_path),
-    )
 
 # ---------------------------------------------------------------------------
 # Operations - OpenClaw
@@ -1264,9 +1127,6 @@ def stack_stop() -> dict:
 # Operations - Maintenance
 # ---------------------------------------------------------------------------
 
-@app.post("/api/backups/clean", summary="Clean backups", description="Remove old backup files per retention policy.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def clean_backups() -> dict:
-    return _run("backups", "clean", backups.clean)
 
 
 
