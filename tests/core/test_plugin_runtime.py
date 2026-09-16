@@ -74,3 +74,10 @@ def test_builtin_inventory_exposes_clickable_feature_cards() -> None:
     response = TestClient(app).get("/api/plugins")
     assert response.status_code == 200
     assert response.json()["count"] == len(inventory)
+
+
+def test_first_migrated_features_are_native_router_plugins() -> None:
+    plugins = {plugin.id: plugin for plugin in get_plugin_registry().resolve()}
+    for plugin_id in ("acc.config-center", "acc.feishu-connection", "acc.routing-rules"):
+        assert plugins[plugin_id].state == "native"
+        assert plugins[plugin_id].router_factory is not None

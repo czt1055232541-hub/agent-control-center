@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from feishu_stack import app as app_module
 from feishu_stack.api import app as api_app_module
+from feishu_stack.modules.config_center import plugin as config_center_plugin
 from feishu_stack.models import AgentConfig, DashboardSummary, ExplainedDiagnosticItem, OperationResult, ThreadMigrationResult
 from feishu_stack.operations import _lock
 
@@ -95,7 +96,7 @@ def test_config_status_reports_redacted_drift(tmp_path, monkeypatch) -> None:
     peer_path.parent.mkdir(parents=True)
     primary_path.write_text(__import__("json").dumps(primary), encoding="utf-8")
     peer_path.write_text(__import__("json").dumps(peer), encoding="utf-8")
-    monkeypatch.setattr(api_app_module, "resolve_settings_path", lambda: primary_path)
+    monkeypatch.setattr(config_center_plugin, "resolve_settings_path", lambda: primary_path)
     monkeypatch.setenv("FEISHU_AGENT_SETTINGS_PATH", str(peer_path))
     response = client.get("/api/config/status")
     assert response.status_code == 200

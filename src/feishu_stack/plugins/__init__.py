@@ -8,6 +8,9 @@ from fastapi import APIRouter
 
 from feishu_stack.plugin_runtime import PluginRegistry, discover_entry_point_plugins
 from feishu_stack.plugin_sdk import AccPlugin, PluginCard
+from feishu_stack.modules.config_center.plugin import create_plugin as create_config_center_plugin
+from feishu_stack.modules.feishu_connection.plugin import create_plugin as create_feishu_connection_plugin
+from feishu_stack.modules.routing_rules.plugin import create_plugin as create_routing_rules_plugin
 
 
 def _feature(
@@ -50,11 +53,11 @@ BUILTIN_PLUGINS = (
     _feature("acc.dashboard", "Dashboard 总览", "运行状态与关键指标总览。", "dashboard", "dashboard.read", order=10, icon="layout-dashboard"),
     _feature("acc.agent-array", "Agent 阵列", "Agent、技能树与运行记录管理。", "agents", "agents.read", "skills.manage", order=20, icon="swords"),
     _feature("acc.task-battlefield", "任务战场", "任务目录、工作区映射与看门狗。", "tasks", "tasks.manage", order=30, icon="calendar-clock"),
-    _feature("acc.feishu-connection", "飞书连接", "飞书账号、权限与授权状态。", "feishu", "feishu.inspect", order=40, icon="send"),
+    create_feishu_connection_plugin(),
     _feature("acc.model-provider", "模型与 Provider", "模型提供方、Codex 与 OpenClaw 运行控制。", "provider", "providers.manage", order=50, icon="server-cog"),
-    _feature("acc.routing-rules", "路由规则", "消息与任务路由规则管理。", "routing", "routing.manage", order=60, icon="route"),
+    create_routing_rules_plugin(),
     _feature("acc.local-tools", "本地工具", "本地工具发现、注册与进程控制。", "tools", "tools.manage", order=70, icon="package-open"),
-    _feature("acc.config-center", "配置中心", "配置校验、导入和导出。", "config", "config.manage", order=80, icon="file-cog"),
+    create_config_center_plugin(),
     _feature("acc.logs-diagnostics", "日志与诊断", "日志、指标与诊断工具。", "diagnostics", "diagnostics.read", order=90, icon="file-text"),
     _feature("acc.backup-migration", "备份与迁移", "备份保留与跨 Provider 线程迁移。", "backup", "backups.manage", order=100, icon="archive"),
 )

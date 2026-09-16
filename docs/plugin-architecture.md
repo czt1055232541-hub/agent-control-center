@@ -49,7 +49,7 @@ def create_plugin() -> AccPlugin:
 
 ## 兼容迁移
 
-当前内置功能已登记为 `transitional` 插件，使清单 API 和 DSH 可以立即发现它们；原路由暂时保留在 `api/app.py`，避免一次迁移破坏现有入口。迁移每个功能时执行：
+当前内置功能均已进入插件清单，使 ACC 和 DSH 可以发现它们。配置中心、路由规则和飞书连接已由各自的原生插件挂载路由；其余功能仍标记为 `transitional`，原路由暂时保留在 `api/app.py`，避免一次迁移破坏现有入口。迁移每个剩余功能时执行：
 
 1. 将请求模型和路由移动到所属 `modules/<功能域>/router.py`；
 2. 给该功能插件设置惰性 `router_factory` 并把状态改为 `native`；

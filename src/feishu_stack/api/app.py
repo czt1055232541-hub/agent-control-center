@@ -28,20 +28,15 @@ from feishu_stack.modules.operations import control_center, stack_actions
 from feishu_stack.modules.logs_diagnostics import diagnostics as diagnostics_module
 from feishu_stack.modules.task_battlefield import task_directory, watchdog
 from feishu_stack.modules.local_tools import registry as local_tools
-from feishu_stack.modules import config_center
-from feishu_stack.modules import routing_rules
-from feishu_stack.modules import feishu_connection
 from feishu_stack.core.settings import StackConfig, find_stack_root, load_config
 from feishu_stack.core.logs import tail
 from feishu_stack.core import codex_streams
 from feishu_stack.core.models import ErrorResponse, OperationResult, ThreadMigrationResult, to_dict
-from feishu_stack.core.config_contract import compare_shared_config, load_json_object, redact_config, validate_shared_config
-from feishu_stack.core.settings import resolve_settings_path
 from feishu_stack.modules.operations.operations import recent_operations, run_exclusive
 from .security import get_or_create_token, require_control_token
 from feishu_stack.core.status import get_status
 from feishu_stack import __version__  # noqa: F401
-from feishu_stack.plugins import create_plugin_router
+from feishu_stack.plugins import create_plugin_router, get_plugin_registry
 
 # ---------------------------------------------------------------------------
 # Tag definitions for /docs
@@ -107,6 +102,7 @@ app.add_middleware(
 # client and external hosts. Existing feature routes remain in this module
 # during their compatibility-preserving migration into native plugins.
 app.include_router(create_plugin_router())
+get_plugin_registry().mount(app)
 
 # ---------------------------------------------------------------------------
 # Request models
@@ -584,196 +580,6 @@ def delete_task_battlefield_task(task_id: str) -> dict:
 )
 def classify_task_battlefield_task(request: TaskClassifyRequest) -> dict:
     return task_directory.classify_task(request.description, request.workspacePath)
-
-# ---------------------------------------------------------------------------
-# Config Center
-# ---------------------------------------------------------------------------
-
-
-@app.get(
-    "/api/config-center/list",
-    summary="List configs",
-    description="Return all config entries as a JSON array.",
-    tags=[CONFIG_CENTER_TAG],
-)
-def config_center_list():
-    return {"configs": config_center.list_configs()}
-
-
-@app.get(
-    "/api/config/status",
-    summary="Shared configuration status",
-    description="Validate the control-plane configuration and report redacted drift from the agent runtime configuration.",
-    tags=[CONFIG_CENTER_TAG],
-)
-def shared_config_status(check_runtime: bool = Query(default=False)) -> dict:
-    primary_path = resolve_settings_path()
-    primary = load_json_object(primary_path)
-    validation = validate_shared_config(primary, check_runtime=check_runtime)
-    explicit_peer = os.environ.get("FEISHU_AGENT_SETTINGS_PATH")
-    peer_path = Path(explicit_peer) if explicit_peer else None
-    drift: list[dict] = []
-    peer_status = "merged" if (find_stack_root(Path(__file__)) / "agent-runtime").exists() and peer_path is None else "not_found"
-    if peer_path is not None and peer_path.exists():
-        try:
-            peer = load_json_object(peer_path)
-            drift = compare_shared_config(primary, peer)
-            peer_status = "available"
-        except (OSError, ValueError, TypeError):
-            peer_status = "invalid"
-    return {
-        **validation,
-        "source": "control-plane",
-        "peer_status": peer_status,
-        "drift": redact_config(drift),
-    }
-
-
-@app.get(
-    "/api/config-center/get/{key}",
-    summary="Get config",
-    description="Return a single config entry by key.",
-    tags=[CONFIG_CENTER_TAG],
-)
-def config_center_get(key: str):
-    item = config_center.get_config(key)
-    if item is None:
-        raise HTTPException(status_code=404, detail=f"Unknown config key: {key}")
-    return item
-
-
-class ConfigCenterSetRequest(BaseModel):
-    key: str
-    value: str
-    description: str = ""
-
-
-@app.post(
-    "/api/config-center/set",
-    summary="Set config",
-    description="Create or update a config entry.",
-    tags=[CONFIG_CENTER_TAG],
-)
-def config_center_set(request: ConfigCenterSetRequest):
-    return config_center.set_config(request.key, request.value, request.description)
-
-
-@app.delete(
-    "/api/config-center/delete/{key}",
-    summary="Delete config",
-    description="Delete a config entry by key.",
-    tags=[CONFIG_CENTER_TAG],
-)
-def config_center_delete(key: str):
-    if not config_center.delete_config(key):
-        raise HTTPException(status_code=404, detail=f"Unknown config key: {key}")
-    return {"ok": True}
-
-
-class ConfigCenterImportRequest(BaseModel):
-    configs: dict
-
-
-class RoutingRuleSetRequest(BaseModel):
-    rule_id: str = ""
-    name: str = ""
-    pattern: str = ""
-    target: str = ""
-    enabled: bool = True
-    description: str = ""
-
-
-class RoutingRuleBatchRequest(BaseModel):
-    rules: list[dict]
-
-
-@app.post(
-    "/api/config-center/export",
-    summary="Export configs",
-    description="Export all config entries as JSON.",
-    tags=[CONFIG_CENTER_TAG],
-)
-def config_center_export():
-    return config_center.export_configs()
-
-
-@app.post(
-    "/api/config-center/import",
-    summary="Import configs",
-    description="Import config entries from JSON. Overwrites existing keys.",
-    tags=[CONFIG_CENTER_TAG],
-)
-def config_center_import(request: ConfigCenterImportRequest):
-    return config_center.import_configs(request.configs)
-
-
-# ---------------------------------------------------------------------------
-# Routing Rules
-# ---------------------------------------------------------------------------
-
-
-@app.get(
-    "/api/routing-rules/list",
-    summary="List routing rules",
-    description="Return all routing rules as a JSON array.",
-    tags=[ROUTING_RULES_TAG],
-)
-def routing_rules_list():
-    return {"rules": routing_rules.list_rules()}
-
-
-@app.get(
-    "/api/routing-rules/get/{rule_id}",
-    summary="Get routing rule",
-    description="Return a single routing rule by rule_id.",
-    tags=[ROUTING_RULES_TAG],
-)
-def routing_rules_get(rule_id: str):
-    item = routing_rules.get_rule(rule_id)
-    if item is None:
-        raise HTTPException(status_code=404, detail=f"Unknown routing rule: {rule_id}")
-    return item
-
-
-@app.post(
-    "/api/routing-rules/set",
-    summary="Set routing rule",
-    description="Create or update a routing rule.",
-    tags=[ROUTING_RULES_TAG],
-)
-def routing_rules_set(request: RoutingRuleSetRequest):
-    return routing_rules.set_rule(
-        rule_id=request.rule_id,
-        name=request.name,
-        pattern=request.pattern,
-        target=request.target,
-        enabled=request.enabled,
-        description=request.description,
-    )
-
-
-@app.delete(
-    "/api/routing-rules/delete/{rule_id}",
-    summary="Delete routing rule",
-    description="Delete a routing rule by rule_id.",
-    tags=[ROUTING_RULES_TAG],
-)
-def routing_rules_delete(rule_id: str):
-    if not routing_rules.delete_rule(rule_id):
-        raise HTTPException(status_code=404, detail=f"Unknown routing rule: {rule_id}")
-    return {"ok": True}
-
-
-@app.post(
-    "/api/routing-rules/batch",
-    summary="Batch import routing rules",
-    description="Import multiple routing rules at once. If rule_id is omitted, one is auto-generated.",
-    tags=[ROUTING_RULES_TAG],
-)
-def routing_rules_batch(request: RoutingRuleBatchRequest):
-    return routing_rules.batch_import_rules(request.rules)
-
-
 
 @app.get(
     "/api/agents/{agent_id}",
@@ -1595,52 +1401,6 @@ def force_stop_watchdog() -> dict:
 )
 def shutdown_control_center() -> dict:
     return to_dict(control_center.request_shutdown())
-
-# ---------------------------------------------------------------------------
-# Feishu Connection
-# ---------------------------------------------------------------------------
-
-
-@app.get(
-    "/api/feishu/connection/status",
-    summary="Feishu connection status",
-    description="Lark authentication status, tenant name, app info (App ID first 8 chars masked).",
-    tags=[FEISHU_CONNECTION_TAG],
-)
-def feishu_connection_status():
-    return feishu_connection.get_connection_status()
-
-
-@app.get(
-    "/api/feishu/connection/accounts",
-    summary="Feishu connection accounts",
-    description="Agent binding list with feishuBinding, bindingStatus, and group info (masked).",
-    tags=[FEISHU_CONNECTION_TAG],
-)
-def feishu_connection_accounts():
-    return feishu_connection.get_connection_accounts()
-
-
-@app.get(
-    "/api/feishu/connection/permissions",
-    summary="Feishu connection permissions",
-    description="Permission scope check with missing item marking and suggestions.",
-    tags=[FEISHU_CONNECTION_TAG],
-)
-def feishu_connection_permissions():
-    return feishu_connection.get_connection_permissions()
-
-
-@app.post(
-    "/api/feishu/connection/refresh",
-    summary="Refresh Feishu auth",
-    description="Manually trigger Lark authentication refresh via lark-cli auth login --force.",
-    tags=[FEISHU_CONNECTION_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def feishu_connection_refresh():
-    return feishu_connection.refresh_connection()
-
 
 # ---------------------------------------------------------------------------
 # Exception handlers
