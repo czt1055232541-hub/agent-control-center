@@ -21,7 +21,6 @@ export type StackStatus = {
   codex_app: ProviderStatus;
   codex_agent_provider: ProviderStatus;
   openclaw: ComponentStatus;
-  moonbridge: ComponentStatus;
   codex_agent: ComponentStatus;
   codex_agent_args: string;
   codex_agent_follows_global_config: boolean;
@@ -116,10 +115,11 @@ export type CommandDiagnostic = {
   duration_ms: number;
 };
 
-export type MoonBridgeDiagnostic = {
+export type DeepSeekEnvDiagnostic = {
   ok: boolean;
-  reachable: boolean;
-  status: number | null;
+  env_key: string;
+  present: boolean;
+  base_url: string;
   models: string[];
   error: string;
   duration_ms: number;
@@ -127,7 +127,7 @@ export type MoonBridgeDiagnostic = {
 
 export type Diagnostics = {
   codex_doctor: CommandDiagnostic;
-  moonbridge_models: MoonBridgeDiagnostic;
+  deepseek_env: DeepSeekEnvDiagnostic;
   lark_auth_status: CommandDiagnostic;
 };
 
@@ -258,13 +258,11 @@ export type ExplainedDiagnosticItem = {
 
 export const componentRows = [
   { key: "openclaw", title: "OpenClaw Gateway", logs: "openclaw" },
-  { key: "moonbridge", title: "MoonBridge", logs: "moonbridge" },
   { key: "codex_agent", title: "Feishu Codex Agent", logs: "codex-agent" },
 ] as const;
 
 export const logOptions = [
   { value: "openclaw", label: "OpenClaw" },
-  { value: "moonbridge", label: "MoonBridge" },
   { value: "codex-agent", label: "Codex Agent" },
   { value: "codex-desktop", label: "Codex Desktop" },
   { value: "control-center-api", label: "Control API" },

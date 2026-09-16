@@ -27,7 +27,7 @@ def make_config(tmp_path: Path) -> StackConfig:
     for path in (stack_root, codex_home, runtime_dir, log_dir, pid_dir):
         path.mkdir(parents=True, exist_ok=True)
     return StackConfig(
-        raw={"moonBridgeBaseUrl": "http://127.0.0.1:38440/v1"},
+        raw={"deepseek": {"baseUrl": "https://api.deepseek.com", "envKey": "DEEPSEEK_API_KEY"}},
         stack_root=stack_root,
         codex_home=codex_home,
         codex_bin=Path("E:/codeX/bin/codex.exe"),
@@ -35,11 +35,8 @@ def make_config(tmp_path: Path) -> StackConfig:
         codex_switch_script=stack_root / "scripts" / "switch.ps1",
         native_model="gpt-5.5",
         native_reasoning_effort="high",
-        moonbridge_model="moonbridge",
-        moonbridge_dir=stack_root / "moonbridge",
-        moonbridge_exe=stack_root / "moonbridge" / "moonbridge.exe",
-        moonbridge_config=stack_root / "moonbridge" / "config.yml",
-        moonbridge_port=38440,
+        deepseek_model="deepseek-v4-pro",
+        deepseek_models=["deepseek-v4-pro"],
         openclaw_home=stack_root / "openclaw",
         openclaw_gateway_cmd=stack_root / "openclaw" / "gateway.cmd",
         openclaw_port=18789,
@@ -187,12 +184,12 @@ def test_load_rollout_context_parses_meta_and_tail(tmp_path: Path) -> None:
 def test_build_migration_summary_uses_stable_template(tmp_path: Path) -> None:
     cfg = make_config(tmp_path)
     write_rollout(cfg, "session-summary")
-    artifacts = build_migration_summary("session-summary", "moonbridge", "moonbridge", DEFAULT_CONTINUATION_PROMPT, cfg)
+    artifacts = build_migration_summary("session-summary", "deepseek", "deepseek-v4-pro", DEFAULT_CONTINUATION_PROMPT, cfg)
     summary = artifacts.summary_path.read_text(encoding="utf-8")
     assert summary.startswith("Migrated Codex thread context")
     assert "- Source thread title:" in summary
     assert "- Source session id: session-summary" in summary
-    assert "- Target provider/model: moonbridge/moonbridge" in summary
+    assert "- Target provider/model: deepseek/deepseek-v4-pro" in summary
     assert "- User continuation prompt: Continue this work from the migrated context." in summary
     assert artifacts.summary_path.parent == cfg.migration_summary_dir
     assert artifacts.excerpt_path.exists()
@@ -203,10 +200,10 @@ def test_build_migration_summary_uses_stable_template(tmp_path: Path) -> None:
 def test_start_migrated_session_returns_manual_summary_result(tmp_path: Path) -> None:
     cfg = make_config(tmp_path)
     write_rollout(cfg, "session-launch")
-    result = start_migrated_session("session-launch", "moonbridge", DEFAULT_CONTINUATION_PROMPT, cfg)
+    result = start_migrated_session("session-launch", "deepseek", DEFAULT_CONTINUATION_PROMPT, cfg)
     assert result.ok is True
     assert result.launch_mode == "summary-only-manual"
-    assert result.target_provider == "moonbridge"
+    assert result.target_provider == "deepseek"
     assert result.source_title == "Migrate my context."
     assert Path(result.summary_path or "").exists()
     assert result.summary_dir

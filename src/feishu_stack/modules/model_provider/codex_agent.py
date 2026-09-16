@@ -6,6 +6,7 @@ import subprocess
 import time
 from pathlib import Path
 
+from feishu_stack.core.env import env_with_registry_fallback
 from feishu_stack.core.settings import StackConfig, load_config
 from feishu_stack.core.models import OperationResult
 from feishu_stack.core.process import CREATE_NO_WINDOW, process_info, read_pid, start_process, stop_component, write_pid
@@ -60,7 +61,7 @@ def _build_if_needed(cfg: StackConfig) -> tuple[bool, str]:
 
 def _build_agent_env(cfg: StackConfig) -> dict[str, str]:
     lark_cli_home = cfg.lark_cli_home or (cfg.stack_root / ".home")
-    env = os.environ.copy()
+    env = env_with_registry_fallback(os.environ, [cfg.deepseek.env_key])
     for key in AGENT_CONTEXT_ENV_KEYS:
         env.pop(key, None)
     env.update(

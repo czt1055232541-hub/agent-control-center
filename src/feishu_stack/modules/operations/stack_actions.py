@@ -3,7 +3,6 @@ from __future__ import annotations
 import time
 
 from feishu_stack.modules.model_provider import codex_agent, provider_switch
-from feishu_stack.modules.model_provider import moonbridge
 from feishu_stack.modules.model_provider import openclaw_gateway as openclaw
 from feishu_stack.modules.operations import typing_indicator
 from feishu_stack.core.settings import StackConfig, load_config
@@ -32,7 +31,7 @@ def _codex_agent_running(cfg: StackConfig) -> bool:
 def switch_agent_provider(
     mode: str,
     config: StackConfig | None = None,
-    moonbridge_model: str | None = None,
+    deepseek_model: str | None = None,
     reasoning_effort: str | None = None,
 ) -> OperationResult:
     cfg = config or load_config()
@@ -40,7 +39,7 @@ def switch_agent_provider(
     switch_result = provider_switch.switch_provider(
         mode,
         cfg,
-        moonbridge_model=moonbridge_model,
+        deepseek_model=deepseek_model,
         reasoning_effort=reasoning_effort,
         target="agent",
     )
@@ -67,17 +66,16 @@ def start_native(config: StackConfig | None = None) -> OperationResult:
     return _combine("start-native", results, started)
 
 
-def start_moonbridge(config: StackConfig | None = None) -> OperationResult:
+def start_deepseek(config: StackConfig | None = None) -> OperationResult:
     cfg = config or load_config()
     started = time.monotonic()
     results = [
-        moonbridge.start(cfg),
-        provider_switch.switch_provider("moonbridge", cfg, target="agent"),
+        provider_switch.switch_provider("deepseek", cfg, target="agent"),
         openclaw.start(cfg),
         codex_agent.restart(cfg),
         typing_indicator.start(cfg),
     ]
-    return _combine("start-moonbridge", results, started)
+    return _combine("start-deepseek", results, started)
 
 
 def stop(config: StackConfig | None = None) -> OperationResult:
@@ -86,7 +84,6 @@ def stop(config: StackConfig | None = None) -> OperationResult:
     results = [
         typing_indicator.stop(cfg),
         codex_agent.stop(cfg),
-        moonbridge.stop(cfg),
         openclaw.stop(cfg),
     ]
     return _combine("stop", results, started)

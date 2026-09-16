@@ -154,8 +154,8 @@ curl -X POST http://127.0.0.1:8765/api/openclaw/start \
 curl -X POST http://127.0.0.1:8765/api/stack/start-native \
   -H "X-Control-Token: $TOKEN"
 
-# 4. 启动全栈（MoonBridge 模式）
-curl -X POST http://127.0.0.1:8765/api/stack/start-moonbridge \
+# 4. 启动全栈（DeepSeek 官方直连模式）
+curl -X POST http://127.0.0.1:8765/api/stack/start-deepseek \
   -H "X-Control-Token: $TOKEN"
 
 # 5. 停止全栈
@@ -169,7 +169,7 @@ curl -X POST http://127.0.0.1:8765/api/stack/stop \
 # 查看 OpenClaw 日志（最近 120 行）
 curl http://127.0.0.1:8765/api/logs/openclaw?lines=120
 
-# 支持的组件：openclaw、moonbridge、codex-agent、codex-desktop、control-center-api、operations
+# 支持的组件：openclaw、deepseek、codex-agent、codex-desktop、control-center-api、operations
 ```
 
 ### 2.6 线程迁移
@@ -178,11 +178,11 @@ curl http://127.0.0.1:8765/api/logs/openclaw?lines=120
 # 列出最近会话
 curl http://127.0.0.1:8765/api/thread-migration/threads?limit=10
 
-# 迁移会话到 MoonBridge（需 Token）
+# 迁移会话到 DeepSeek 官方直连（需 Token）
 curl -X POST http://127.0.0.1:8765/api/thread-migration/migrate \
   -H "X-Control-Token: $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"session_id": "<SESSION_ID>", "target_provider": "moonbridge", "prompt": "请继续"}'
+  -d '{"session_id": "<SESSION_ID>", "target_provider": "deepseek", "prompt": "请继续"}'
 ```
 
 ### 2.7 诊断
@@ -194,8 +194,8 @@ curl http://127.0.0.1:8765/api/diagnostics
 # Codex 诊断
 curl http://127.0.0.1:8765/api/doctor/codex
 
-# 查看 MoonBridge 可用模型
-curl http://127.0.0.1:8765/api/moonbridge/models
+# 查看 DeepSeek 直连可用模型配置
+curl http://127.0.0.1:8765/api/deepseek/available-models
 
 # 查看飞书认证状态
 curl http://127.0.0.1:8765/api/lark/auth-status

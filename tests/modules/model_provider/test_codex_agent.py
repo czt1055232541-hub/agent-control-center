@@ -39,6 +39,7 @@ def _fake_config(**overrides):
             peer_cli_home="",
         ),
     )
+    c.deepseek = SimpleNamespace(env_key="DEEPSEEK_API_KEY")
     c.raw = {}
     for k, v in overrides.items():
         setattr(c, k, v)
@@ -125,6 +126,17 @@ class CodexAgentEnvTests(unittest.TestCase):
         self.assertNotIn('CLAW_HOME', env)
         self.assertNotIn('HERMES_HOME', env)
         self.assertNotIn('LARK_CHANNEL', env)
+
+    def test_build_agent_env_uses_windows_registry_fallback_for_deepseek_key(self):
+        cfg = _fake_config(codex_bin=Path(r'C:\Codex\current\codex.exe'))
+        with (
+            patch.dict('os.environ', {}, clear=True),
+            patch('feishu_stack.core.env._windows_registry_env_value', return_value='test-key'),
+        ):
+            from feishu_stack.modules.model_provider.codex_agent import _build_agent_env
+            env = _build_agent_env(cfg)
+
+        self.assertEqual(env['DEEPSEEK_API_KEY'], 'test-key')
 
 
 class CodexAgentStartTests(unittest.TestCase):

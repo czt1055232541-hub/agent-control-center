@@ -10,16 +10,14 @@
   "codexConfig": "C:\\path\\to\\.codex\\config.toml",
   "codexNativeModel": "your-native-model",
   "codexNativeReasoningEffort": "high",
-  "codexMoonBridgeModel": "your-moonbridge-model",
-  "codexMoonBridgeReasoningEffort": "high",
-  "codexSwitchScript": "C:\\path\\to\\agent-control-center\\scripts\\stack.py",
-  "moonBridgeBaseUrl": "http://127.0.0.1:38440/v1",
-  "moonbridge": {
-    "dir": "C:\\path\\to\\moonbridge",
-    "exe": "C:\\path\\to\\moonbridge.exe",
-    "config": "C:\\path\\to\\moonbridge\\config.yml",
-    "port": 38440
+  "codexDeepSeekModel": "deepseek-v4-pro",
+  "codexDeepSeekModels": ["deepseek-v4-pro", "deepseek-v4-flash"],
+  "codexDeepSeekReasoningEffort": "high",
+  "deepseek": {
+    "baseUrl": "https://api.deepseek.com",
+    "envKey": "DEEPSEEK_API_KEY"
   },
+  "codexSwitchScript": "C:\\path\\to\\agent-control-center\\scripts\\stack.py",
   "openclaw": {
     "home": "C:\\path\\to\\openclaw",
     "gatewayCmd": "C:\\path\\to\\openclaw\\.openclaw\\gateway.cmd",

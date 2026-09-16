@@ -5,7 +5,7 @@
 ```text
 python scripts/stack.py status --json
 python scripts/stack.py stack start-native
-python scripts/stack.py stack start-moonbridge
+python scripts/stack.py stack start-deepseek
 python scripts/stack.py stack stop
 python scripts/stack.py serve-control-center --open
 python scripts/stack.py status-control-center

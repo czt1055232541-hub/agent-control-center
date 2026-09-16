@@ -23,7 +23,7 @@ def read_provider_status(config: StackConfig, codex_config: Path | None = None) 
     model = model_match.group(1) if model_match else "unknown"
     provider = provider_match.group(1) if provider_match else "openai/default"
     reasoning_effort = effort_match.group(1) if effort_match else "high"
-    mode = "moonbridge" if provider == "moonbridge" else "native"
+    mode = "deepseek" if provider == "deepseek" else "native"
     return ProviderStatus(model=model, provider=provider, mode=mode, config=str(config_path), reasoning_effort=reasoning_effort)
 
 
@@ -141,7 +141,6 @@ def get_status(config: StackConfig | None = None) -> StackStatus:
         codex_app=app_provider,
         codex_agent_provider=agent_provider,
         openclaw=component_status("openclaw", cfg.openclaw_port, cfg.pid_openclaw),
-        moonbridge=component_status("moonbridge", cfg.moonbridge_port, cfg.pid_moonbridge),
         codex_agent=component_status("codex-agent", None, cfg.pid_codex_agent),
         codex_agent_args=codex_agent_args,
         codex_agent_follows_global_config=agent_config_scope == "shared_legacy" and "--profile" not in codex_agent_args,

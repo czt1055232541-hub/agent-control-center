@@ -16,7 +16,7 @@ C:\agent-control-center\
 │   ├── core/                        # settings、models、process、logs、status
 │   ├── modules/                     # 与网页侧边栏一致的后端功能域
 │   │   ├── agent_array/skill_tree/  # Agent 阵列、技能树、配置编辑、registry
-│   │   ├── model_provider/          # OpenClaw Gateway、MoonBridge、Codex Agent、Provider 切换
+│   │   ├── model_provider/          # OpenClaw Gateway、DeepSeek、Codex Agent、Provider 切换
 │   │   ├── logs_diagnostics/        # 日志、诊断、指标
 │   │   ├── backup_migration/        # 备份、线程迁移
 │   │   ├── operations/              # CLI、Control Center、操作锁、stack 编排
@@ -86,9 +86,9 @@ npm run build
 ### 3.1 启动全栈
 
 ```bash
-# 使用 Python 入口启动 MoonBridge 模式（规范命令）
+# 使用 Python 入口启动 DeepSeek 官方直连模式（规范命令）
 cd C:\agent-control-center
-python scripts/stack.py stack start-moonbridge
+python scripts/stack.py stack start-deepseek
 
 # 使用 Python 入口启动 Native 模式
 python scripts/stack.py stack start-native
@@ -126,7 +126,7 @@ curl http://127.0.0.1:8765/api/status
 
 Control Center API 使用 `uvicorn` 运行，进程管理逻辑：
 
-1. **启动流程：** CLI 启动 OpenClaw → MoonBridge → Codex Agent，最后启动 FastAPI 服务
+1. **启动流程：** CLI 启动 OpenClaw → Codex Agent，最后启动 FastAPI 服务；DeepSeek 模式直连官方 Responses API，不依赖 DeepSeek 代理
 2. **PID 管理：** 各组件 PID 写入 `runtime/pids/` 目录
 3. **日志：** 各组件日志写入 `runtime/logs/` 目录
 
@@ -159,9 +159,9 @@ Control Center API 使用 `uvicorn` 运行，进程管理逻辑：
 | `codexHome` | Codex Desktop 安装目录 |
 | `codexConfig` | Codex 配置路径（config.toml） |
 | `codexNativeModel` | Native 模式默认模型 |
-| `codexMoonBridgeModel` | MoonBridge 模式默认模型 |
-| `codexMoonBridgeReasoningEffort` | MoonBridge 模式默认推理强度：`minimal` / `low` / `medium` / `high` / `xhigh` |
-| `moonbridge.port` | MoonBridge 代理端口（38440） |
+| `codexDeepSeekModel` | DeepSeek 模式默认模型 |
+| `codexDeepSeekReasoningEffort` | DeepSeek 模式默认推理强度：`minimal` / `low` / `medium` / `high` / `xhigh` |
+| deepseek.baseUrl / deepseek.envKey | DeepSeek official API URL and API key environment variable name |
 | `openclaw.port` | OpenClaw 网关端口（18789） |
 
 ### 4.2 `pyproject.toml`

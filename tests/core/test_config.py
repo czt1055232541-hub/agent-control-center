@@ -24,14 +24,13 @@ class ConfigTests(unittest.TestCase):
   "codexBin": "__ROOT__\\\\codex\\\\codex.exe",
   "codexConfig": "__ROOT__\\\\codex\\\\config.toml",
   "codexNativeModel": "gpt-5.5",
-  "codexMoonBridgeModel": "moonbridge",
-  "codexSwitchScript": "__ROOT__\\\\codex\\\\Switch-CodexProvider.ps1",
-  "moonbridge": {
-    "dir": "__ROOT__\\\\moonbridge",
-    "exe": "__ROOT__\\\\moonbridge\\\\moonbridge.exe",
-    "config": "__ROOT__\\\\moonbridge\\\\config.yml",
-    "port": 38440
+  "codexDeepSeekModel": "deepseek-v4-pro",
+  "codexDeepSeekModels": ["deepseek-v4-pro", "deepseek-v4-flash"],
+  "deepseek": {
+    "baseUrl": "https://api.deepseek.com",
+    "envKey": "DEEPSEEK_API_KEY"
   },
+  "codexSwitchScript": "__ROOT__\\\\codex\\\\Switch-CodexProvider.ps1",
   "openclaw": {
     "home": "__ROOT__\\\\openclaw",
     "gatewayCmd": "__ROOT__\\\\openclaw\\\\gateway.cmd",
@@ -71,16 +70,17 @@ class ConfigTests(unittest.TestCase):
             config = load_config(settings)
 
         self.assertEqual(config.openclaw_port, 18789)
-        self.assertEqual(config.moonbridge_port, 38440)
         self.assertEqual(config.node_exe.name, "node.exe")
         self.assertEqual(config.npm_exe.name, "npm.cmd")
         self.assertEqual(config.pid_dir.name, "pids")
         self.assertEqual(config.migration_summary_dir.name, "summaries")
         self.assertEqual(config.codex.native_model, "gpt-5.5")
+        self.assertEqual(config.deepseek.model, "deepseek-v4-pro")
+        self.assertEqual(config.deepseek.env_key, "DEEPSEEK_API_KEY")
         self.assertEqual(config.agent.codex_agent_args, "exec --skip-git-repo-check")
         self.assertEqual(config.agent.codex_home, config.stack_root / "agent-runtime" / "codex-home")
         self.assertEqual(config.agent.codex_config, config.stack_root / "agent-runtime" / "codex-home" / "config.toml")
-        self.assertEqual(config.moonbridge.base_url, "http://127.0.0.1:38440/v1")
+        self.assertEqual(config.deepseek.base_url, "https://api.deepseek.com")
         self.assertEqual(config.local_tools[0].id, "demo-tool")
         self.assertEqual(config.local_tools[0].command[-1], "app.py")
         self.assertEqual(config.local_tools[0].entry.name, "app.py")
@@ -120,9 +120,9 @@ class ConfigTests(unittest.TestCase):
   "codexBin": "__ROOT__\\\\codex\\\\codex.exe",
   "codexConfig": "__ROOT__\\\\codex\\\\config.toml",
   "codexNativeModel": "gpt-5.5",
-  "codexMoonBridgeModel": "moonbridge",
+  "codexDeepSeekModel": "deepseek-v4-pro",
+  "deepseek": {"baseUrl": "https://api.deepseek.com", "envKey": "DEEPSEEK_API_KEY"},
   "codexSwitchScript": "__ROOT__\\\\codex\\\\Switch-CodexProvider.ps1",
-  "moonbridge": {"dir": "__ROOT__\\\\moonbridge", "exe": "__ROOT__\\\\moonbridge\\\\moonbridge.exe", "config": "__ROOT__\\\\moonbridge\\\\config.yml", "port": 38440},
   "openclaw": {"home": "__ROOT__\\\\openclaw", "gatewayCmd": "__ROOT__\\\\openclaw\\\\gateway.cmd", "port": 18789},
   "agent": {"dir": "__ROOT__\\\\agent", "entry": "dist\\\\src\\\\index.js", "larkCliBin": "__ROOT__\\\\agent\\\\lark-cli.exe"},
   "runtime": {"dir": "__ROOT__\\\\runtime", "logs": "__ROOT__\\\\runtime\\\\logs", "pids": "__ROOT__\\\\runtime\\\\pids"},

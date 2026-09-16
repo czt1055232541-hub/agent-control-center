@@ -18,7 +18,6 @@ EXCLUDED_PROCESS_MARKERS = (
     "codex-agent",
     "codex_desktop",
     "codex desktop",
-    "moonbridge",
 )
 
 

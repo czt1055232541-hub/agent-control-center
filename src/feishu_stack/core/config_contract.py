@@ -15,9 +15,10 @@ SHARED_FIELDS: tuple[str, ...] = (
     "codexBin",
     "codexConfig",
     "codexNativeModel",
-    "codexMoonBridgeModel",
+    "codexDeepSeekModel",
     "codexSwitchScript",
-    "moonbridge.port",
+    "deepseek.baseUrl",
+    "deepseek.envKey",
     "openclaw.port",
     "agent.dir",
     "agent.larkCliBin",
@@ -72,13 +73,13 @@ def validate_shared_config(raw: dict[str, Any], *, check_runtime: bool = False) 
     """Validate the stable cross-repository fields without exposing private values."""
     errors: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
-    required = ("codexHome", "codexBin", "codexConfig", "moonbridge", "openclaw", "agent", "runtime")
+    required = ("codexHome", "codexBin", "codexConfig", "deepseek", "openclaw", "agent", "runtime")
     for field in required:
         if raw.get(field) in (None, "", {}):
             errors.append({"code": "MISSING_FIELD", "field": field, "message": f"Required field is missing: {field}"})
 
     ports: dict[str, int] = {}
-    for field in ("moonbridge.port", "openclaw.port"):
+    for field in ("openclaw.port",):
         value = _get_dotted(raw, field)
         try:
             port = int(value)
@@ -97,9 +98,6 @@ def validate_shared_config(raw: dict[str, Any], *, check_runtime: bool = False) 
         "codexBin",
         "codexConfig",
         "codexSwitchScript",
-        "moonbridge.dir",
-        "moonbridge.exe",
-        "moonbridge.config",
         "openclaw.home",
         "openclaw.gatewayCmd",
         "agent.dir",

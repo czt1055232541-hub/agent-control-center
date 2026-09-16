@@ -7,7 +7,6 @@ from typing import Callable
 
 from feishu_stack.modules.backup_migration import thread_migration
 from feishu_stack.modules.model_provider import codex_agent, codex_desktop, provider_switch
-from feishu_stack.modules.model_provider import moonbridge
 from feishu_stack.modules.model_provider import openclaw_gateway as openclaw
 from feishu_stack.modules.operations import typing_indicator
 from feishu_stack.modules.backup_migration import backups
@@ -59,9 +58,6 @@ def _component_action(action: str, component: str) -> OperationResult:
         ("start", "openclaw"): openclaw.start,
         ("stop", "openclaw"): openclaw.stop,
         ("restart", "openclaw"): openclaw.restart,
-        ("start", "moonbridge"): moonbridge.start,
-        ("stop", "moonbridge"): moonbridge.stop,
-        ("restart", "moonbridge"): moonbridge.restart,
         ("start", "codex-agent"): codex_agent.start,
         ("stop", "codex-agent"): codex_agent.stop,
         ("restart", "codex-agent"): codex_agent.restart,
@@ -84,18 +80,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     for action in ("start", "stop", "restart"):
         sub = subcommands.add_parser(action, help=f"{action.title()} a component.")
-        sub.add_argument("component", choices=["openclaw", "moonbridge", "codex-agent", "codex-desktop", "typing-indicator"])
+        sub.add_argument("component", choices=["openclaw", "codex-agent", "codex-desktop", "typing-indicator"])
 
     switch = subcommands.add_parser("switch-provider", help="Switch Codex provider.")
-    switch.add_argument("mode", choices=["native", "moonbridge", "toggle"])
+    switch.add_argument("mode", choices=["native", "deepseek", "toggle"])
 
     migrate = subcommands.add_parser("migrate-thread", help="Migrate a thread by summary into a new provider session.")
     migrate.add_argument("--session-id", required=True)
-    migrate.add_argument("--target-provider", required=True, choices=["native", "moonbridge"])
+    migrate.add_argument("--target-provider", required=True, choices=["native", "deepseek"])
     migrate.add_argument("--prompt", default=thread_migration.DEFAULT_CONTINUATION_PROMPT)
 
     stack = subcommands.add_parser("stack", help="Run stack actions.")
-    stack.add_argument("action", choices=["start-native", "start-moonbridge", "stop"])
+    stack.add_argument("action", choices=["start-native", "start-deepseek", "stop"])
 
     backups_cmd = subcommands.add_parser("backups", help="Backup actions.")
     backups_cmd.add_argument("action", choices=["clean"])
@@ -148,7 +144,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "stack":
             table = {
                 "start-native": stack_actions.start_native,
-                "start-moonbridge": stack_actions.start_moonbridge,
+                "start-deepseek": stack_actions.start_deepseek,
                 "stop": stack_actions.stop,
             }
             result = table[args.action]()

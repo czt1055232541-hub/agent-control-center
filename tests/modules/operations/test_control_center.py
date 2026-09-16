@@ -22,7 +22,7 @@ def test_control_center_process_match_excludes_agent_stack_processes() -> None:
         },
         cfg,
     )
-    for marker in ("openclaw gateway", "codex-agent", "moonbridge"):
+    for marker in ("openclaw gateway", "codex-agent"):
         assert not control_center._is_control_center_process(
             {
                 "pid": 101,

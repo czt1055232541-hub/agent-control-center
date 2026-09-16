@@ -29,12 +29,8 @@ class StackConfigValidation(BaseModel):
     npm_exe: str | None = Field(default=None, alias="npmExe")
     codex_native_model: str = Field(alias="codexNativeModel")
     codex_native_reasoning_effort: str = Field(default="high", alias="codexNativeReasoningEffort")
-    codex_moonbridge_model: str = Field(alias="codexMoonBridgeModel")
-    codex_moonbridge_reasoning_effort: str = Field(default="high", alias="codexMoonBridgeReasoningEffort")
-    moonbridge_dir: str
-    moonbridge_exe: str
-    moonbridge_config: str
-    moonbridge_port: int
+    codex_deepseek_model: str = Field(default="", alias="codexDeepSeekModel")
+    codex_deepseek_reasoning_effort: str = Field(default="high", alias="codexDeepSeekReasoningEffort")
     openclaw_home: str
     openclaw_gateway_cmd: str
     openclaw_port: int
@@ -47,7 +43,7 @@ class StackConfigValidation(BaseModel):
 
     @model_validator(mode="after")
     def validate_ports(self) -> "StackConfigValidation":
-        for name in ("moonbridge_port", "openclaw_port"):
+        for name in ("openclaw_port",):
             port = getattr(self, name)
             if not (1 <= port <= 65535):
                 raise ValueError(f"{name} must be 1-65535, got {port}")
@@ -55,7 +51,7 @@ class StackConfigValidation(BaseModel):
 
     @model_validator(mode="after")
     def validate_reasoning_effort(self) -> "StackConfigValidation":
-        for name in ("codex_native_reasoning_effort", "codex_moonbridge_reasoning_effort"):
+        for name in ("codex_native_reasoning_effort", "codex_deepseek_reasoning_effort"):
             effort = getattr(self, name)
             if effort not in REASONING_EFFORTS:
                 raise ValueError(f"{name} must be one of {sorted(REASONING_EFFORTS)}, got {effort}")
@@ -68,9 +64,6 @@ class StackConfigValidation(BaseModel):
             "codex_bin": self.codex_bin,
             "codex_config": self.codex_config,
             "codex_switch_script": self.codex_switch_script,
-            "moonbridge_dir": self.moonbridge_dir,
-            "moonbridge_exe": self.moonbridge_exe,
-            "moonbridge_config": self.moonbridge_config,
             "openclaw_home": self.openclaw_home,
             "openclaw_gateway_cmd": self.openclaw_gateway_cmd,
             "agent_dir": self.agent_dir,
@@ -88,7 +81,6 @@ class StackConfigValidation(BaseModel):
 
 def validate_config(raw: dict[str, Any]) -> StackConfigValidation:
     """Validate raw stack settings with Pydantic."""
-    moonbridge = raw.get("moonbridge", {})
     openclaw = raw.get("openclaw", {})
     agent = raw.get("agent", {})
     runtime = raw.get("runtime", {})
@@ -103,12 +95,8 @@ def validate_config(raw: dict[str, Any]) -> StackConfigValidation:
         npmExe=raw.get("npmExe"),
         codexNativeModel=raw["codexNativeModel"],
         codexNativeReasoningEffort=raw.get("codexNativeReasoningEffort", "high"),
-        codexMoonBridgeModel=raw["codexMoonBridgeModel"],
-        codexMoonBridgeReasoningEffort=raw.get("codexMoonBridgeReasoningEffort", "high"),
-        moonbridge_dir=moonbridge["dir"],
-        moonbridge_exe=moonbridge["exe"],
-        moonbridge_config=moonbridge["config"],
-        moonbridge_port=int(moonbridge["port"]),
+        codexDeepSeekModel=raw.get("codexDeepSeekModel", ""),
+        codexDeepSeekReasoningEffort=raw.get("codexDeepSeekReasoningEffort", "high"),
         openclaw_home=openclaw["home"],
         openclaw_gateway_cmd=openclaw["gatewayCmd"],
         openclaw_port=int(openclaw["port"]),
@@ -306,18 +294,16 @@ class CodexSettings:
     switch_script: Path
     native_model: str
     native_reasoning_effort: str
-    moonbridge_model: str
-    moonbridge_reasoning_effort: str
+    deepseek_model: str
+    deepseek_reasoning_effort: str
 
 
 @dataclass(frozen=True)
-class MoonBridgeSettings:
-    dir: Path
-    exe: Path
-    config: Path
-    port: int
+class DeepSeekSettings:
     base_url: str
+    env_key: str
     model: str
+    models: list[str]
     reasoning_effort: str
 
 
@@ -395,11 +381,6 @@ class StackConfig:
     python_exe: Path
     native_model: str
     native_reasoning_effort: str
-    moonbridge_model: str
-    moonbridge_dir: Path
-    moonbridge_exe: Path
-    moonbridge_config: Path
-    moonbridge_port: int
     openclaw_home: Path
     openclaw_gateway_cmd: Path
     openclaw_port: int
@@ -411,6 +392,8 @@ class StackConfig:
     runtime_dir: Path
     log_dir: Path
     pid_dir: Path
+    deepseek_model: str = ""
+    deepseek_models: list[str] = field(default_factory=list)
     app_id: str = ""
     app_name: str = ""
     projects_root: Path | None = None
@@ -419,11 +402,11 @@ class StackConfig:
     watchdog_state_dir: Path | None = None
     node_exe: Path | str = "node"
     npm_exe: Path | str = "npm"
-    moonbridge_reasoning_effort: str = "high"
+    deepseek_reasoning_effort: str = "high"
     local_tools: list[LocalToolSettings] = field(default_factory=list)
     toolchain: ToolchainSettings = field(init=False)
     codex: CodexSettings = field(init=False)
-    moonbridge: MoonBridgeSettings = field(init=False)
+    deepseek: DeepSeekSettings = field(init=False)
     openclaw: OpenClawSettings = field(init=False)
     agent: AgentSettings = field(init=False)
     runtime: RuntimeSettings = field(init=False)
@@ -445,21 +428,21 @@ class StackConfig:
                 switch_script=self.codex_switch_script,
                 native_model=self.native_model,
                 native_reasoning_effort=self.native_reasoning_effort,
-                moonbridge_model=self.moonbridge_model,
-                moonbridge_reasoning_effort=self.moonbridge_reasoning_effort,
+                deepseek_model=self.deepseek_model,
+                deepseek_reasoning_effort=self.deepseek_reasoning_effort,
             ),
         )
+        deepseek_settings = raw.get("deepseek", {}) if isinstance(raw.get("deepseek", {}), dict) else {}
+        deepseek_models = self.deepseek_models or [self.deepseek_model]
         object.__setattr__(
             self,
-            "moonbridge",
-            MoonBridgeSettings(
-                dir=self.moonbridge_dir,
-                exe=self.moonbridge_exe,
-                config=self.moonbridge_config,
-                port=self.moonbridge_port,
-                base_url=str(raw.get("moonBridgeBaseUrl") or f"http://127.0.0.1:{self.moonbridge_port}/v1"),
-                model=self.moonbridge_model,
-                reasoning_effort=self.moonbridge_reasoning_effort,
+            "deepseek",
+            DeepSeekSettings(
+                base_url=str(deepseek_settings.get("baseUrl") or raw.get("deepSeekBaseUrl") or "https://api.deepseek.com"),
+                env_key=str(deepseek_settings.get("envKey") or raw.get("deepSeekEnvKey") or "DEEPSEEK_API_KEY"),
+                model=self.deepseek_model,
+                models=[model for model in deepseek_models if model],
+                reasoning_effort=self.deepseek_reasoning_effort,
             ),
         )
         object.__setattr__(
@@ -503,10 +486,6 @@ class StackConfig:
         return self.pid_dir / "openclaw-gateway.pid"
 
     @property
-    def pid_moonbridge(self) -> Path:
-        return self.pid_dir / "moonbridge.pid"
-
-    @property
     def pid_codex_agent(self) -> Path:
         return self.pid_dir / "codex-agent.pid"
 
@@ -517,14 +496,6 @@ class StackConfig:
     @property
     def openclaw_stderr_log(self) -> Path:
         return self.log_dir / "openclaw-gateway-err.log"
-
-    @property
-    def moonbridge_stdout_log(self) -> Path:
-        return self.log_dir / "moonbridge-out.log"
-
-    @property
-    def moonbridge_stderr_log(self) -> Path:
-        return self.log_dir / "moonbridge-err.log"
 
     @property
     def codex_agent_stdout_log(self) -> Path:
@@ -579,7 +550,6 @@ def load_config(path: Path | None = None) -> StackConfig:
     raw = json.loads(settings_path.read_text(encoding="utf-8-sig"))
     validate_config(raw)  # raises on invalid config
     stack_root = Path(raw.get("stackRoot") or settings_path.parents[1]).resolve()
-    moonbridge = raw["moonbridge"]
     openclaw = raw["openclaw"]
     agent = raw["agent"]
     runtime = raw["runtime"]
@@ -605,12 +575,9 @@ def load_config(path: Path | None = None) -> StackConfig:
         npm_exe=resolve_command(raw.get("npmExe"), "NPM_EXE", "npm.cmd" if os.name == "nt" else "npm"),
         native_model=raw["codexNativeModel"],
         native_reasoning_effort=str(raw.get("codexNativeReasoningEffort") or "high"),
-        moonbridge_model=raw["codexMoonBridgeModel"],
-        moonbridge_reasoning_effort=str(raw.get("codexMoonBridgeReasoningEffort") or "high"),
-        moonbridge_dir=Path(moonbridge["dir"]),
-        moonbridge_exe=Path(moonbridge["exe"]),
-        moonbridge_config=Path(moonbridge["config"]),
-        moonbridge_port=int(moonbridge["port"]),
+        deepseek_model=str(raw.get("codexDeepSeekModel") or "deepseek-v4-pro"),
+        deepseek_models=[str(item) for item in raw.get("codexDeepSeekModels", [])] if isinstance(raw.get("codexDeepSeekModels"), list) else [],
+        deepseek_reasoning_effort=str(raw.get("codexDeepSeekReasoningEffort") or "high"),
         openclaw_home=Path(openclaw["home"]),
         openclaw_gateway_cmd=Path(openclaw["gatewayCmd"]),
         openclaw_port=configured_port,

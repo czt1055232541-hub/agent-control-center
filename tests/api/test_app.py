@@ -39,12 +39,12 @@ def test_status_is_read_only_without_token() -> None:
 def test_provider_target_routes_call_switch_provider(monkeypatch) -> None:
     calls = []
 
-    def fake_switch(mode, _cfg, moonbridge_model=None, reasoning_effort=None, target="app"):
-        calls.append((mode, moonbridge_model, reasoning_effort, target))
+    def fake_switch(mode, _cfg, deepseek_model=None, reasoning_effort=None, target="app"):
+        calls.append((mode, deepseek_model, reasoning_effort, target))
         return OperationResult(True, f"codex-provider-{target}", f"switch-{mode}", "ok")
 
-    def fake_switch_agent(mode, _cfg, moonbridge_model=None, reasoning_effort=None):
-        calls.append((mode, moonbridge_model, reasoning_effort, "agent"))
+    def fake_switch_agent(mode, _cfg, deepseek_model=None, reasoning_effort=None):
+        calls.append((mode, deepseek_model, reasoning_effort, "agent"))
         return OperationResult(True, "codex-provider-agent", f"switch-agent-{mode}", "ok")
 
     monkeypatch.setattr(api_app_module.provider_switch, "switch_provider", fake_switch)
@@ -53,14 +53,14 @@ def test_provider_target_routes_call_switch_provider(monkeypatch) -> None:
 
     assert client.post("/api/codex-provider/app/native", headers=headers).status_code == 200
     assert client.post(
-        "/api/codex-provider/agent/moonbridge",
+        "/api/codex-provider/agent/deepseek",
         headers=headers,
-        json={"model": "bridge-model", "reasoning_effort": "xhigh"},
+        json={"model": "deepseek-v4-pro", "reasoning_effort": "xhigh"},
     ).status_code == 200
 
     assert calls == [
         ("native", None, None, "app"),
-        ("moonbridge", "bridge-model", "xhigh", "agent"),
+        ("deepseek", "deepseek-v4-pro", "xhigh", "agent"),
     ]
 
 
@@ -82,8 +82,8 @@ def test_http_error_is_structured_and_correlated() -> None:
 def test_config_status_reports_redacted_drift(tmp_path, monkeypatch) -> None:
     primary = {
         "codexHome": "C:/codex", "codexBin": "C:/codex.exe", "codexConfig": "C:/config.toml",
-        "codexNativeModel": "native", "codexMoonBridgeModel": "bridge", "codexSwitchScript": "C:/switch.py",
-        "moonbridge": {"port": 38440},
+        "codexNativeModel": "native", "codexDeepSeekModel": "deepseek-v4-pro", "codexSwitchScript": "C:/switch.py",
+        "deepseek": {"baseUrl": "https://api.deepseek.com", "envKey": "DEEPSEEK_API_KEY"},
         "openclaw": {"port": 18789, "token": "must-not-leak"},
         "agent": {"dir": "C:/agent", "larkCliBin": "C:/lark.exe", "larkBotOpenId": "ou_private"},
         "runtime": {"dir": "C:/runtime", "logs": "C:/runtime/logs", "pids": "C:/runtime/pids"},
@@ -123,35 +123,35 @@ def test_agents_route_is_read_only_without_token(monkeypatch) -> None:
         "list_agents",
         lambda: [
             AgentConfig(
-                id="moonbridge",
-                name="MoonBridge",
-                role="Provider proxy",
+                id="deepseek",
+                name="DeepSeek",
+                role="Direct provider",
                 status="running",
-                provider="moonbridge",
+                provider="deepseek",
                 model="deepseek-v4-pro",
                 pid=123,
-                port=38440,
+                port=None,
                 uptime="--",
                 feishuBinding="--",
                 triggerMode="Provider",
                 tools=["models"],
                 permissionLevel="network",
                 promptVersion="--",
-                configPath="E:/moonbridge/config.yml",
+                configPath="E:/codeX/config.toml",
                 currentTask="--",
                 lastCalledAt=None,
                 lastLatencyMs=None,
                 lastError="",
                 todayTaskCount=0,
                 successRate=None,
-                controlComponent="moonbridge",
-                logsComponent="moonbridge",
+                controlComponent="codex-provider",
+                logsComponent="codex-agent",
             )
         ],
     )
     response = client.get("/api/agents")
     assert response.status_code == 200
-    assert response.json()["agents"][0]["id"] == "moonbridge"
+    assert response.json()["agents"][0]["id"] == "deepseek"
 
 
 def test_infrastructure_route_is_read_only_without_token(monkeypatch) -> None:
@@ -497,11 +497,11 @@ def test_codex_doctor_endpoint_uses_mock(monkeypatch) -> None:
     assert response.json()["stdout"] == "doctor"
 
 
-def test_moonbridge_models_endpoint_uses_mock(monkeypatch) -> None:
-    monkeypatch.setattr(app_module.diagnostics_module, "moonbridge_models", lambda: {"ok": True, "models": ["moonbridge"]})
-    response = client.get("/api/moonbridge/models")
+def test_deepseek_env_status_endpoint_uses_mock(monkeypatch) -> None:
+    monkeypatch.setattr(app_module.diagnostics_module, "deepseek_env_status", lambda: {"ok": True, "present": True, "env_key": "DEEPSEEK_API_KEY"})
+    response = client.get("/api/deepseek/env-status")
     assert response.status_code == 200
-    assert response.json()["models"] == ["moonbridge"]
+    assert response.json()["env_key"] == "DEEPSEEK_API_KEY"
 
 
 def test_lark_auth_status_endpoint_uses_mock(monkeypatch) -> None:
@@ -632,12 +632,12 @@ def test_codex_agent_stream_websocket_latest(monkeypatch, tmp_path) -> None:
 
 
 def test_thread_migration_requires_token() -> None:
-    response = client.post("/api/thread-migration/migrate", json={"session_id": "abc", "target_provider": "moonbridge", "prompt": "continue"})
+    response = client.post("/api/thread-migration/migrate", json={"session_id": "abc", "target_provider": "deepseek", "prompt": "continue"})
     assert response.status_code == 401
     response = client.post(
         "/api/thread-migration/migrate",
         headers={"X-Control-Token": "bad"},
-        json={"session_id": "abc", "target_provider": "moonbridge", "prompt": "continue"},
+        json={"session_id": "abc", "target_provider": "deepseek", "prompt": "continue"},
     )
     assert response.status_code == 403
 
@@ -656,7 +656,7 @@ def test_thread_migration_route_uses_mock(monkeypatch) -> None:
             source_session_id=session_id,
             source_title="Example Thread",
             target_provider=target_provider,
-            target_model="moonbridge",
+            target_model="deepseek-v4-pro",
             summary_path="F:/summary.txt",
             summary_dir="F:/",
             launch_mode="cli-session-fallback",
@@ -666,7 +666,7 @@ def test_thread_migration_route_uses_mock(monkeypatch) -> None:
     response = client.post(
         "/api/thread-migration/migrate",
         headers={"X-Control-Token": token},
-        json={"session_id": "abc", "target_provider": "moonbridge", "prompt": "continue"},
+        json={"session_id": "abc", "target_provider": "deepseek", "prompt": "continue"},
     )
     assert response.status_code == 200
     assert response.json()["component"] == "thread-migration"

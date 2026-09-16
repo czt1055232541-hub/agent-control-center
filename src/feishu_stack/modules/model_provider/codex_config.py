@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import shutil
 import time
-import json
-import urllib.request
 from pathlib import Path
 
 from feishu_stack.core.settings import StackConfig, load_config
@@ -156,40 +154,12 @@ def clean_backups(config: StackConfig | None = None, keep: int = 1) -> Operation
     )
 
 
-def _moonbridge_ready(cfg: StackConfig, timeout: int = 3) -> bool:
-    url = cfg.moonbridge.base_url.rstrip("/") + "/models"
-    try:
-        with urllib.request.urlopen(url, timeout=timeout) as response:
-            return 200 <= response.status < 500
-    except Exception:
-        return False
-
-
-def _moonbridge_has_model(cfg: StackConfig, model: str, timeout: int = 3) -> bool:
-    url = cfg.moonbridge.base_url.rstrip("/") + "/models"
-    try:
-        with urllib.request.urlopen(url, timeout=timeout) as response:
-            if not (200 <= response.status < 300):
-                return False
-            payload = json.loads(response.read().decode("utf-8", errors="replace"))
-    except Exception:
-        return False
-    models = []
-    if isinstance(payload, dict):
-        models = payload.get("data") or payload.get("models") or []
-    for item in models:
-        if not isinstance(item, dict):
-            continue
-        if item.get("id") == model or item.get("slug") == model or item.get("model") == model or item.get("name") == model:
-            return True
-    return False
-
-
 def _apply_native(lines: list[str], cfg: StackConfig) -> list[str]:
     result = _set_top_level_key(lines, "model", f'"{cfg.native_model}"')
     result = _set_top_level_key(result, "model_reasoning_effort", f'"{cfg.native_reasoning_effort}"')
     result = _remove_top_level_keys(result, {"model_provider", "model_context_window", "model_max_output_tokens", "model_catalog_json"})
-    return _remove_section(result, "model_providers.moonbridge")
+    result = _remove_section(result, "model_providers.moonbridge")
+    return _remove_section(result, "model_providers.deepseek")
 
 
 def _normalize_reasoning_effort(value: str | None, fallback: str = "high") -> str:
@@ -199,41 +169,27 @@ def _normalize_reasoning_effort(value: str | None, fallback: str = "high") -> st
     return effort
 
 
-def _apply_moonbridge(
+def _apply_deepseek(
     lines: list[str],
     cfg: StackConfig,
-    codex_home: Path | None = None,
-    allow_unavailable: bool = False,
     model: str | None = None,
     reasoning_effort: str | None = None,
 ) -> list[str]:
-    target_model = model or cfg.moonbridge_model
-    target_effort = _normalize_reasoning_effort(reasoning_effort, cfg.moonbridge_reasoning_effort)
-    if not allow_unavailable and not _moonbridge_ready(cfg):
-        raise RuntimeError(f"MoonBridge is not reachable at 127.0.0.1:{cfg.moonbridge_port}.")
-    if not allow_unavailable and not _moonbridge_has_model(cfg, target_model):
-        raise RuntimeError(f"MoonBridge model is not available: {target_model}.")
-    home = codex_home or cfg.codex_home
-    catalog = home / "models_catalog.json"
-    catalog_source = home / "models_catalog.json.bak-switch"
-    if not catalog.exists() and catalog_source.exists():
-        shutil.copy2(catalog_source, catalog)
-    if not catalog.exists():
-        raise FileNotFoundError(f"MoonBridge model catalog not found: {catalog}")
-    catalog_toml = str(catalog).replace("\\", "\\\\")
-    base_url = cfg.moonbridge.base_url
+    target_model = model or cfg.deepseek.model
+    target_effort = _normalize_reasoning_effort(reasoning_effort, cfg.deepseek.reasoning_effort)
     result = _set_top_level_key(lines, "model", f'"{target_model}"')
-    result = _set_top_level_key(result, "model_provider", '"moonbridge"')
+    result = _set_top_level_key(result, "model_provider", '"deepseek"')
     result = _set_top_level_key(result, "model_reasoning_effort", f'"{target_effort}"')
-    result = _set_top_level_key(result, "model_context_window", "1000000")
-    result = _set_top_level_key(result, "model_catalog_json", f'"{catalog_toml}"')
+    result = _remove_top_level_keys(result, {"model_context_window", "model_max_output_tokens", "model_catalog_json"})
     result = _remove_section(result, "model_providers.moonbridge")
+    result = _remove_section(result, "model_providers.deepseek")
     return _append_section(
         result,
         [
-            "[model_providers.moonbridge]",
-            'name = "Moon Bridge"',
-            f'base_url = "{base_url}"',
+            "[model_providers.deepseek]",
+            'name = "DeepSeek"',
+            f'base_url = "{cfg.deepseek.base_url}"',
+            f'env_key = "{cfg.deepseek.env_key}"',
             'wire_api = "responses"',
         ],
     )
@@ -242,12 +198,11 @@ def _apply_moonbridge(
 def switch_provider(
     mode: str,
     config: StackConfig | None = None,
-    allow_unavailable_moonbridge: bool = False,
-    moonbridge_model: str | None = None,
+    deepseek_model: str | None = None,
     reasoning_effort: str | None = None,
     target: str = "app",
 ) -> OperationResult:
-    if mode not in {"native", "moonbridge", "toggle"}:
+    if mode not in {"native", "deepseek", "toggle"}:
         raise ValueError(f"Unsupported provider mode: {mode}")
     cfg = config or load_config()
     codex_home, codex_config_path, target_label = _target_paths(cfg, target)
@@ -255,18 +210,20 @@ def switch_provider(
         _bootstrap_agent_config(cfg)
     started = time.monotonic()
     current = read_provider_status(cfg, codex_config_path)
-    target = "native" if mode == "toggle" and current.mode == "moonbridge" else "moonbridge" if mode == "toggle" else mode
+    target = "native" if mode == "toggle" and current.mode != "native" else "deepseek" if mode == "toggle" else mode
     lines = _read_lines(codex_config_path)
     backup = codex_home / f"config.toml.bak-switch-{target_label}-{_timestamp()}"
     shutil.copy2(codex_config_path, backup)
-    new_lines = (
-        _apply_native(lines, cfg)
-        if target == "native"
-        else _apply_moonbridge(lines, cfg, codex_home, allow_unavailable_moonbridge, moonbridge_model, reasoning_effort)
-    )
+    if target == "native":
+        new_lines = _apply_native(lines, cfg)
+    else:
+        new_lines = _apply_deepseek(lines, cfg, deepseek_model, reasoning_effort)
     _write_lines(codex_config_path, new_lines)
     verified = read_provider_status(cfg, codex_config_path)
-    expected_model = cfg.native_model if target == "native" else (moonbridge_model or cfg.moonbridge_model)
+    if target == "native":
+        expected_model = cfg.native_model
+    else:
+        expected_model = deepseek_model or cfg.deepseek.model
     ok = verified.mode == target and verified.model == expected_model
     _cleanup_backups(codex_home, f"config.toml.bak-switch-{target_label}-*", 1, backup)
     return OperationResult(

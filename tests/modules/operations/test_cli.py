@@ -6,8 +6,8 @@ from feishu_stack.models import OperationResult, ThreadMigrationResult
 
 def test_cli_routes_stack_action(monkeypatch, capsys) -> None:
     monkeypatch.setattr(cli, "load_config", lambda: object())
-    monkeypatch.setattr(cli.stack_actions, "start_moonbridge", lambda: OperationResult(True, "stack", "start-moonbridge", "ok"))
-    assert cli.main(["stack", "start-moonbridge", "--json"]) == 0
+    monkeypatch.setattr(cli.stack_actions, "start_deepseek", lambda: OperationResult(True, "stack", "start-deepseek", "ok"))
+    assert cli.main(["stack", "start-deepseek", "--json"]) == 0
     assert '"component": "stack"' in capsys.readouterr().out
 
 
@@ -30,12 +30,12 @@ def test_cli_routes_thread_migration(monkeypatch, capsys) -> None:
             "ok",
             source_session_id=session_id,
             target_provider=target_provider,
-            target_model="moonbridge",
+            target_model="deepseek-v4-pro",
             summary_path="F:/summary.txt",
             launch_mode="cli-session-fallback",
         ),
     )
-    assert cli.main(["migrate-thread", "--session-id", "abc", "--target-provider", "moonbridge", "--json"]) == 0
+    assert cli.main(["migrate-thread", "--session-id", "abc", "--target-provider", "deepseek", "--json"]) == 0
     output = capsys.readouterr().out
     assert '"component": "thread-migration"' in output
     assert '"source_session_id": "abc"' in output

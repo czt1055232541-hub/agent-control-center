@@ -335,28 +335,6 @@ def list_infrastructure(config: StackConfig | None = None, status: StackStatus |
             backing_component="openclaw",
         ),
         _agent(
-            id="moonbridge",
-            name="MoonBridge",
-            role="模型 Provider 代理",
-            status=_component_status(stack.moonbridge),
-            provider="moonbridge",
-            model=cfg.moonbridge_model,
-            pid=stack.moonbridge.pid,
-            port=stack.moonbridge.port,
-            config_path=str(cfg.moonbridge_config),
-            tools=["模型代理", "OpenAI 兼容接口"],
-            permission="网络访问",
-            control_component="moonbridge",
-            logs_component="moonbridge",
-            trigger_mode="Provider 路由",
-            backend_actions=[
-                *_component_actions("moonbridge", "moonbridge"),
-                _backend_action("switch-provider", "Switch Provider", endpoint="/api/codex-provider/moonbridge", kind="provider"),
-            ],
-            source="infrastructure",
-            backing_component="moonbridge",
-        ),
-        _agent(
             id="codex-runtime",
             name="Codex Runtime",
             role="本机 Codex Desktop / CLI 运行时",
@@ -374,7 +352,7 @@ def list_infrastructure(config: StackConfig | None = None, status: StackStatus |
             backend_actions=[
                 *_component_actions("codex-desktop", "codex-desktop"),
                 _backend_action("switch-native", "Switch Native", endpoint="/api/codex-provider/native", kind="provider"),
-                _backend_action("switch-moonbridge", "Switch MoonBridge", endpoint="/api/codex-provider/moonbridge", kind="provider"),
+                _backend_action("switch-deepseek", "Switch DeepSeek", endpoint="/api/codex-provider/deepseek", kind="provider"),
             ],
             source="infrastructure",
             backing_component="codex-desktop",
@@ -401,8 +379,6 @@ def dashboard_summary(config: StackConfig | None = None, status: StackStatus | N
         if agent.id in {"feishu-codex-agent", "openclaw-gateway"}
     )
     health = "warning" if core_problem else "normal"
-    if stack.codex.mode == "moonbridge" and not _component_running(stack.moonbridge):
-        health = "error"
     return DashboardSummary(
         systemHealth=health,
         provider=f"{stack.codex.mode} / {stack.codex.model}",
@@ -431,49 +407,43 @@ def explained_diagnostics(config: StackConfig | None = None, diagnostic_data: di
     stack = data.get("status") or get_status(cfg)
     if isinstance(stack, dict):
         provider_mode = stack.get("codex", {}).get("mode", "unknown")
-        moonbridge_running = bool(stack.get("moonbridge", {}).get("pid_running") or stack.get("moonbridge", {}).get("port_listening"))
         openclaw_running = bool(stack.get("openclaw", {}).get("pid_running") or stack.get("openclaw", {}).get("port_listening"))
         codex_agent_running = bool(stack.get("codex_agent", {}).get("pid_running") or stack.get("codex_agent", {}).get("port_listening"))
     else:
         provider_mode = stack.codex.mode
-        moonbridge_running = _component_running(stack.moonbridge)
         openclaw_running = _component_running(stack.openclaw)
         codex_agent_running = _component_running(stack.codex_agent)
 
     items: list[ExplainedDiagnosticItem] = []
-    moonbridge_diag = data.get("moonbridge_models", {})
-    if provider_mode == "moonbridge" and (not moonbridge_diag.get("ok") or not moonbridge_running):
+    deepseek_diag = data.get("deepseek_env", {})
+    if provider_mode == "deepseek" and not deepseek_diag.get("ok"):
         items.append(
             ExplainedDiagnosticItem(
-                id="moonbridge-unavailable",
+                id="deepseek-env-missing",
                 level="error",
-                title="MoonBridge 连接失败",
-                affectedModules=["MoonBridge", "Provider", "Codex Runtime"],
+                title="DeepSeek API Key 未就绪",
+                affectedModules=["DeepSeek", "Provider", "Codex Runtime"],
                 status="需要处理",
-                rawError=str(moonbridge_diag.get("error") or moonbridge_diag.get("status") or "MoonBridge 未就绪"),
-                possibleCauses=["MoonBridge 服务未启动", "端口 38440 不可访问", "Provider 已切到 MoonBridge 但代理不可用", "本机网络或防火墙阻止连接"],
-                suggestions=["启动 MoonBridge", "临时切换到 Native Provider", "查看 MoonBridge 日志", "重启 MoonBridge Stack"],
-                actions=[
-                    _action("start-moonbridge", "Start MoonBridge", "/api/moonbridge/start"),
-                    _action("switch-native", "Switch Native", "/api/codex-provider/native"),
-                    _action("view-moonbridge-logs", "View Logs", log_component="moonbridge"),
-                ],
-                relatedLogs=["moonbridge", "operations"],
+                rawError=str(deepseek_diag.get("error") or "DEEPSEEK_API_KEY is missing"),
+                possibleCauses=["当前 ACC 进程未读取到 DeepSeek API key 环境变量", "设置环境变量后尚未重启 ACC / Codex Agent"],
+                suggestions=["设置 DEEPSEEK_API_KEY 用户环境变量", "重启 ACC 和 Feishu Codex Agent", "临时切换到 Native Provider"],
+                actions=[_action("switch-native", "Switch Native", "/api/codex-provider/native")],
+                relatedLogs=["operations", "codex-agent"],
             )
         )
-    elif provider_mode == "moonbridge":
+    elif provider_mode == "deepseek":
         items.append(
             ExplainedDiagnosticItem(
-                id="moonbridge-ok",
+                id="deepseek-env-ok",
                 level="normal",
-                title="MoonBridge Provider 正常",
-                affectedModules=["MoonBridge", "Provider"],
+                title="DeepSeek Provider 就绪",
+                affectedModules=["DeepSeek", "Provider"],
                 status="正常",
                 rawError="",
                 possibleCauses=[],
                 suggestions=["保持当前 Provider 配置"],
-                actions=[_action("view-moonbridge-logs", "View Logs", log_component="moonbridge")],
-                relatedLogs=["moonbridge"],
+                actions=[],
+                relatedLogs=[],
             )
         )
 

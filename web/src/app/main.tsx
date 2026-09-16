@@ -201,7 +201,7 @@ function StackActions({
       <p className="mt-1 text-sm text-slate-600">启动/停止 Feishu Codex Agent 栈；不会改变 ChatGPT/Codex App provider。</p>
       <div className="mt-4 grid gap-2">
         <ActionButton disabled={busy} icon={<Play size={16} />} label="Start Agent Stack (Native)" onClick={() => run("/api/stack/start-native", afterStackAction)} />
-        <ActionButton disabled={busy} icon={<Play size={16} />} label="Start Agent Stack (MoonBridge)" onClick={() => run("/api/stack/start-moonbridge", afterStackAction)} />
+        <ActionButton disabled={busy} icon={<Play size={16} />} label="Start Agent Stack (DeepSeek)" onClick={() => run("/api/stack/start-deepseek", afterStackAction)} />
         <ActionButton disabled={busy} danger icon={<PauseCircle size={16} />} label="Stop Agent Stack" onClick={() => run("/api/stack/stop", afterStackAction)} />
       </div>
     </section>
@@ -224,7 +224,7 @@ function RawDiagnostics({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-semibold text-slate-950">Raw Diagnostics</h2>
-          <p className="mt-1 text-sm text-slate-600">Codex doctor、MoonBridge models、Lark auth 原始检查结果。</p>
+          <p className="mt-1 text-sm text-slate-600">Codex doctor / DeepSeek env / Lark auth diagnostics</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <ActionButton disabled={busy} icon={<RefreshCcw size={16} />} label="Refresh" onClick={() => loadDiagnostics()} />
@@ -235,7 +235,7 @@ function RawDiagnostics({
             icon={<Power size={16} />}
             label="Close Control Center"
             onClick={() => {
-              if (window.confirm("关闭 Agent Control Center 自身进程？不会关闭 OpenClaw Gateway、Codex 或 MoonBridge。")) {
+              if (window.confirm("Close Agent Control Center only? OpenClaw and Codex processes will remain running.")) {
                 run("/api/control-center/shutdown");
               }
             }}
@@ -250,10 +250,14 @@ function RawDiagnostics({
           footer={`${diagnostics?.codex_doctor.duration_ms ?? 0} ms`}
         />
         <DiagnosticCard
-          title="MoonBridge Models"
-          ok={Boolean(diagnostics?.moonbridge_models.ok)}
-          body={diagnostics?.moonbridge_models.models?.join(", ") || diagnostics?.moonbridge_models.error || "No models"}
-          footer={`HTTP ${diagnostics?.moonbridge_models.status ?? "n/a"} | ${diagnostics?.moonbridge_models.duration_ms ?? 0} ms`}
+          title="DeepSeek Env"
+          ok={Boolean(diagnostics?.deepseek_env.ok)}
+          body={
+            diagnostics?.deepseek_env.present
+              ? `${diagnostics.deepseek_env.env_key} is set`
+              : diagnostics?.deepseek_env.error || "Not loaded"
+          }
+          footer={`${diagnostics?.deepseek_env.base_url ?? "n/a"} | ${diagnostics?.deepseek_env.duration_ms ?? 0} ms`}
         />
         <DiagnosticCard
           title="Lark Auth"
@@ -481,7 +485,7 @@ function App() {
 
   React.useEffect(() => {
     mig.loadThreads().catch(() => {});
-    mig.loadMoonbridgeModels().catch(() => {});
+    mig.loadDeepSeekModels().catch(() => {});
   }, []);
 
   React.useEffect(() => {
@@ -643,8 +647,8 @@ function App() {
               <p className="mt-1 text-sm text-slate-600">{status?.stack_root ?? "Loading stack status..."}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <StatusPill active={appProviderMode === "moonbridge"} label={`App: ${appProviderMode}`} />
-              <StatusPill active={agentProviderMode === "moonbridge"} label={`Agent: ${agentProviderMode}`} />
+              <StatusPill active={appProviderMode === "deepseek"} label={`App: ${appProviderMode}`} />
+              <StatusPill active={agentProviderMode === "deepseek"} label={`Agent: ${agentProviderMode}`} />
               <StatusPill active={Boolean(status?.codex_desktop_running)} label="Codex Desktop" />
             </div>
           </header>
@@ -745,8 +749,8 @@ function App() {
                   threads={mig.threads}
                   confirmStop={mig.confirmDesktopStop}
                   confirmRestart={mig.confirmDesktopRestart}
-                  availableModels={mig.availableMoonbridgeModels}
-                  switchingModel={mig.switchingMoonbridgeModel}
+                  availableModels={mig.availableDeepSeekModels}
+                  switchingModel={mig.switchingDeepSeekModel}
                   setMigrationSessionId={mig.setMigrationSessionId}
                   setMigrationTargetProvider={mig.setMigrationTargetProvider}
                   setConfirmStop={mig.setConfirmDesktopStop}

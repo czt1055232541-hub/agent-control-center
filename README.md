@@ -2,9 +2,9 @@
 
 运维命令、端口、配置、日志和恢复流程以 [docs/ops/README.md](docs/ops/README.md) 为唯一导航。ACC 与飞书 Agent 已合并为单仓，运行面位于 `agent-runtime/`，统一使用根配置、runtime 和 `scripts/stack.py`。
 
-本项目是一个本机桌面控制中心，用来统一管理这台机器上的 Agent 运行栈：Control Center API、React GUI、OpenClaw Gateway、MoonBridge、Feishu Codex Agent、Codex provider 切换、Codex Desktop 状态检测、日志、PID 和诊断。
+本项目是一个本机桌面控制中心，用来统一管理这台机器上的 Agent 运行栈：Control Center API、React GUI、OpenClaw Gateway、DeepSeek、Feishu Codex Agent、Codex provider 切换、Codex Desktop 状态检测、日志、PID 和诊断。
 
-它的定位是“控制面板”，不是 OpenClaw、飞书应用或 Codex 本体。真实的飞书认证、OpenClaw 凭据、Codex 登录态、MoonBridge 上游密钥都应留在各自组件的本机目录中，不应提交到本仓库。
+它的定位是“控制面板”，不是 OpenClaw、飞书应用或 Codex 本体。真实的飞书认证、OpenClaw 凭据、Codex 登录态、DeepSeek 上游密钥都应留在各自组件的本机目录中，不应提交到本仓库。
 
 ## 快速开始
 
@@ -22,7 +22,7 @@ python -c "import shutil; shutil.copyfile('config/stack.settings.example.json', 
 python -c "import os; os.startfile('config/stack.settings.local.json')"
 ```
 
-把 `stack.settings.local.json` 里的路径、端口、模型名、Python、Node/NPM、OpenClaw、MoonBridge、Feishu Agent、lark-cli 位置改成本机实际值。程序读取配置的优先级是：
+把 `stack.settings.local.json` 里的路径、端口、模型名、Python、Node/NPM、OpenClaw、DeepSeek、Feishu Agent、lark-cli 位置改成本机实际值。程序读取配置的优先级是：
 
 1. `STACK_SETTINGS_PATH` 环境变量指定的文件
 2. `config/stack.settings.local.json`
@@ -32,7 +32,7 @@ python -c "import os; os.startfile('config/stack.settings.local.json')"
 
 ## 常用命令
 
-统一使用 Python 入口管理 Codex Agent、OpenClaw、MoonBridge、Control Center 和 provider 切换；仓库不再提供 shell 启动脚本。
+统一使用 Python 入口管理 Codex Agent、OpenClaw、DeepSeek、Control Center 和 provider 切换；仓库不再提供 shell 启动脚本。
 
 查看状态：
 
@@ -40,11 +40,11 @@ python -c "import os; os.startfile('config/stack.settings.local.json')"
 python scripts/stack.py status --json
 ```
 
-启动 MoonBridge 模式：
+启动 DeepSeek 官方直连模式：
 
 ```bash
-python scripts/stack.py start moonbridge
-python scripts/stack.py switch-provider moonbridge
+python scripts/stack.py stack start-deepseek
+python scripts/stack.py switch-provider deepseek
 python scripts/stack.py start codex-agent
 ```
 
@@ -62,10 +62,10 @@ python scripts/stack.py start openclaw
 python scripts/stack.py restart openclaw
 ```
 
-检查 MoonBridge 活体：
+检查 DeepSeek 直连模型配置：
 
 ```bash
-curl http://127.0.0.1:38440/v1/models
+curl http://127.0.0.1:8765/api/deepseek/available-models
 ```
 
 启动控制中心 API 和 GUI：
@@ -86,13 +86,27 @@ http://127.0.0.1:8765
 python scripts/stack.py install-shortcut
 ```
 
-## Codex App 与 MoonBridge 模式
+## Codex App 与 DeepSeek 直连模式
 
 Codex provider 切换写入用户级 Codex 配置文件，通常是本机 Codex home 下的 `config.toml`。新版官方 Codex App 会把当前可用的 CLI 路径写入 `CODEX_CLI_PATH`；控制中心会优先使用这个 app 管理的 CLI 路径启动 Feishu Codex Agent，只有当该路径不存在时才回退到配置中的 `codexBin`。
 
 这样做的目的是适配官方 App 更新后 CLI 目录随版本或哈希变化的情况，避免把旧的 `codex.exe` 路径写死。
 
-MoonBridge 模式由 Control Center 统一切换：网页中的模型下拉会更新 MoonBridge YAML、当前 stack settings，以及 Codex `config.toml` 中的 `model` / `model_provider` / `model_reasoning_effort`。推理强度使用 Codex 配置值 `minimal`、`low`、`medium`、`high`、`xhigh`，界面显示为最低、低、中、高、超高。Feishu Codex Agent 默认跟随全局 Codex 配置，因此会同步使用同一组模型与推理强度。
+DeepSeek 模式由 Control Center 统一切换：网页中的模型下拉会更新目标 Codex `config.toml` 中的 `model` / `model_provider` / `model_reasoning_effort`，并写入 `[model_providers.deepseek]`，通过 DeepSeek 官方 Responses API 直连。推理强度使用 Codex 配置值 `minimal`、`low`、`medium`、`high`、`xhigh`。Feishu Codex Agent 默认使用独立 Codex home，因此可以和 Codex App 本体分别选择 native 或 DeepSeek provider。
+
+DeepSeek 接入不依赖本地代理。ACC 切换 provider 时会重写目标 Codex `config.toml` 的 provider 字段，因此 DeepSeek API key 应放在环境变量中，不应手工写入 App 或 Agent 的 `config.toml`。
+
+设置 DeepSeek API key（当前用户，推荐）：
+
+```powershell
+[Environment]::SetEnvironmentVariable("DEEPSEEK_API_KEY", "你的真实key", "User")
+```
+
+设置后重启 Agent Control Center、Codex App 或 Feishu Codex Agent，让新进程继承该环境变量。验证当前终端是否可见：
+
+```powershell
+python -c "import os; print(bool(os.environ.get('DEEPSEEK_API_KEY')))"
+```
 
 `codex-agent` 启动时只会清理它自己的子进程环境副本中的 Agent source 自动检测变量，例如：
 
@@ -113,7 +127,7 @@ codex-desktop stop 会关闭本机 Codex App。为避免误关当前工作中的
 公开仓库不应包含以下内容：
 
 - 飞书 `open_id`、`chat_id`、机器人身份、用户身份、群聊 ID
-- app secret、API key、MoonBridge 上游模型密钥
+- app secret、API key、DeepSeek 上游模型密钥
 - OpenClaw gateway token
 - Codex `auth file`、会话数据库、日志数据库、SQLite 状态文件
 - 本机绝对路径中带个人目录、账号或私有项目结构的信息
@@ -141,12 +155,12 @@ rg -n "<your sensitive patterns>" .
 
 在新电脑上部署时，按这个顺序处理：
 
-1. 安装 Python、Node.js、Git，以及需要的 Codex App、MoonBridge、OpenClaw、lark-cli。
+1. 安装 Python、Node.js、Git，以及需要的 Codex App、DeepSeek、OpenClaw、lark-cli。
 2. 克隆本仓库。
 3. 执行 `python -m pip install -e .[dev]`。
 4. 复制 `config/stack.settings.example.json` 为 `config/stack.settings.local.json`。
 5. 修改 local 配置中的路径、端口、模型名、Node/NPM、lark-cli home、Feishu Agent 路径。
-6. 分别确认 OpenClaw、MoonBridge、Codex App、lark-cli 可以独立运行。
+6. 分别确认 OpenClaw、DeepSeek、Codex App、lark-cli 可以独立运行。
 7. 运行 `python -m feishu_stack.cli doctor` 和 `python -m pytest -q`。
 8. 启动 Control Center API / GUI。
 
@@ -180,7 +194,7 @@ http://127.0.0.1:8765/docs
 - `src/feishu_stack/core/`：配置、模型、进程、日志、状态等基础设施
 - `src/feishu_stack/modules/`：按页面功能域分类的后端业务代码
   - `agent_array/skill_tree/`：Agent 阵列、技能树、配置编辑、registry、dashboard 数据
-  - `model_provider/`：OpenClaw Gateway、MoonBridge、Codex Agent、Codex Desktop、Provider 切换
+  - `model_provider/`：OpenClaw Gateway、DeepSeek、Codex Agent、Codex Desktop、Provider 切换
   - `logs_diagnostics/`：诊断和指标
   - `backup_migration/`：备份和线程迁移
   - `operations/`：CLI、Control Center 启动、操作锁、stack 编排、Typing Indicator
@@ -207,13 +221,13 @@ http://127.0.0.1:8765/docs
 
 中期：
 
-- 把 OpenClaw、MoonBridge、Feishu Agent、Codex App 的启动契约整理为插件式组件注册表。
+- 把 OpenClaw、DeepSeek、Feishu Agent、Codex App 的启动契约整理为插件式组件注册表。
 - 增加配置向导，帮助新电脑生成 `stack.settings.local.json`。
-- 将 MoonBridge 模型、Codex provider、Feishu Agent 参数做成可审计的变更记录。
+- 将 DeepSeek 模型、Codex provider、Feishu Agent 参数做成可审计的变更记录。
 
 长期：
 
-- 支持多套 profile，例如 `local-dev`、`moonbridge-prod`、`native-codex`。
+- 支持多套 profile，例如 `local-dev`、`deepseek-prod`、`native-codex`。
 - 将敏感配置接入系统凭据库或 secret manager，而不是写入 JSON。
 - 把控制中心发展为可迁移、可恢复、可审计的本机 Agent 运维面板。
 
@@ -225,4 +239,4 @@ http://127.0.0.1:8765/docs
 git status --short
 ```
 
-保留源代码、测试、脱敏配置模板、运维文档和必要的 `.gitkeep`。不要删除外部组件自己的配置目录，例如 OpenClaw、MoonBridge、Codex home、Feishu Agent home，除非你正在做明确的迁移或卸载。
+保留源代码、测试、脱敏配置模板、运维文档和必要的 `.gitkeep`。不要删除外部组件自己的配置目录，例如 OpenClaw、DeepSeek、Codex home、Feishu Agent home，除非你正在做明确的迁移或卸载。

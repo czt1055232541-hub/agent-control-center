@@ -5,7 +5,7 @@
 文件说明：
 
 - `ActionButton.tsx`：统一风格的操作按钮。
-- `CodexRuntimePanel.tsx`：展示和切换 Codex / MoonBridge 运行相关状态的面板。
+- `CodexRuntimePanel.tsx`：展示和切换 Codex / DeepSeek 运行相关状态的面板。
 - `ComponentPanel.tsx`：通用信息面板容器。
 - `DiagnosticCard.tsx`：展示诊断结果的小卡片。
 - `StatusPill.tsx`：状态小标签。

@@ -21,7 +21,6 @@ from pydantic import BaseModel
 from feishu_stack.modules.agent_array.skill_tree import agent_config_editor, agent_dashboard, skill_baseline, skill_registry, skill_drift, tree_config
 from feishu_stack.modules.backup_migration import thread_migration
 from feishu_stack.modules.model_provider import codex_agent, codex_desktop, provider_switch
-from feishu_stack.modules.model_provider import moonbridge
 from feishu_stack.modules.model_provider import openclaw_gateway as openclaw
 from feishu_stack.modules.backup_migration import backups
 from feishu_stack.modules.logs_diagnostics import metrics
@@ -42,6 +41,7 @@ from feishu_stack.modules.operations.operations import recent_operations, run_ex
 from .security import get_or_create_token, require_control_token
 from feishu_stack.core.status import get_status
 from feishu_stack import __version__  # noqa: F401
+from feishu_stack.plugins import create_plugin_router
 
 # ---------------------------------------------------------------------------
 # Tag definitions for /docs
@@ -103,6 +103,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# The framework inventory is the stable discovery surface for ACC's own Web
+# client and external hosts. Existing feature routes remain in this module
+# during their compatibility-preserving migration into native plugins.
+app.include_router(create_plugin_router())
+
 # ---------------------------------------------------------------------------
 # Request models
 # ---------------------------------------------------------------------------
@@ -142,7 +147,7 @@ class LocalToolRegisterRequest(BaseModel):
     env: dict[str, str] | None = None
 
 
-class MoonBridgeModelSwitchRequest(BaseModel):
+class ProviderModelSwitchRequest(BaseModel):
     model: str
     reasoning_effort: str | None = None
 
@@ -369,7 +374,7 @@ def health() -> dict:
 @app.get(
     "/api/status",
     summary="Stack status",
-    description="Return the full stack status: openclaw, moonbridge, codex-agent, "
+    description="Return the full stack status: openclaw, codex-agent, "
     "codex-desktop, and provider info.",
     tags=[STATUS_TAG],
 )
@@ -905,7 +910,6 @@ def logs(component: str, lines: int = 120) -> dict:
         codex_desktop.log(cfg)
     table = {
         "openclaw": [cfg.openclaw_stdout_log, cfg.openclaw_stderr_log],
-        "moonbridge": [cfg.moonbridge_stdout_log, cfg.moonbridge_stderr_log],
         "codex-agent": [cfg.codex_agent_stdout_log, cfg.codex_agent_stderr_log],
         "codex-desktop": [cfg.log_dir / "codex-desktop-status.log"],
         "control-center-api": [cfg.log_dir / "control-center-api-out.log", cfg.log_dir / "control-center-api-err.log"],
@@ -963,13 +967,13 @@ def codex_doctor() -> dict:
 
 
 @app.get(
-    "/api/moonbridge/models",
-    summary="Moonbridge models",
-    description="Query the moonbridge endpoint for available models.",
+    "/api/deepseek/env-status",
+    summary="DeepSeek environment status",
+    description="Check whether the configured DeepSeek API key environment variable is visible.",
     tags=[DIAGNOSTICS_TAG],
 )
-def moonbridge_models() -> dict:
-    return diagnostics_module.moonbridge_models()
+def deepseek_env_status() -> dict:
+    return diagnostics_module.deepseek_env_status()
 
 
 @app.get(
@@ -1446,30 +1450,10 @@ def restart_openclaw() -> dict:
 def open_openclaw_ui() -> dict:
     return _run("openclaw", "open-ui", openclaw.open_ui)
 
-# ---------------------------------------------------------------------------
-# Operations - MoonBridge
-# ---------------------------------------------------------------------------
-
-@app.post("/api/moonbridge/start", summary="Start MoonBridge", description="Start the MoonBridge API proxy service.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def start_moonbridge() -> dict:
-    return _run("moonbridge", "start", moonbridge.start)
-
-@app.post("/api/moonbridge/stop", summary="Stop MoonBridge", description="Stop the MoonBridge API proxy service.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def stop_moonbridge() -> dict:
-    return _run("moonbridge", "stop", moonbridge.stop)
-
-@app.post("/api/moonbridge/restart", summary="Restart MoonBridge", description="Restart the MoonBridge API proxy service.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def restart_moonbridge() -> dict:
-    return _run("moonbridge", "restart", moonbridge.restart)
-
-@app.get("/api/moonbridge/available-models", summary="Available MoonBridge models", description="Return the list of available moonbridge models.", tags=[OPERATIONS_TAG])
-def available_moonbridge_models() -> dict:
-    models = moonbridge.get_available_models()
-    return {"models": models}
-
-@app.post("/api/moonbridge/model/switch", summary="Switch MoonBridge model", description="Switch the active model used by MoonBridge.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def switch_moonbridge_model(request: MoonBridgeModelSwitchRequest) -> dict:
-    return _run("moonbridge", "switch-model", lambda cfg: moonbridge.switch_model(request.model, cfg, request.reasoning_effort))
+@app.get("/api/deepseek/available-models", summary="Available DeepSeek models", description="Return the configured direct DeepSeek models.", tags=[OPERATIONS_TAG])
+def available_deepseek_models() -> dict:
+    cfg = load_config()
+    return {"models": cfg.deepseek.models}
 
 # ---------------------------------------------------------------------------
 # Operations - Codex Agent
@@ -1511,54 +1495,57 @@ def restart_codex_desktop() -> dict:
 def switch_native() -> dict:
     return _run("codex-provider", "switch-native", lambda cfg: provider_switch.switch_provider("native", cfg, target="app"))
 
-@app.post("/api/codex-provider/moonbridge", summary="Switch to MoonBridge provider", description="Switch the codex provider to the MoonBridge proxy backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def switch_moonbridge(request: MoonBridgeModelSwitchRequest | None = Body(default=None)) -> dict:
+@app.post("/api/codex-provider/deepseek", summary="Switch to DeepSeek provider", description="Switch the codex provider to the direct DeepSeek Responses API backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
+def switch_deepseek(request: ProviderModelSwitchRequest | None = Body(default=None)) -> dict:
     return _run(
         "codex-provider",
-        "switch-moonbridge",
+        "switch-deepseek",
         lambda cfg: provider_switch.switch_provider(
-            "moonbridge",
+            "deepseek",
             cfg,
-            moonbridge_model=request.model if request else None,
+            deepseek_model=request.model if request else None,
             reasoning_effort=request.reasoning_effort if request else None,
             target="app",
         ),
     )
+
 
 @app.post("/api/codex-provider/app/native", summary="Switch App to native provider", description="Switch the ChatGPT/Codex App provider to the native OpenAI backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
 def switch_app_native() -> dict:
     return _run("codex-provider-app", "switch-native", lambda cfg: provider_switch.switch_provider("native", cfg, target="app"))
 
-@app.post("/api/codex-provider/app/moonbridge", summary="Switch App to MoonBridge provider", description="Switch the ChatGPT/Codex App provider to the MoonBridge proxy backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def switch_app_moonbridge(request: MoonBridgeModelSwitchRequest | None = Body(default=None)) -> dict:
+@app.post("/api/codex-provider/app/deepseek", summary="Switch App to DeepSeek provider", description="Switch the ChatGPT/Codex App provider to the direct DeepSeek Responses API backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
+def switch_app_deepseek(request: ProviderModelSwitchRequest | None = Body(default=None)) -> dict:
     return _run(
         "codex-provider-app",
-        "switch-moonbridge",
+        "switch-deepseek",
         lambda cfg: provider_switch.switch_provider(
-            "moonbridge",
+            "deepseek",
             cfg,
-            moonbridge_model=request.model if request else None,
+            deepseek_model=request.model if request else None,
             reasoning_effort=request.reasoning_effort if request else None,
             target="app",
         ),
     )
 
+
 @app.post("/api/codex-provider/agent/native", summary="Switch Agent to native provider", description="Switch the Feishu Codex Agent provider to the native OpenAI backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
 def switch_agent_native() -> dict:
     return _run("codex-provider-agent", "switch-native", lambda cfg: stack_actions.switch_agent_provider("native", cfg))
 
-@app.post("/api/codex-provider/agent/moonbridge", summary="Switch Agent to MoonBridge provider", description="Switch the Feishu Codex Agent provider to the MoonBridge proxy backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def switch_agent_moonbridge(request: MoonBridgeModelSwitchRequest | None = Body(default=None)) -> dict:
+@app.post("/api/codex-provider/agent/deepseek", summary="Switch Agent to DeepSeek provider", description="Switch the Feishu Codex Agent provider to the direct DeepSeek Responses API backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
+def switch_agent_deepseek(request: ProviderModelSwitchRequest | None = Body(default=None)) -> dict:
     return _run(
         "codex-provider-agent",
-        "switch-moonbridge",
+        "switch-deepseek",
         lambda cfg: stack_actions.switch_agent_provider(
-            "moonbridge",
+            "deepseek",
             cfg,
-            moonbridge_model=request.model if request else None,
+            deepseek_model=request.model if request else None,
             reasoning_effort=request.reasoning_effort if request else None,
         ),
     )
+
 
 # ---------------------------------------------------------------------------
 # Operations - Stack (orchestrated)
@@ -1568,11 +1555,11 @@ def switch_agent_moonbridge(request: MoonBridgeModelSwitchRequest | None = Body(
 def stack_start_native() -> dict:
     return _run("stack", "start-native", stack_actions.start_native)
 
-@app.post("/api/stack/start-moonbridge", summary="Start stack (MoonBridge)", description="Start the full stack using the MoonBridge proxy provider.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def stack_start_moonbridge() -> dict:
-    return _run("stack", "start-moonbridge", stack_actions.start_moonbridge)
+@app.post("/api/stack/start-deepseek", summary="Start stack (DeepSeek)", description="Start the full stack using the direct DeepSeek provider.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
+def stack_start_deepseek() -> dict:
+    return _run("stack", "start-deepseek", stack_actions.start_deepseek)
 
-@app.post("/api/stack/stop", summary="Stop stack", description="Stop all stack components (openclaw, moonbridge, codex-agent).", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
+@app.post("/api/stack/stop", summary="Stop stack", description="Stop all stack components (openclaw, codex-agent).", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
 def stack_stop() -> dict:
     return _run("stack", "stop", stack_actions.stop)
 
@@ -1602,7 +1589,7 @@ def force_stop_watchdog() -> dict:
 @app.post(
     "/api/control-center/shutdown",
     summary="Shutdown Control Center",
-    description="Close Control Center API/launcher processes only. OpenClaw, Codex, and MoonBridge processes are excluded. Requires control token.",
+    description="Close Control Center API/launcher processes only. OpenClaw and Codex processes are excluded. Requires control token.",
     tags=[OPERATIONS_TAG],
     dependencies=[Depends(require_control_token)],
 )

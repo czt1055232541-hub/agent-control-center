@@ -45,7 +45,6 @@ class StackStatus:
     codex_app: ProviderStatus
     codex_agent_provider: ProviderStatus
     openclaw: ComponentStatus
-    moonbridge: ComponentStatus
     codex_agent: ComponentStatus
     codex_agent_args: str
     codex_agent_follows_global_config: bool

@@ -311,8 +311,8 @@ def build_migration_summary(
 
 
 def _provider_args(target_provider: str, cfg: StackConfig) -> tuple[str, list[str]]:
-    if target_provider == "moonbridge":
-        return cfg.moonbridge_model, []
+    if target_provider == "deepseek":
+        return cfg.deepseek.model, []
     return cfg.native_model, []
 
 
@@ -372,6 +372,6 @@ def migrate_thread(
     prompt: str = DEFAULT_CONTINUATION_PROMPT,
     config: StackConfig | None = None,
 ) -> ThreadMigrationResult:
-    if target_provider not in {"native", "moonbridge"}:
+    if target_provider not in {"native", "deepseek"}:
         raise ValueError(f"Unsupported target provider: {target_provider}")
     return start_migrated_session(session_id, target_provider, prompt, config or load_config())

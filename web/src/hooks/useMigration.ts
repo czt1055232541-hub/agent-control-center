@@ -1,15 +1,15 @@
-﻿import React from "react";
+import React from "react";
 import { readJson } from "../api";
 import type { OperationResult, ThreadListItem } from "../types";
 
 export function useMigration(token: string, refresh: () => Promise<void>) {
   const [migrationSessionId, setMigrationSessionId] = React.useState("");
-  const [migrationTargetProvider, setMigrationTargetProvider] = React.useState("moonbridge");
+  const [migrationTargetProvider, setMigrationTargetProvider] = React.useState("deepseek");
   const [threads, setThreads] = React.useState<ThreadListItem[]>([]);
   const [confirmDesktopStop, setConfirmDesktopStop] = React.useState(false);
   const [confirmDesktopRestart, setConfirmDesktopRestart] = React.useState(false);
-  const [availableMoonbridgeModels, setAvailableMoonbridgeModels] = React.useState<string[]>([]);
-  const [switchingMoonbridgeModel, setSwitchingMoonbridgeModel] = React.useState(false);
+  const [availableDeepSeekModels, setAvailableDeepSeekModels] = React.useState<string[]>([]);
+  const [switchingDeepSeekModel, setSwitchingDeepSeekModel] = React.useState(false);
 
   const loadThreads = React.useCallback(async () => {
     const next = await readJson<{ threads: ThreadListItem[] }>(
@@ -18,12 +18,12 @@ export function useMigration(token: string, refresh: () => Promise<void>) {
     setThreads(Array.isArray(next.threads) ? next.threads : []);
   }, []);
 
-  const loadMoonbridgeModels = React.useCallback(async () => {
+  const loadDeepSeekModels = React.useCallback(async () => {
     try {
-      const data = await readJson<{ models: string[] }>("/api/moonbridge/available-models");
-      setAvailableMoonbridgeModels(data.models ?? []);
+      const data = await readJson<{ models: string[] }>("/api/deepseek/available-models");
+      setAvailableDeepSeekModels(data.models ?? []);
     } catch {
-      setAvailableMoonbridgeModels([]);
+      setAvailableDeepSeekModels([]);
     }
   }, []);
 
@@ -38,9 +38,9 @@ export function useMigration(token: string, refresh: () => Promise<void>) {
         setError("Control token is not ready.");
         return;
       }
-      setSwitchingMoonbridgeModel(true);
+      setSwitchingDeepSeekModel(true);
       try {
-        const next = await readJson<OperationResult>("/api/codex-provider/moonbridge", {
+        const next = await readJson<OperationResult>("/api/codex-provider/deepseek", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -53,7 +53,7 @@ export function useMigration(token: string, refresh: () => Promise<void>) {
       } catch (exc) {
         setError(exc instanceof Error ? exc.message : String(exc));
       } finally {
-        setSwitchingMoonbridgeModel(false);
+        setSwitchingDeepSeekModel(false);
       }
     },
     [token, refresh],
@@ -65,14 +65,14 @@ export function useMigration(token: string, refresh: () => Promise<void>) {
     threads,
     confirmDesktopStop,
     confirmDesktopRestart,
-    availableMoonbridgeModels,
-    switchingMoonbridgeModel,
+    availableDeepSeekModels,
+    switchingDeepSeekModel,
     setMigrationSessionId,
     setMigrationTargetProvider,
     setConfirmDesktopStop,
     setConfirmDesktopRestart,
     loadThreads,
-    loadMoonbridgeModels,
+    loadDeepSeekModels,
     switchModel,
   };
 }

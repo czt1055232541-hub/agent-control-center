@@ -99,7 +99,7 @@ def _read_codex_provider_config(config_path: Path) -> ProviderStatus:
 
     model = value("model", "unknown")
     provider = value("model_provider", "openai/default")
-    mode = "moonbridge" if provider == "moonbridge" else "native"
+    mode = "deepseek" if provider == "deepseek" else "native"
     return ProviderStatus(model=model, provider=provider, mode=mode, config=str(config_path), reasoning_effort=value("model_reasoning_effort", "high"))
 
 

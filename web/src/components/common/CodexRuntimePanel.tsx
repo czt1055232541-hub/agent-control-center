@@ -23,18 +23,18 @@ function ProviderControl({
   run: (path: string, after?: () => Promise<void>, body?: unknown) => Promise<void>;
   loadDiagnostics: () => Promise<void>;
 }) {
-  const activeMoonbridgeModel =
-    provider?.mode === "moonbridge" && availableModels.includes(provider.model)
+  const activeDeepSeekModel =
+    provider?.mode === "deepseek" && availableModels.includes(provider.model)
       ? provider.model
       : availableModels[0] ?? "";
-  const [selectedMoonbridgeModel, setSelectedMoonbridgeModel] = React.useState(activeMoonbridgeModel);
+  const [selectedDeepSeekModel, setSelectedDeepSeekModel] = React.useState(activeDeepSeekModel);
   const [selectedReasoningEffort, setSelectedReasoningEffort] = React.useState(provider?.reasoning_effort ?? "high");
 
   React.useEffect(() => {
-    if (activeMoonbridgeModel && !availableModels.includes(selectedMoonbridgeModel)) {
-      setSelectedMoonbridgeModel(activeMoonbridgeModel);
+    if (activeDeepSeekModel && !availableModels.includes(selectedDeepSeekModel)) {
+      setSelectedDeepSeekModel(activeDeepSeekModel);
     }
-  }, [activeMoonbridgeModel, availableModels, selectedMoonbridgeModel]);
+  }, [activeDeepSeekModel, availableModels, selectedDeepSeekModel]);
 
   React.useEffect(() => {
     setSelectedReasoningEffort(provider?.reasoning_effort ?? "high");
@@ -57,12 +57,12 @@ function ProviderControl({
           onClick={() => run(`/api/codex-provider/${target}/native`, loadDiagnostics)}
         />
         <ActionButton
-          disabled={busy || switchingModel || !selectedMoonbridgeModel}
+          disabled={busy || switchingModel || !selectedDeepSeekModel}
           icon={<Server size={16} />}
-          label={provider?.mode === "moonbridge" ? "Apply" : "MoonBridge"}
+          label={provider?.mode === "deepseek" ? "Apply" : "DeepSeek"}
           onClick={() =>
-            run(`/api/codex-provider/${target}/moonbridge`, loadDiagnostics, {
-              model: selectedMoonbridgeModel,
+            run(`/api/codex-provider/${target}/deepseek`, loadDiagnostics, {
+              model: selectedDeepSeekModel,
               reasoning_effort: selectedReasoningEffort,
             })
           }
@@ -70,12 +70,12 @@ function ProviderControl({
       </div>
       {availableModels.length > 0 ? (
         <div className="mt-2">
-          <select
-            className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
-            value={selectedMoonbridgeModel}
-            disabled={busy || switchingModel}
-            onChange={(event) => setSelectedMoonbridgeModel(event.target.value)}
-          >
+            <select
+              className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
+              value={selectedDeepSeekModel}
+              disabled={busy || switchingModel}
+              onChange={(event) => setSelectedDeepSeekModel(event.target.value)}
+            >
             {availableModels.map((modelName) => (
               <option key={modelName} value={modelName}>
                 {modelName}
@@ -271,7 +271,7 @@ export function CodexRuntimePanel({
             onChange={(event) => setMigrationTargetProvider(event.target.value)}
           >
             <option value="native">Native</option>
-            <option value="moonbridge">MoonBridge</option>
+            <option value="deepseek">DeepSeek</option>
           </select>
           <ActionButton
             disabled={busy || !migrationSessionId.trim()}

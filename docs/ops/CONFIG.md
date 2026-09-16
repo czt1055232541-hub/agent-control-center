@@ -2,7 +2,7 @@
 
 ACC 配置默认位于 `{ACC_ROOT}/config/stack.settings.local.json`，该文件包含本机路径和身份映射，不得提交。模板使用 `stack.settings.example.json`。
 
-共享契约版本 1 包括 Codex 路径/模型、MoonBridge 端口、OpenClaw 端口、Agent 目录、被 Git 忽略的 `{ACC_ROOT}/projects` 和 lark-cli 路径。`projectsRoot` 默认指向该项目工作区；根配置是唯一真值来源，`agent-runtime` 不保留第二份活动配置。
+共享契约版本 1 包括 Codex 路径/模型、DeepSeek 直连 provider、DeepSeek legacy 端口、OpenClaw 端口、Agent 目录、被 Git 忽略的 `{ACC_ROOT}/projects` 和 lark-cli 路径。`projectsRoot` 默认指向该项目工作区；根配置是唯一真值来源，`agent-runtime` 不保留第二份活动配置。
 
 可用环境覆盖：
 

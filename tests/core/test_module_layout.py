@@ -9,7 +9,6 @@ def test_legacy_module_wrappers_resolve() -> None:
         "feishu_stack.app",
         "feishu_stack.cli",
         "feishu_stack.config",
-        "feishu_stack.moonbridge",
         "feishu_stack.openclaw",
         "feishu_stack.codex_agent",
         "feishu_stack.codex_config",
