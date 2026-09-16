@@ -45,7 +45,7 @@ def create_plugin() -> AccPlugin:
 
 ## 内建功能迁移
 
-十个内建功能都有路由贡献。配置中心、路由规则、飞书连接和任务战场在独立模块中直接定义路由，状态为 `native`；其余六个仍为 `transitional`，原有端点通过 `builtin_routers.adopt_builtin_feature_routes` 兼容层转移到插件路由，再由插件注册表统一挂载。旧 API 路径不变。过渡模块只完成路由挂载归属，业务实现仍在核心应用中，不代表插件化验收完成。
+十个内建功能都有路由贡献。Dashboard、配置中心、路由规则、飞书连接和任务战场在独立模块中直接定义路由，状态为 `native`；其余五个仍为 `transitional`，原有端点通过 `builtin_routers.adopt_builtin_feature_routes` 兼容层转移到插件路由，再由插件注册表统一挂载。旧 API 路径不变。过渡模块只完成路由挂载归属，业务实现仍在核心应用中，不代表插件化验收完成。
 
 兼容层只服务于现有实现的渐进式拆分。新增功能不得在 `api/app.py` 注册业务端点，必须在独立插件包中定义路由、卡片与能力。后续可逐模块把兼容层内的处理函数移动到 `modules/<feature>/plugin.py`，无需再次改变外部 API 或 DSH 适配器。
 

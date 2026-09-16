@@ -12,10 +12,10 @@ from feishu_stack.modules.config_center.plugin import create_plugin as create_co
 from feishu_stack.modules.feishu_connection.plugin import create_plugin as create_feishu_connection_plugin
 from feishu_stack.modules.routing_rules.plugin import create_plugin as create_routing_rules_plugin
 from feishu_stack.modules.task_battlefield.plugin import create_plugin as create_task_battlefield_plugin
+from feishu_stack.modules.dashboard.plugin import create_plugin as create_dashboard_plugin
 from feishu_stack.plugins.builtin_routers import (
     agent_array_router,
     backup_migration_router,
-    dashboard_router,
     local_tools_router,
     logs_diagnostics_router,
     model_provider_router,
@@ -61,7 +61,7 @@ BUILTIN_PLUGINS = (
         kind="framework",
         capabilities=("acc.plugins.inventory",),
     ),
-    _feature("acc.dashboard", "Dashboard 总览", "运行状态与关键指标总览。", "dashboard", "dashboard.read", order=10, icon="layout-dashboard", router=dashboard_router),
+    create_dashboard_plugin(),
     _feature("acc.agent-array", "Agent 阵列", "Agent、技能树与运行记录管理。", "agents", "agents.read", "skills.manage", order=20, icon="swords", router=agent_array_router),
     create_task_battlefield_plugin(),
     create_feishu_connection_plugin(),

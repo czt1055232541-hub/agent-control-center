@@ -3,7 +3,6 @@
 from fastapi import APIRouter, FastAPI
 
 
-dashboard_router = APIRouter()
 agent_array_router = APIRouter()
 model_provider_router = APIRouter()
 local_tools_router = APIRouter()
@@ -12,7 +11,6 @@ backup_migration_router = APIRouter()
 
 
 _ROUTE_OWNERS = (
-    (dashboard_router, ("/api/dashboard", "/api/status", "/api/operations", "/api/infrastructure")),
     (agent_array_router, ("/api/agents", "/api/skill-workshop")),
     (
         model_provider_router,
@@ -47,7 +45,6 @@ def adopt_builtin_feature_routes(app: FastAPI) -> None:
 __all__ = [
     "agent_array_router",
     "backup_migration_router",
-    "dashboard_router",
     "local_tools_router",
     "logs_diagnostics_router",
     "model_provider_router",

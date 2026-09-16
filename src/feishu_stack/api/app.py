@@ -353,35 +353,10 @@ def health() -> dict:
 # ---------------------------------------------------------------------------
 
 
-@app.get(
-    "/api/status",
-    summary="Stack status",
-    description="Return the full stack status: openclaw, codex-agent, "
-    "codex-desktop, and provider info.",
-    tags=[STATUS_TAG],
-)
-def status() -> dict:
-    return to_dict(get_status())
 
 
-@app.get(
-    "/api/operations",
-    summary="Recent operations",
-    description="Return the most recent control operations and their outcomes.",
-    tags=[STATUS_TAG],
-)
-def operations() -> dict:
-    return {"operations": to_dict(recent_operations())}
 
 
-@app.get(
-    "/api/dashboard/summary",
-    summary="Dashboard summary",
-    description="Return the command dashboard top-level health and activity counters.",
-    tags=[DASHBOARD_TAG],
-)
-def dashboard_summary() -> dict:
-    return to_dict(agent_dashboard.dashboard_summary())
 
 
 @app.get(
@@ -394,14 +369,6 @@ def agents() -> dict:
     return {"agents": to_dict(agent_dashboard.list_agents())}
 
 
-@app.get(
-    "/api/infrastructure",
-    summary="Infrastructure inventory",
-    description="Return the real backend services that carry the agent roles.",
-    tags=[DASHBOARD_TAG],
-)
-def infrastructure() -> dict:
-    return {"agents": to_dict(agent_dashboard.list_infrastructure())}
 
 
 @app.get(
