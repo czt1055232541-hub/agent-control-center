@@ -1,26 +1,23 @@
-# ACC 插件架构与 DSH 接入方案
+# ACC 插件架构与 DSH 接入
 
-## 目标状态
+## 目标
 
-ACC 只保留插件发现、依赖解析、生命周期、配置、安全与 UI 贡献协议。Agent 阵列、任务战场、飞书连接、模型 Provider、本地工具、配置中心、日志诊断和备份迁移均作为功能插件存在。DSH 不修改源码，只安装一个树外 `dsh-plugin-acc` bundle。
+ACC 是轻量宿主：只负责插件发现、依赖排序、生命周期、配置、安全边界和 UI 投影。业务能力全部以插件贡献；DSH 只安装仓库外的 `dsh-plugin-acc`，不修改 DSH 源码。
 
 ```text
-ACC feature plugins ─┐
-external ACC plugins ├─> ACC plugin runtime ─> HTTP/Remote adapter ─> DSH host plugin
-ACC built-ins ───────┘                                      │
-                                                           └─> DSH client card
+ACC 内建插件 ─┐
+ACC 外部插件 ─┼─> ACC plugin runtime ─> /api/plugins ─> dsh-plugin-acc ─> DSH 原生卡片
+未来功能插件 ─┘                              └──────────────> ACC Web 导航
 ```
 
-## 插件边界
+## 插件契约
 
-公共 Python 协议位于 `feishu_stack.plugin_sdk`，运行时位于 `feishu_stack.plugin_runtime`。外部发行包通过 `agent_control_center.plugins` entry-point 提供一个 `AccPlugin` 或返回它的无参 factory。插件可以贡献：
+公开 Python 契约位于 `feishu_stack.plugin_sdk`，运行时位于 `feishu_stack.plugin_runtime`。外部发行包通过 `agent_control_center.plugins` entry point 返回 `AccPlugin` 或无参数 factory。
 
-- `router_factory`：按需创建 FastAPI `APIRouter`；
-- `capabilities`：供 ACC、DSH 与其他宿主发现的稳定能力名；
-- `cards`：宿主无关的卡片元数据；
-- `requires`：其他 ACC 插件 id，运行时在挂载前校验并拓扑排序。
-
-插件包示例：
+- `router_factory`：延迟创建 FastAPI `APIRouter`；
+- `capabilities`：跨 ACC/DSH 使用的稳定能力标识；
+- `cards`：与宿主无关的可点击卡片元数据；
+- `requires`：依赖的插件 ID，挂载前进行缺失和循环校验。
 
 ```toml
 [project.entry-points."agent_control_center.plugins"]
@@ -32,8 +29,7 @@ from fastapi import APIRouter
 from feishu_stack.plugin_sdk import AccPlugin, PluginCard
 
 def create_router() -> APIRouter:
-    router = APIRouter(prefix="/api/example", tags=["Example"])
-    return router
+    return APIRouter(prefix="/api/example", tags=["Example"])
 
 def create_plugin() -> AccPlugin:
     return AccPlugin(
@@ -47,37 +43,26 @@ def create_plugin() -> AccPlugin:
     )
 ```
 
-## 兼容迁移
+## 内建功能迁移
 
-当前内置功能均已进入插件清单，使 ACC 和 DSH 可以发现它们。配置中心、路由规则和飞书连接已由各自的原生插件挂载路由；其余功能仍标记为 `transitional`，原路由暂时保留在 `api/app.py`，避免一次迁移破坏现有入口。迁移每个剩余功能时执行：
+十个内建功能都有路由贡献。配置中心、路由规则、飞书连接和任务战场在独立模块中直接定义路由，状态为 `native`；其余六个仍为 `transitional`，原有端点通过 `builtin_routers.adopt_builtin_feature_routes` 兼容层转移到插件路由，再由插件注册表统一挂载。旧 API 路径不变。过渡模块只完成路由挂载归属，业务实现仍在核心应用中，不代表插件化验收完成。
 
-1. 将请求模型和路由移动到所属 `modules/<功能域>/router.py`；
-2. 给该功能插件设置惰性 `router_factory` 并把状态改为 `native`；
-3. 前端页面导出 `AccClientPlugin`，不再由 `main.tsx` 和 `Sidebar.tsx` 直接导入；
-4. 删除原单体路由，仅保留已有公开路径；
-5. 运行功能测试、完整 Python 测试和 Web build。
+兼容层只服务于现有实现的渐进式拆分。新增功能不得在 `api/app.py` 注册业务端点，必须在独立插件包中定义路由、卡片与能力。后续可逐模块把兼容层内的处理函数移动到 `modules/<feature>/plugin.py`，无需再次改变外部 API 或 DSH 适配器。
 
-旧的 `feishu_stack/*.py` 导入 wrapper 和现有 CLI 在迁移期间保持可用。
+最终核心宿主应只保留会话、健康检查、框架清单、异常处理、静态页面和宿主关停职责。当前核心仍含业务处理函数和业务 WebSocket，需继续迁移。
 
-## DSH 适配
+## DSH 适配器
 
-`dsh-plugin-acc` 是独立仓库或独立 npm 包，不进入 DSH 源码：
+`integrations/dsh-plugin-acc` 是独立 npm bundle：
 
-- Host 插件连接 ACC 的 loopback API，注册 `acc_list_plugins`、`acc_get_status` 和按 capability 生成的工具；
-- Client 插件为这些 wire 工具名注册 `tool.call.toolview`，使用 DSH 主题变量渲染可点击卡片；
-- 卡片点击后打开 DSH 右侧栏的 ACC 详情资源；完整 ACC 控制台仍可独立运行；
-- ACC 不可用时插件返回结构化离线状态，不影响 DSH 启动和其他工具；
-- bundle 通过 `dsh plugin --profile web add <package>` 安装，通过移除 bundle 完整回退。
+- 通过 `dsh plugin --profile web add <tarball>` 安装；
+- Host 注册 `acc_overview`，只读取 ACC 的 loopback `/api/plugins`；
+- Client 在 `tool.call.toolview` 插槽渲染 DSH 风格的可点击卡片；
+- 在线时点击卡片打开 ACC，离线时返回结构化降级状态，不影响 DSH 主体启动和使用；
+- DSH 只依赖公开 HTTP 清单，不 import ACC 源码或私有文件。
 
-DSH 适配器只依赖 `/api/plugins` 与后续稳定的 `/api/integrations/dsh/*`，不得 import ACC 源码或依赖 ACC 私有文件结构。
+未来新增 ACC 插件后，清单、ACC 导航和 DSH 概览卡片会自动出现，无需修改 DSH 或重新编译其源码。只有在需要把某项 ACC 能力直接暴露为 DSH 工具时，才扩展稳定的 capability 调用协议；不能让 DSH 直接依赖业务插件实现。
 
-## Web 插件投影
+## 发布与回退
 
-ACC Web 不再维护第二份硬编码导航表。`usePluginInventory` 读取 `/api/plugins`，侧边栏按卡片 `order` 自动排序并显示插件迁移状态。内置页面继续使用各自的 React 组件；外部插件或尚无专属组件的页面使用统一插件详情页展示描述、版本和 capabilities。这样新增功能只需注册插件与卡片，不需要修改应用外壳。
-
-## 阶段验收
-
-1. 插件内核：依赖顺序、重复 id、缺失依赖、循环依赖、惰性路由和清单 API 均有测试。
-2. 内置迁移：所有功能插件状态从 `transitional` 变为 `native`，`api/app.py` 不再导入业务模块。
-3. 前端迁移：导航和页面来自插件注册表，禁用某插件会同时移除页面和菜单卡片。
-4. DSH：DSH 仓库无源码 diff；ACC 在线、离线、禁用和卸载场景均验证；专属卡片通过 Client 构建和浏览器检查。
+每个阶段执行 Python 全量测试、Web 构建、集成包语法/打包检查、真实 DSH 启动检查及新增行隐私扫描。阶段提交推送到 `develop`，以语义化标签形成回退点；改造前远端备份分支为 `backup/pre-plugin-0.3.0-20260916`。

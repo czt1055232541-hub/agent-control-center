@@ -76,8 +76,49 @@ def test_builtin_inventory_exposes_clickable_feature_cards() -> None:
     assert response.json()["count"] == len(inventory)
 
 
-def test_first_migrated_features_are_native_router_plugins() -> None:
+def test_all_builtin_features_contribute_routers() -> None:
     plugins = {plugin.id: plugin for plugin in get_plugin_registry().resolve()}
-    for plugin_id in ("acc.config-center", "acc.feishu-connection", "acc.routing-rules"):
-        assert plugins[plugin_id].state == "native"
+    for plugin_id in (
+        "acc.dashboard",
+        "acc.agent-array",
+        "acc.task-battlefield",
+        "acc.feishu-connection",
+        "acc.model-provider",
+        "acc.routing-rules",
+        "acc.local-tools",
+        "acc.config-center",
+        "acc.logs-diagnostics",
+        "acc.backup-migration",
+    ):
         assert plugins[plugin_id].router_factory is not None
+
+
+def test_builtin_feature_routes_are_contributed_by_plugins() -> None:
+    from feishu_stack.api.app import app as _composed_app  # noqa: F401
+
+    plugins = {plugin.id: plugin for plugin in get_plugin_registry().resolve()}
+    expected_paths = {
+        "acc.dashboard": "/api/dashboard/summary",
+        "acc.agent-array": "/api/agents",
+        "acc.task-battlefield": "/api/task-battlefield/directory",
+        "acc.model-provider": "/api/openclaw/start",
+        "acc.local-tools": "/api/local-tools",
+        "acc.logs-diagnostics": "/api/diagnostics",
+        "acc.backup-migration": "/api/thread-migration/threads",
+    }
+    for plugin_id, expected_path in expected_paths.items():
+        router = plugins[plugin_id].router_factory()
+        assert expected_path in {route.path for route in router.routes}
+
+
+def test_task_plugin_can_serve_without_application_composition(monkeypatch) -> None:
+    from feishu_stack.modules.task_battlefield.plugin import create_plugin, task_directory
+
+    monkeypatch.setattr(task_directory, "load_directory", lambda: {"tasks": []})
+    isolated_app = FastAPI()
+    isolated_app.include_router(create_plugin().router_factory())
+    client = TestClient(isolated_app)
+    response = client.get("/api/task-battlefield/directory")
+    assert response.status_code == 200
+    assert response.json() == {"tasks": []}
+    assert client.post("/api/watchdog/force-stop").status_code in (401, 403)
