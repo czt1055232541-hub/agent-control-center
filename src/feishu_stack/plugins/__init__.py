@@ -15,41 +15,11 @@ from feishu_stack.modules.task_battlefield.plugin import create_plugin as create
 from feishu_stack.modules.dashboard.plugin import create_plugin as create_dashboard_plugin
 from feishu_stack.modules.local_tools.plugin import create_plugin as create_local_tools_plugin
 from feishu_stack.modules.backup_migration.plugin import create_plugin as create_backup_migration_plugin
-from feishu_stack.plugins.builtin_routers import (
-    agent_array_router,
-    logs_diagnostics_router,
-    model_provider_router,
-)
+from feishu_stack.modules.agent_array.plugin import create_plugin as create_agent_array_plugin
+from feishu_stack.modules.model_provider.plugin import create_plugin as create_model_provider_plugin
+from feishu_stack.modules.logs_diagnostics.plugin import create_plugin as create_logs_diagnostics_plugin
 
 
-def _feature(
-    plugin_id: str,
-    name: str,
-    description: str,
-    page: str,
-    *capabilities: str,
-    order: int,
-    icon: str,
-    router: APIRouter,
-) -> AccPlugin:
-    return AccPlugin(
-        id=plugin_id,
-        name=name,
-        version="1.0.0",
-        description=description,
-        state="transitional",
-        requires=("acc.framework",),
-        capabilities=capabilities,
-        cards=(PluginCard(
-            id=f"{plugin_id}.overview",
-            title=name,
-            description=description,
-            page=page,
-            icon=icon,
-            order=order,
-        ),),
-        router_factory=lambda: router,
-    )
 
 
 BUILTIN_PLUGINS = (
@@ -62,14 +32,14 @@ BUILTIN_PLUGINS = (
         capabilities=("acc.plugins.inventory",),
     ),
     create_dashboard_plugin(),
-    _feature("acc.agent-array", "Agent 阵列", "Agent、技能树与运行记录管理。", "agents", "agents.read", "skills.manage", order=20, icon="swords", router=agent_array_router),
+    create_agent_array_plugin(),
     create_task_battlefield_plugin(),
     create_feishu_connection_plugin(),
-    _feature("acc.model-provider", "模型与 Provider", "模型提供方、Codex 与 OpenClaw 运行控制。", "provider", "providers.manage", order=50, icon="server-cog", router=model_provider_router),
+    create_model_provider_plugin(),
     create_routing_rules_plugin(),
     create_local_tools_plugin(),
     create_config_center_plugin(),
-    _feature("acc.logs-diagnostics", "日志与诊断", "日志、指标与诊断工具。", "diagnostics", "diagnostics.read", order=90, icon="file-text", router=logs_diagnostics_router),
+    create_logs_diagnostics_plugin(),
     create_backup_migration_plugin(),
 )
 

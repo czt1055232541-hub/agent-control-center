@@ -8,7 +8,11 @@ from fastapi.testclient import TestClient
 
 from feishu_stack import app as app_module
 from feishu_stack.modules.backup_migration import plugin as backup_plugin
-from feishu_stack.api import app as api_app_module
+from feishu_stack.modules.agent_array import plugin as agent_plugin
+from feishu_stack.modules.model_provider import plugin as provider_plugin
+from feishu_stack.modules.logs_diagnostics import plugin as logs_plugin
+from feishu_stack.modules.local_tools import plugin as tools_plugin
+from feishu_stack.modules.task_battlefield import plugin as task_plugin
 from feishu_stack.modules.config_center import plugin as config_center_plugin
 from feishu_stack.models import AgentConfig, DashboardSummary, ExplainedDiagnosticItem, OperationResult, ThreadMigrationResult
 from feishu_stack.operations import _lock
@@ -49,8 +53,8 @@ def test_provider_target_routes_call_switch_provider(monkeypatch) -> None:
         calls.append((mode, deepseek_model, reasoning_effort, "agent"))
         return OperationResult(True, "codex-provider-agent", f"switch-agent-{mode}", "ok")
 
-    monkeypatch.setattr(api_app_module.provider_switch, "switch_provider", fake_switch)
-    monkeypatch.setattr(api_app_module.stack_actions, "switch_agent_provider", fake_switch_agent)
+    monkeypatch.setattr(provider_plugin.provider_switch, "switch_provider", fake_switch)
+    monkeypatch.setattr(provider_plugin.stack_actions, "switch_agent_provider", fake_switch_agent)
     headers = {"X-Control-Token": _token()}
 
     assert client.post("/api/codex-provider/app/native", headers=headers).status_code == 200
@@ -110,7 +114,7 @@ def test_config_status_reports_redacted_drift(tmp_path, monkeypatch) -> None:
 
 def test_dashboard_summary_is_read_only_without_token(monkeypatch) -> None:
     monkeypatch.setattr(
-        app_module.agent_dashboard,
+        agent_plugin.agent_dashboard,
         "dashboard_summary",
         lambda: DashboardSummary("normal", "native / gpt-5.5", "unknown", 3, 4, None, None, 0),
     )
@@ -121,7 +125,7 @@ def test_dashboard_summary_is_read_only_without_token(monkeypatch) -> None:
 
 def test_agents_route_is_read_only_without_token(monkeypatch) -> None:
     monkeypatch.setattr(
-        app_module.agent_dashboard,
+        agent_plugin.agent_dashboard,
         "list_agents",
         lambda: [
             AgentConfig(
@@ -157,14 +161,14 @@ def test_agents_route_is_read_only_without_token(monkeypatch) -> None:
 
 
 def test_infrastructure_route_is_read_only_without_token(monkeypatch) -> None:
-    monkeypatch.setattr(app_module.agent_dashboard, "list_infrastructure", lambda: [])
+    monkeypatch.setattr(agent_plugin.agent_dashboard, "list_infrastructure", lambda: [])
     response = client.get("/api/infrastructure")
     assert response.status_code == 200
     assert response.json()["agents"] == []
 
 
 def test_local_tools_route_is_read_only_without_token(monkeypatch) -> None:
-    monkeypatch.setattr(app_module.local_tools, "list_tools", lambda: [{"id": "demo-tool", "name": "Demo Tool"}])
+    monkeypatch.setattr(tools_plugin.local_tools, "list_tools", lambda: [{"id": "demo-tool", "name": "Demo Tool"}])
     response = client.get("/api/local-tools")
     assert response.status_code == 200
     assert response.json()["tools"][0]["id"] == "demo-tool"
@@ -176,7 +180,7 @@ def test_local_tools_scan_requires_token() -> None:
 
 
 def test_local_tools_scan_route_uses_registry(monkeypatch) -> None:
-    monkeypatch.setattr(app_module.local_tools, "scan", lambda root=None: [{"id": "calendar-tool", "registered": False, "root": root}])
+    monkeypatch.setattr(tools_plugin.local_tools, "scan", lambda root=None: [{"id": "calendar-tool", "registered": False, "root": root}])
     response = client.get("/api/local-tools/scan?root=TOOLS", headers={"X-Control-Token": _token()})
     assert response.status_code == 200
     assert response.json()["candidates"][0]["id"] == "calendar-tool"
@@ -190,7 +194,7 @@ def test_local_tools_register_route_uses_registry(monkeypatch) -> None:
         payloads.append(payload)
         return {"ok": True, "registered": payload, "settings_path": "F:/settings.json", "updated": False}
 
-    monkeypatch.setattr(app_module.local_tools, "register", fake_register)
+    monkeypatch.setattr(tools_plugin.local_tools, "register", fake_register)
     response = client.post(
         "/api/local-tools/register",
         headers={"X-Control-Token": _token()},
@@ -203,7 +207,7 @@ def test_local_tools_register_route_uses_registry(monkeypatch) -> None:
 
 def test_current_watchdog_route_is_read_only_without_token(monkeypatch) -> None:
     monkeypatch.setattr(
-        app_module.watchdog,
+        task_plugin.watchdog,
         "current_watchdog",
         lambda: {
             "enabled": True,
@@ -229,7 +233,7 @@ def test_current_watchdog_route_is_read_only_without_token(monkeypatch) -> None:
 
 def test_task_battlefield_directory_is_read_only_without_token(monkeypatch) -> None:
     monkeypatch.setattr(
-        app_module.task_directory,
+        task_plugin.task_directory,
         "load_directory",
         lambda: {
             "version": 1,
@@ -263,7 +267,7 @@ def test_task_battlefield_write_route_uses_mock(monkeypatch) -> None:
         called["add"] = True
         return {"tasks": [payload], "groups": [], "sync": {"addedFolders": [], "missingWorkspaces": []}}
 
-    monkeypatch.setattr(app_module.task_directory, "add_task", fake_add)
+    monkeypatch.setattr(task_plugin.task_directory, "add_task", fake_add)
     response = client.post(
         "/api/task-battlefield/tasks",
         headers={"X-Control-Token": token},
@@ -286,7 +290,7 @@ def test_task_battlefield_update_tags_uses_mock(monkeypatch) -> None:
             "sync": {"addedFolders": [], "missingWorkspaces": []},
         }
 
-    monkeypatch.setattr(app_module.task_directory, "update_task", fake_update)
+    monkeypatch.setattr(task_plugin.task_directory, "update_task", fake_update)
     response = client.put(
         "/api/task-battlefield/tasks/task-1",
         headers={"X-Control-Token": token},
@@ -299,7 +303,7 @@ def test_task_battlefield_update_tags_uses_mock(monkeypatch) -> None:
 
 def test_task_battlefield_classify_is_read_only_without_token(monkeypatch) -> None:
     monkeypatch.setattr(
-        app_module.task_directory,
+        task_plugin.task_directory,
         "classify_task",
         lambda description, workspace_path=None: {
             "decision": "existing_project",
@@ -314,14 +318,14 @@ def test_task_battlefield_classify_is_read_only_without_token(monkeypatch) -> No
 
 
 def test_agent_detail_route_handles_unknown_agent(monkeypatch) -> None:
-    monkeypatch.setattr(app_module.agent_dashboard, "get_agent", lambda agent_id: None)
+    monkeypatch.setattr(agent_plugin.agent_dashboard, "get_agent", lambda agent_id: None)
     response = client.get("/api/agents/missing")
     assert response.status_code == 404
 
 
 def test_agent_editable_config_route_is_read_only_without_token(monkeypatch) -> None:
     monkeypatch.setattr(
-        app_module.agent_config_editor,
+        agent_plugin.agent_config_editor,
         "get_editable_config",
         lambda agent_id: {"agentId": agent_id, "values": {"AGENT_PROVIDER": "codex"}},
     )
@@ -347,7 +351,7 @@ def test_agent_editable_config_update_uses_mock(monkeypatch) -> None:
         called["update"] = True
         return {"ok": True, "agentId": agent_id, "values": values}
 
-    monkeypatch.setattr(app_module.agent_config_editor, "update_editable_config", fake_update)
+    monkeypatch.setattr(agent_plugin.agent_config_editor, "update_editable_config", fake_update)
     response = client.put(
         "/api/agents/codex-code-agent/editable-config",
         headers={"X-Control-Token": token},
@@ -360,7 +364,7 @@ def test_agent_editable_config_update_uses_mock(monkeypatch) -> None:
 
 def test_explained_diagnostics_route_is_read_only_without_token(monkeypatch) -> None:
     monkeypatch.setattr(
-        app_module.agent_dashboard,
+        agent_plugin.agent_dashboard,
         "explained_diagnostics",
         lambda: [
             ExplainedDiagnosticItem(
@@ -384,7 +388,7 @@ def test_explained_diagnostics_route_is_read_only_without_token(monkeypatch) -> 
 
 def test_skill_tree_config_route_is_read_only_without_token(monkeypatch) -> None:
     monkeypatch.setattr(
-        app_module.tree_config,
+        agent_plugin.tree_config,
         "load_all_tree_configs",
         lambda: {
             "version": 2,
@@ -410,7 +414,7 @@ def test_skill_tree_agent_config_route_handles_unknown_agent(monkeypatch) -> Non
     def fake_load_agent_tree(agent_id):
         raise KeyError(agent_id)
 
-    monkeypatch.setattr(app_module.tree_config, "load_agent_tree", fake_load_agent_tree)
+    monkeypatch.setattr(agent_plugin.tree_config, "load_agent_tree", fake_load_agent_tree)
     response = client.get("/api/skill-workshop/tree-config/missing")
     assert response.status_code == 404
 
@@ -431,7 +435,7 @@ def test_operation_lock_returns_busy(monkeypatch) -> None:
     def fake_start(_config):
         return OperationResult(True, "openclaw", "start", "started")
 
-    monkeypatch.setattr(app_module.openclaw, "start", fake_start)
+    monkeypatch.setattr(provider_plugin.openclaw, "start", fake_start)
     assert _lock.acquire(blocking=False)
     try:
         response = client.post("/api/openclaw/start", headers={"X-Control-Token": token})
@@ -448,7 +452,7 @@ def test_codex_desktop_stop_route_uses_mock(monkeypatch) -> None:
         called["stop"] = True
         return OperationResult(True, "codex-desktop", "stop", "mock stop")
 
-    monkeypatch.setattr(app_module.codex_desktop, "stop", fake_stop)
+    monkeypatch.setattr(provider_plugin.codex_desktop, "stop", fake_stop)
     response = client.post("/api/codex-desktop/stop", headers={"X-Control-Token": token})
     assert response.status_code == 200
     assert response.json()["component"] == "codex-desktop"
@@ -458,12 +462,12 @@ def test_codex_desktop_stop_route_uses_mock(monkeypatch) -> None:
 def test_stack_stop_does_not_stop_codex_desktop(monkeypatch) -> None:
     token = _token()
 
-    monkeypatch.setattr(app_module.stack_actions, "stop", lambda _config: OperationResult(True, "stack", "stop", "mock stack stop"))
+    monkeypatch.setattr(provider_plugin.stack_actions, "stop", lambda _config: OperationResult(True, "stack", "stop", "mock stack stop"))
 
     def fail_stop(_config):
         raise AssertionError("Codex Desktop stop must not be called by stack stop")
 
-    monkeypatch.setattr(app_module.codex_desktop, "stop", fail_stop)
+    monkeypatch.setattr(provider_plugin.codex_desktop, "stop", fail_stop)
     response = client.post("/api/stack/stop", headers={"X-Control-Token": token})
     assert response.status_code == 200
     assert response.json()["component"] == "stack"
@@ -477,7 +481,7 @@ def test_openclaw_open_ui_route_uses_mock(monkeypatch) -> None:
         called["open"] = True
         return OperationResult(True, "openclaw", "open-ui", "mock open ui", port=18789)
 
-    monkeypatch.setattr(app_module.openclaw, "open_ui", fake_open_ui)
+    monkeypatch.setattr(provider_plugin.openclaw, "open_ui", fake_open_ui)
     response = client.post("/api/openclaw/open-ui", headers={"X-Control-Token": token})
     assert response.status_code == 200
     assert response.json()["component"] == "openclaw"
@@ -486,28 +490,28 @@ def test_openclaw_open_ui_route_uses_mock(monkeypatch) -> None:
 
 
 def test_diagnostics_endpoint_uses_mock(monkeypatch) -> None:
-    monkeypatch.setattr(app_module.diagnostics_module, "diagnostics", lambda: {"codex_doctor": {"ok": True}})
+    monkeypatch.setattr(logs_plugin.diagnostics_module, "diagnostics", lambda: {"codex_doctor": {"ok": True}})
     response = client.get("/api/diagnostics")
     assert response.status_code == 200
     assert response.json()["codex_doctor"]["ok"] is True
 
 
 def test_codex_doctor_endpoint_uses_mock(monkeypatch) -> None:
-    monkeypatch.setattr(app_module.diagnostics_module, "codex_doctor", lambda: {"ok": True, "stdout": "doctor"})
+    monkeypatch.setattr(logs_plugin.diagnostics_module, "codex_doctor", lambda: {"ok": True, "stdout": "doctor"})
     response = client.get("/api/doctor/codex")
     assert response.status_code == 200
     assert response.json()["stdout"] == "doctor"
 
 
 def test_deepseek_env_status_endpoint_uses_mock(monkeypatch) -> None:
-    monkeypatch.setattr(app_module.diagnostics_module, "deepseek_env_status", lambda: {"ok": True, "present": True, "env_key": "DEEPSEEK_API_KEY"})
+    monkeypatch.setattr(logs_plugin.diagnostics_module, "deepseek_env_status", lambda: {"ok": True, "present": True, "env_key": "DEEPSEEK_API_KEY"})
     response = client.get("/api/deepseek/env-status")
     assert response.status_code == 200
     assert response.json()["env_key"] == "DEEPSEEK_API_KEY"
 
 
 def test_lark_auth_status_endpoint_uses_mock(monkeypatch) -> None:
-    monkeypatch.setattr(app_module.diagnostics_module, "lark_auth_status", lambda: {"ok": True, "stdout": "logged in"})
+    monkeypatch.setattr(logs_plugin.diagnostics_module, "lark_auth_status", lambda: {"ok": True, "stdout": "logged in"})
     response = client.get("/api/lark/auth-status")
     assert response.status_code == 200
     assert response.json()["stdout"] == "logged in"
@@ -557,7 +561,7 @@ def test_watchdog_force_stop_route_uses_mock(monkeypatch) -> None:
         called["stop"] = True
         return OperationResult(True, "watchdog", "force-stop", "mock stop", pid=456)
 
-    monkeypatch.setattr(app_module.watchdog, "force_stop_current", fake_force_stop)
+    monkeypatch.setattr(task_plugin.watchdog, "force_stop_current", fake_force_stop)
     response = client.post("/api/watchdog/force-stop", headers={"X-Control-Token": token})
     assert response.status_code == 200
     assert response.json()["component"] == "watchdog"
@@ -602,7 +606,7 @@ def test_codex_agent_stream_routes(monkeypatch, tmp_path) -> None:
         + "\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(api_app_module, "load_config", lambda: SimpleNamespace(runtime_dir=tmp_path / "runtime"))
+    monkeypatch.setattr(logs_plugin, "load_config", lambda: SimpleNamespace(runtime_dir=tmp_path / "runtime"))
 
     listed = client.get("/api/codex-agent/streams")
     assert listed.status_code == 200
@@ -624,7 +628,7 @@ def test_codex_agent_stream_websocket_latest(monkeypatch, tmp_path) -> None:
         json.dumps({"run_id": "run-2", "timestamp": "2026-07-13T00:00:00Z", "phase": "start", "stream": "stage", "text": "started"}) + "\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(api_app_module, "load_config", lambda: SimpleNamespace(runtime_dir=tmp_path / "runtime"))
+    monkeypatch.setattr(logs_plugin, "load_config", lambda: SimpleNamespace(runtime_dir=tmp_path / "runtime"))
 
     with client.websocket_connect("/ws/codex-agent/stream?run_id=latest") as websocket:
         message = websocket.receive_json()

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -10,32 +9,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse
-from pydantic import BaseModel
 
-from feishu_stack.modules.agent_array.skill_tree import agent_config_editor, agent_dashboard, skill_baseline, skill_registry, skill_drift, tree_config
-from feishu_stack.modules.model_provider import codex_agent, codex_desktop, provider_switch
-from feishu_stack.modules.model_provider import openclaw_gateway as openclaw
 from feishu_stack.modules.logs_diagnostics import metrics
-from feishu_stack.modules.operations import control_center, stack_actions
-from feishu_stack.modules.logs_diagnostics import diagnostics as diagnostics_module
-from feishu_stack.modules.task_battlefield import task_directory, watchdog
-from feishu_stack.modules.local_tools import registry as local_tools
+from feishu_stack.modules.operations import control_center
 from feishu_stack.core.settings import StackConfig, find_stack_root, load_config
-from feishu_stack.core.logs import tail
-from feishu_stack.core import codex_streams
-from feishu_stack.core.models import ErrorResponse, OperationResult, ThreadMigrationResult, to_dict
-from feishu_stack.modules.operations.operations import recent_operations, run_exclusive
+from feishu_stack.core.models import ErrorResponse, OperationResult, to_dict
+from feishu_stack.modules.operations.operations import run_exclusive
 from .security import get_or_create_token, require_control_token
 from feishu_stack.core.status import get_status
 from feishu_stack import __version__  # noqa: F401
 from feishu_stack.plugins import create_plugin_router, get_plugin_registry
-from feishu_stack.plugins.builtin_routers import adopt_builtin_feature_routes
 
 # ---------------------------------------------------------------------------
 # Tag definitions for /docs
@@ -111,39 +100,22 @@ app.include_router(create_plugin_router())
 
 
 
-class LogLevelSetRequest(BaseModel):
-    logger: str = "root"
-    level: str
-
-
-
-
-class ProviderModelSwitchRequest(BaseModel):
-    model: str
-    reasoning_effort: str | None = None
-
-
-class AgentEditableConfigUpdateRequest(BaseModel):
-    values: dict
 
 
 
 
 
 
-class SkillBaselineConfirmRequest(BaseModel):
-    confirmText: str
-    confirmedBy: str = "manual"
 
 
-class SkillSnapshotRequest(BaseModel):
-    confirmText: str
-    createdBy: str = "manual"
 
 
-class SkillRollbackRequest(BaseModel):
-    confirmText: str
-    confirmedBy: str = "manual"
+
+
+
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -261,36 +233,6 @@ async def ws_status(ws: WebSocket) -> None:
         ws_manager.disconnect(ws)
 
 
-@app.websocket("/ws/codex-agent/stream")
-async def ws_codex_agent_stream(ws: WebSocket, run_id: str = "latest") -> None:
-    await ws.accept()
-    sent_count = 0
-    active_path: Path | None = None
-    try:
-        while True:
-            cfg = load_config()
-            payload = codex_streams.read_stream(cfg, run_id)
-            if payload is None:
-                await ws.send_json({"type": "heartbeat", "run_id": run_id, "events": []})
-                await asyncio.sleep(1)
-                continue
-            path = Path(payload["path"])
-            events = payload["events"]
-            if active_path != path:
-                active_path = path
-                sent_count = 0
-            for event in events[sent_count:]:
-                await ws.send_json({"type": "event", "run_id": payload["run_id"], "event": event})
-            sent_count = len(events)
-            await asyncio.sleep(0.75)
-    except WebSocketDisconnect:
-        return
-    except Exception:
-        logger.exception("Codex stream WebSocket failed")
-        try:
-            await ws.close()
-        except Exception:
-            pass
 
 
 # ---------------------------------------------------------------------------
@@ -337,14 +279,6 @@ def health() -> dict:
 
 
 
-@app.get(
-    "/api/agents",
-    summary="Agent inventory",
-    description="Return the v1 read-only agent inventory used by the command dashboard.",
-    tags=[DASHBOARD_TAG],
-)
-def agents() -> dict:
-    return {"agents": to_dict(agent_dashboard.list_agents())}
 
 
 
@@ -374,91 +308,16 @@ def agents() -> dict:
 
 
 
-@app.get(
-    "/api/agents/{agent_id}",
-    summary="Agent detail",
-    description="Return a single read-only agent configuration summary.",
-    tags=[DASHBOARD_TAG],
-)
-def agent_detail(agent_id: str) -> dict:
-    agent = agent_dashboard.get_agent(agent_id)
-    if agent is None:
-        raise HTTPException(status_code=404, detail=f"Unknown agent: {agent_id}")
-    return to_dict(agent)
 
 
-@app.get(
-    "/api/agents/{agent_id}/editable-config",
-    summary="Editable agent config",
-    description="Return safe, editable configuration fields for a real agent.",
-    tags=[DASHBOARD_TAG],
-)
-def agent_editable_config(agent_id: str) -> dict:
-    try:
-        return agent_config_editor.get_editable_config(agent_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.get(
-    "/api/agents/{agent_id}/config-preview",
-    summary="Agent config preview",
-    description="Return current safe config values and editing notes.",
-    tags=[DASHBOARD_TAG],
-)
-def agent_config_preview(agent_id: str) -> dict:
-    try:
-        return agent_config_editor.preview_config(agent_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.put(
-    "/api/agents/{agent_id}/editable-config",
-    summary="Update editable agent config",
-    description="Update whitelisted low-risk config fields. Requires control token.",
-    tags=[DASHBOARD_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def update_agent_editable_config(agent_id: str, request: AgentEditableConfigUpdateRequest) -> dict:
-    try:
-        return agent_config_editor.update_editable_config(agent_id, request.values)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.post(
-    "/api/agents/{agent_id}/config-backup",
-    summary="Backup agent config",
-    description="Create a backup for the editable config file. Requires control token.",
-    tags=[DASHBOARD_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def backup_agent_config(agent_id: str) -> dict:
-    try:
-        return agent_config_editor.backup_config(agent_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.post(
-    "/api/agents/{agent_id}/config-rollback-latest",
-    summary="Rollback latest agent config backup",
-    description="Restore the latest backup for the editable config file. Requires control token.",
-    tags=[DASHBOARD_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def rollback_agent_config(agent_id: str) -> dict:
-    try:
-        return agent_config_editor.rollback_latest(agent_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -466,255 +325,38 @@ def rollback_agent_config(agent_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-@app.get(
-    "/api/logs/level",
-    summary="Get log level",
-    description="Return the current log level for a given logger name.",
-    tags=[LOGS_TAG],
-)
-def get_log_level(logger: str = "root") -> dict:
-    log = logging.getLogger(logger)
-    level_name = logging.getLevelName(log.getEffectiveLevel())
-    return {"logger": logger, "level": level_name}
 
 
-@app.post(
-    "/api/logs/level",
-    summary="Set log level",
-    description="Set the log level for a given logger. Requires a valid control token.",
-    tags=[LOGS_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def set_log_level(request: LogLevelSetRequest) -> dict:
-    level_upper = request.level.upper()
-    if level_upper not in LOG_LEVELS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid level '{request.level}'. Must be one of: {', '.join(LOG_LEVELS)}",
-        )
-    log = logging.getLogger(request.logger)
-    log.setLevel(getattr(logging, level_upper))
-    return {"logger": request.logger, "level": level_upper}
 
 
-@app.get(
-    "/api/logs/{component}",
-    summary="Tail component logs",
-    description="Return the last N lines of log files for a given component.",
-    tags=[LOGS_TAG],
-)
-def logs(component: str, lines: int = 120) -> dict:
-    cfg = load_config()
-    if component == "codex-desktop":
-        codex_desktop.log(cfg)
-    table = {
-        "openclaw": [cfg.openclaw_stdout_log, cfg.openclaw_stderr_log],
-        "codex-agent": [cfg.codex_agent_stdout_log, cfg.codex_agent_stderr_log],
-        "codex-desktop": [cfg.log_dir / "codex-desktop-status.log"],
-        "control-center-api": [cfg.log_dir / "control-center-api-out.log", cfg.log_dir / "control-center-api-err.log"],
-        "operations": [cfg.log_dir / "operations.jsonl"],
-    }
-    if component.startswith("local-tool:"):
-        tool_id = component.split(":", 1)[1]
-        try:
-            local_tools.get_tool_status(tool_id, cfg)
-        except KeyError as exc:
-            raise HTTPException(status_code=404, detail=f"Unknown local tool: {tool_id}") from exc
-        table[component] = [cfg.local_tool_stdout_log(tool_id), cfg.local_tool_stderr_log(tool_id)]
-    if component not in table:
-        raise HTTPException(status_code=404, detail=f"Unknown log component: {component}")
-    return {"component": component, "logs": [to_dict(tail(path, lines)) for path in table[component]]}
 
 
-@app.get(
-    "/api/codex-agent/streams",
-    summary="List Codex Agent streams",
-    description="Return recent Codex Agent subprocess stream runs.",
-    tags=[LOGS_TAG],
-)
-def codex_agent_streams(limit: int = 20) -> dict:
-    cfg = load_config()
-    return {"streams": codex_streams.list_streams(cfg, limit=limit)}
 
 
-@app.get(
-    "/api/codex-agent/streams/{run_id}",
-    summary="Read a Codex Agent stream",
-    description="Return recorded JSONL events for a Codex Agent subprocess stream.",
-    tags=[LOGS_TAG],
-)
-def codex_agent_stream(run_id: str) -> dict:
-    cfg = load_config()
-    payload = codex_streams.read_stream(cfg, run_id)
-    if payload is None:
-        raise HTTPException(status_code=404, detail=f"Unknown Codex Agent stream: {run_id}")
-    return payload
 
 # ---------------------------------------------------------------------------
 # Diagnostics
 # ---------------------------------------------------------------------------
 
 
-@app.get(
-    "/api/doctor/codex",
-    summary="Codex doctor",
-    description="Run the codex doctor diagnostic and return results.",
-    tags=[DIAGNOSTICS_TAG],
-)
-def codex_doctor() -> dict:
-    return diagnostics_module.codex_doctor()
 
 
-@app.get(
-    "/api/deepseek/env-status",
-    summary="DeepSeek environment status",
-    description="Check whether the configured DeepSeek API key environment variable is visible.",
-    tags=[DIAGNOSTICS_TAG],
-)
-def deepseek_env_status() -> dict:
-    return diagnostics_module.deepseek_env_status()
 
 
-@app.get(
-    "/api/lark/auth-status",
-    summary="Lark auth status",
-    description="Check the current lark-cli authentication status.",
-    tags=[DIAGNOSTICS_TAG],
-)
-def lark_auth_status() -> dict:
-    return diagnostics_module.lark_auth_status()
 
 
-@app.get(
-    "/api/diagnostics",
-    summary="Full diagnostics",
-    description="Run all diagnostics checks and return a comprehensive report.",
-    tags=[DIAGNOSTICS_TAG],
-)
-def diagnostics() -> dict:
-    return to_dict(diagnostics_module.diagnostics())
 
 
-@app.get(
-    "/api/diagnostics/explained",
-    summary="Explained diagnostics",
-    description="Return Chinese, action-oriented diagnostics for the command dashboard.",
-    tags=[DIAGNOSTICS_TAG],
-)
-def explained_diagnostics() -> dict:
-    return {"items": to_dict(agent_dashboard.explained_diagnostics())}
 
 # ---------------------------------------------------------------------------
 # Skill Workshop helpers
 # ---------------------------------------------------------------------------
 
 
-def _to_workshop_skill(entry: skill_registry.SkillEntry, report: skill_drift.DriftReport | None = None) -> dict:
-    """Transform a SkillEntry into the frontend SkillWorkshopSkill shape."""
-    drift_status: str = "ok"
-    drift_severity: str = "normal"
-    drift_reasons: list[str] = []
-    baseline_sha: str | None = None
-    baseline_dir_sha: str | None = None
-    baseline_version: str | None = None
-    confirmed_at: str | None = None
-    confirmed_by: str | None = None
-
-    if report is not None:
-        for d in report.drifts:
-            raw = d.to_dict()
-            if raw.get("details", {}).get("skillId") == entry.skill_id:
-                drift_status = "drift" if d.severity in ("P0", "P1", "P2") else "no_baseline"
-                drift_severity = {"P0": "critical", "P1": "warning", "P2": "warning", "info": "info"}.get(d.severity, "normal")
-                drift_reasons.append(d.message)
-
-    baseline_entry = _baseline_for_skill(entry.skill_id)
-    if baseline_entry:
-        baseline_info = baseline_entry.get("baseline", {})
-        baseline_sha = baseline_info.get("skillMdSha256") or baseline_entry.get("version")
-        baseline_dir_sha = baseline_info.get("directorySha256") or baseline_entry.get("dirHash")
-        baseline_version = baseline_info.get("version") or baseline_entry.get("version")
-        confirmed_at = baseline_info.get("confirmedAt")
-        confirmed_by = baseline_info.get("confirmedBy")
-
-    return {
-        "skillId": entry.skill_id,
-        "displayName": entry.name,
-        "sourceAlias": entry.source_alias,
-        "runtime": entry.source,
-        "agentIds": entry.agent_visibility,
-        "relativePath": entry.path,
-        "loadPriority": 0,
-        "updateMechanism": "manual",
-        "actual": {
-            "skillMdSha256": entry.version,
-            "directorySha256": entry.dir_hash or "",
-            "mtime": entry.mtime or "",
-            "version": entry.version,
-        },
-        "baseline": {
-            "skillMdSha256": baseline_sha or "",
-            "directorySha256": baseline_dir_sha or "",
-            "version": baseline_version or "",
-            "confirmedAt": confirmed_at,
-            "confirmedBy": confirmed_by,
-        },
-        "drift": {
-            "status": drift_status,
-            "severity": drift_severity,
-            "reasons": drift_reasons,
-        },
-    }
 
 
-def _baseline_for_skill(skill_id: str) -> dict | None:
-    baseline = skill_baseline.load_baseline()
-    if not baseline:
-        return None
-    for entry in baseline.get("skills", []):
-        if isinstance(entry, dict) and entry.get("skillId") == skill_id:
-            return entry
-    return None
 
 
-def _to_drift_report_dict(report: skill_drift.DriftReport, inventory: skill_registry.SkillInventory) -> dict:
-    """Transform a DriftReport into the frontend SkillDriftReport shape."""
-    items: list[dict] = []
-    for d in report.drifts:
-        raw = d.to_dict()
-        sev = d.severity
-        drift_status = "drift" if sev in ("P0", "P1", "P2") else "no_baseline"
-        drift_severity = {"P0": "critical", "P1": "warning", "P2": "warning", "info": "info"}.get(sev, "normal")
-        details = raw.get("details", {})
-        actual_hash = details.get("actualVersion", details.get("version", ""))
-        baseline_hash = details.get("baselineVersion")
-        suggestion = details.get("recommendation", d.message)
-        items.append({
-            "skillId": raw.get("skillId", details.get("skillId", "")),
-            "displayName": d.skill_name,
-            "sourceAlias": d.source_alias,
-            "runtime": d.source,
-            "drift": {
-                "status": drift_status,
-                "severity": drift_severity,
-                "reasons": [d.message],
-            },
-            "actualHash": actual_hash,
-            "baselineHash": baseline_hash,
-            "suggestion": suggestion,
-        })
-    return {
-        "generatedAt": report.generated_at,
-        "summary": {
-            "totalSkills": inventory.total,
-            "driftCount": report.total_drifts,
-            "noBaselineCount": report.info_count,
-            "p0Count": report.p0_count,
-            "p1Count": report.p1_count,
-            "p2Count": report.p2_count,
-        },
-        "items": items,
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -722,262 +364,36 @@ def _to_drift_report_dict(report: skill_drift.DriftReport, inventory: skill_regi
 # ---------------------------------------------------------------------------
 
 
-@app.get(
-    "/api/skill-workshop/summary",
-    summary="Skill workshop summary",
-    description="Return skill counts, drift counts, P0/P1/P2, and last scan time.",
-    tags=[SKILL_WORKSHOP_TAG],
-)
-def skill_workshop_summary() -> dict:
-    inventory = skill_registry.get_inventory()
-    report = skill_drift.detect_drift(inventory, baseline=skill_baseline.load_baseline())
-    affected_agents = sorted(inventory.by_agent.keys()) if inventory.by_agent else []
-    affected_runtimes = sorted(inventory.by_source.keys()) if inventory.by_source else []
-    return {
-        "totalSkills": inventory.total,
-        "driftCount": report.total_drifts,
-        "p0Count": report.p0_count,
-        "p1Count": report.p1_count,
-        "p2Count": report.p2_count,
-        "lastScanTime": inventory.scan_metadata.scanned_at if inventory.scan_metadata else None,
-        "affectedAgents": len(affected_agents),
-        "affectedRuntimes": affected_runtimes,
-    }
 
 
-@app.get(
-    "/api/skill-workshop/skills",
-    summary="Skill inventory",
-    description="Return the full skill inventory. Supports filtering by "
-    "?agent_id=, ?runtime=, ?source=, ?status=.",
-    tags=[SKILL_WORKSHOP_TAG],
-)
-def skill_workshop_skills(
-    agent_id: str | None = None,
-    runtime: str | None = None,
-    source: str | None = None,
-    status: str | None = None,
-) -> dict:
-    inventory = skill_registry.get_inventory()
-    report = skill_drift.detect_drift(inventory, baseline=skill_baseline.load_baseline())
-    skills = inventory.skills
-
-    if agent_id:
-        skills = [s for s in skills if agent_id in s.agent_visibility]
-    if runtime:
-        skills = [s for s in skills if s.source == runtime]
-    if source:
-        skills = [s for s in skills if s.source == source]
-    if status:
-        skills = [s for s in skills if s.status == status]
-
-    return {
-        "skills": [_to_workshop_skill(s, report) for s in skills],
-        "total": len(skills),
-        "totalInventory": inventory.total,
-        "scanMetadata": inventory.scan_metadata.to_dict() if inventory.scan_metadata else None,
-    }
 
 
-@app.get(
-    "/api/skill-workshop/tree-config",
-    summary="Configured skill tree",
-    description="Return the configured per-agent skill tree graph used by the integrated workshop page.",
-    tags=[SKILL_WORKSHOP_TAG],
-)
-def skill_workshop_tree_config() -> dict:
-    return tree_config.load_all_tree_configs()
 
 
-@app.get(
-    "/api/skill-workshop/tree-config/{agent_id}",
-    summary="Configured agent skill tree",
-    description="Return one configured agent skill tree graph.",
-    tags=[SKILL_WORKSHOP_TAG],
-)
-def skill_workshop_agent_tree_config(agent_id: str) -> dict:
-    try:
-        return tree_config.load_agent_tree(agent_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=f"Unknown skill tree agent: {agent_id}") from exc
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.get(
-    "/api/skill-workshop/skills/{skill_id}",
-    summary="Skill detail",
-    description="Return a single skill's details.",
-    tags=[SKILL_WORKSHOP_TAG],
-)
-def skill_workshop_skill_detail(skill_id: str) -> dict:
-    skill = skill_registry.get_skill_by_id(skill_id)
-    if skill is None:
-        raise HTTPException(status_code=404, detail=f"Unknown skill: {skill_id}")
-    report = skill_drift.detect_drift(baseline=skill_baseline.load_baseline())
-    return _to_workshop_skill(skill, report)
 
 
-@app.get(
-    "/api/skill-workshop/agents/{agent_id}/skills",
-    summary="Agent skills",
-    description="Return skills visible to a specific agent.",
-    tags=[SKILL_WORKSHOP_TAG],
-)
-def skill_workshop_agent_skills(agent_id: str) -> dict:
-    skills = skill_registry.get_agent_skills(agent_id)
-    report = skill_drift.detect_drift(baseline=skill_baseline.load_baseline())
-    return {"agentId": agent_id, "skills": [_to_workshop_skill(s, report) for s in skills], "total": len(skills)}
 
 
-@app.get(
-    "/api/skill-workshop/drift-report",
-    summary="Drift report",
-    description="Return the current skill drift report.",
-    tags=[SKILL_WORKSHOP_TAG],
-)
-def skill_workshop_drift_report() -> dict:
-    inventory = skill_registry.get_inventory()
-    report = skill_drift.detect_drift(inventory, baseline=skill_baseline.load_baseline())
-    return _to_drift_report_dict(report, inventory)
 
 
-@app.get(
-    "/api/skill-workshop/baseline/preview",
-    summary="Baseline diff preview",
-    description="Preview the changes that confirming the current scan as baseline would make.",
-    tags=[SKILL_WORKSHOP_TAG],
-)
-def skill_workshop_baseline_preview() -> dict:
-    return skill_baseline.preview_baseline_diff()
 
 
-@app.post(
-    "/api/skill-workshop/baseline/confirm",
-    summary="Confirm skill baseline",
-    description="Persist the current skill inventory as the manual baseline. Requires control token and confirmText.",
-    tags=[SKILL_WORKSHOP_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def skill_workshop_baseline_confirm(request: SkillBaselineConfirmRequest) -> dict:
-    try:
-        return skill_baseline.confirm_baseline(
-            confirm_text=request.confirmText,
-            confirmed_by=request.confirmedBy,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.post(
-    "/api/skill-workshop/snapshot",
-    summary="Create skill snapshot",
-    description="Create a skill inventory snapshot without changing baseline. Requires control token and confirmText.",
-    tags=[SKILL_WORKSHOP_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def skill_workshop_snapshot(request: SkillSnapshotRequest) -> dict:
-    try:
-        return skill_baseline.create_snapshot(
-            confirm_text=request.confirmText,
-            created_by=request.createdBy,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.get(
-    "/api/skill-workshop/history",
-    summary="Skill workshop version history",
-    description="List baseline changes and skill inventory snapshots.",
-    tags=[SKILL_WORKSHOP_TAG],
-)
-def skill_workshop_history() -> dict:
-    return skill_baseline.list_history()
 
 
-@app.get(
-    "/api/skill-workshop/history/{version_id}",
-    summary="Skill workshop version detail",
-    description="Return the stored skill state for a baseline or snapshot version.",
-    tags=[SKILL_WORKSHOP_TAG],
-)
-def skill_workshop_history_detail(version_id: str) -> dict:
-    try:
-        return skill_baseline.get_version(version_id)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.get(
-    "/api/skill-workshop/compare",
-    summary="Skill workshop version diff",
-    description="Compare two stored skill workshop versions.",
-    tags=[SKILL_WORKSHOP_TAG],
-)
-def skill_workshop_compare(from_: str = Query(default="", alias="from"), to: str = "") -> dict:
-    if not from_:
-        raise HTTPException(status_code=400, detail="Query parameter 'from' is required.")
-    if not to:
-        raise HTTPException(status_code=400, detail="Query parameter 'to' is required.")
-    try:
-        return skill_baseline.compare_versions(from_, to)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.post(
-    "/api/skill-workshop/rollback/{version_id}",
-    summary="Rollback skill workshop baseline",
-    description="Rollback workshop baseline state to a stored version. Requires control token and confirmText.",
-    tags=[SKILL_WORKSHOP_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def skill_workshop_rollback(version_id: str, request: SkillRollbackRequest) -> dict:
-    try:
-        return skill_baseline.rollback_to_version(
-            version_id,
-            confirm_text=request.confirmText,
-            confirmed_by=request.confirmedBy,
-        )
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.get(
-    "/api/skill-workshop/comparison",
-    summary="Cross-runtime comparison",
-    description="Compare a skill's versions across different runtimes.",
-    tags=[SKILL_WORKSHOP_TAG],
-)
-def skill_workshop_comparison(skillId: str = "") -> dict:
-    if not skillId:
-        raise HTTPException(status_code=400, detail="Query parameter 'skillId' is required.")
-    return skill_drift.build_comparison(skillId)
 
 
-@app.post(
-    "/api/skill-workshop/scan",
-    summary="Trigger skill scan",
-    description="Trigger a read-only skill scan. Requires control token.",
-    tags=[SKILL_WORKSHOP_TAG],
-    dependencies=[Depends(require_control_token)],
-)
-def skill_workshop_scan() -> dict:
-    inventory = skill_registry.scan_skills(force_full=True)
-    return {
-        "ok": True,
-        "totalSkills": inventory.total,
-        "scanMetadata": inventory.scan_metadata.to_dict() if inventory.scan_metadata else None,
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -994,134 +410,44 @@ def skill_workshop_scan() -> dict:
 # Operations - OpenClaw
 # ---------------------------------------------------------------------------
 
-@app.post("/api/openclaw/start", summary="Start OpenClaw", description="Start the OpenClaw gateway service.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def start_openclaw() -> dict:
-    return _run("openclaw", "start", openclaw.start)
 
-@app.post("/api/openclaw/stop", summary="Stop OpenClaw", description="Stop the OpenClaw gateway service.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def stop_openclaw() -> dict:
-    return _run("openclaw", "stop", openclaw.stop)
 
-@app.post("/api/openclaw/restart", summary="Restart OpenClaw", description="Restart the OpenClaw gateway service.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def restart_openclaw() -> dict:
-    return _run("openclaw", "restart", openclaw.restart)
 
-@app.post("/api/openclaw/open-ui", summary="Open OpenClaw UI", description="Open the OpenClaw web UI in the default browser.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def open_openclaw_ui() -> dict:
-    return _run("openclaw", "open-ui", openclaw.open_ui)
 
-@app.get("/api/deepseek/available-models", summary="Available DeepSeek models", description="Return the configured direct DeepSeek models.", tags=[OPERATIONS_TAG])
-def available_deepseek_models() -> dict:
-    cfg = load_config()
-    return {"models": cfg.deepseek.models}
 
 # ---------------------------------------------------------------------------
 # Operations - Codex Agent
 # ---------------------------------------------------------------------------
 
-@app.post("/api/codex-agent/start", summary="Start Codex Agent", description="Start the codex-agent service.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def start_codex_agent() -> dict:
-    return _run("codex-agent", "start", codex_agent.start)
 
-@app.post("/api/codex-agent/stop", summary="Stop Codex Agent", description="Stop the codex-agent service.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def stop_codex_agent() -> dict:
-    return _run("codex-agent", "stop", codex_agent.stop)
 
-@app.post("/api/codex-agent/restart", summary="Restart Codex Agent", description="Restart the codex-agent service.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def restart_codex_agent() -> dict:
-    return _run("codex-agent", "restart", codex_agent.restart)
 
 # ---------------------------------------------------------------------------
 # Operations - Codex Desktop
 # ---------------------------------------------------------------------------
 
-@app.post("/api/codex-desktop/start", summary="Start Codex Desktop", description="Start the Codex Desktop application.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def start_codex_desktop() -> dict:
-    return _run("codex-desktop", "start", codex_desktop.start)
 
-@app.post("/api/codex-desktop/stop", summary="Stop Codex Desktop", description="Stop the Codex Desktop application.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def stop_codex_desktop() -> dict:
-    return _run("codex-desktop", "stop", codex_desktop.stop)
 
-@app.post("/api/codex-desktop/restart", summary="Restart Codex Desktop", description="Restart the Codex Desktop application.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def restart_codex_desktop() -> dict:
-    return _run("codex-desktop", "restart", codex_desktop.restart)
 
 # ---------------------------------------------------------------------------
 # Operations - Provider switch
 # ---------------------------------------------------------------------------
 
-@app.post("/api/codex-provider/native", summary="Switch to native provider", description="Switch the codex provider to the native OpenAI backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def switch_native() -> dict:
-    return _run("codex-provider", "switch-native", lambda cfg: provider_switch.switch_provider("native", cfg, target="app"))
-
-@app.post("/api/codex-provider/deepseek", summary="Switch to DeepSeek provider", description="Switch the codex provider to the direct DeepSeek Responses API backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def switch_deepseek(request: ProviderModelSwitchRequest | None = Body(default=None)) -> dict:
-    return _run(
-        "codex-provider",
-        "switch-deepseek",
-        lambda cfg: provider_switch.switch_provider(
-            "deepseek",
-            cfg,
-            deepseek_model=request.model if request else None,
-            reasoning_effort=request.reasoning_effort if request else None,
-            target="app",
-        ),
-    )
 
 
-@app.post("/api/codex-provider/app/native", summary="Switch App to native provider", description="Switch the ChatGPT/Codex App provider to the native OpenAI backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def switch_app_native() -> dict:
-    return _run("codex-provider-app", "switch-native", lambda cfg: provider_switch.switch_provider("native", cfg, target="app"))
-
-@app.post("/api/codex-provider/app/deepseek", summary="Switch App to DeepSeek provider", description="Switch the ChatGPT/Codex App provider to the direct DeepSeek Responses API backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def switch_app_deepseek(request: ProviderModelSwitchRequest | None = Body(default=None)) -> dict:
-    return _run(
-        "codex-provider-app",
-        "switch-deepseek",
-        lambda cfg: provider_switch.switch_provider(
-            "deepseek",
-            cfg,
-            deepseek_model=request.model if request else None,
-            reasoning_effort=request.reasoning_effort if request else None,
-            target="app",
-        ),
-    )
 
 
-@app.post("/api/codex-provider/agent/native", summary="Switch Agent to native provider", description="Switch the Feishu Codex Agent provider to the native OpenAI backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def switch_agent_native() -> dict:
-    return _run("codex-provider-agent", "switch-native", lambda cfg: stack_actions.switch_agent_provider("native", cfg))
 
-@app.post("/api/codex-provider/agent/deepseek", summary="Switch Agent to DeepSeek provider", description="Switch the Feishu Codex Agent provider to the direct DeepSeek Responses API backend.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def switch_agent_deepseek(request: ProviderModelSwitchRequest | None = Body(default=None)) -> dict:
-    return _run(
-        "codex-provider-agent",
-        "switch-deepseek",
-        lambda cfg: stack_actions.switch_agent_provider(
-            "deepseek",
-            cfg,
-            deepseek_model=request.model if request else None,
-            reasoning_effort=request.reasoning_effort if request else None,
-        ),
-    )
+
+
 
 
 # ---------------------------------------------------------------------------
 # Operations - Stack (orchestrated)
 # ---------------------------------------------------------------------------
 
-@app.post("/api/stack/start-native", summary="Start stack (native)", description="Start the full stack using the native OpenAI provider.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def stack_start_native() -> dict:
-    return _run("stack", "start-native", stack_actions.start_native)
 
-@app.post("/api/stack/start-deepseek", summary="Start stack (DeepSeek)", description="Start the full stack using the direct DeepSeek provider.", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def stack_start_deepseek() -> dict:
-    return _run("stack", "start-deepseek", stack_actions.start_deepseek)
 
-@app.post("/api/stack/stop", summary="Stop stack", description="Stop all stack components (openclaw, codex-agent).", tags=[OPERATIONS_TAG], dependencies=[Depends(require_control_token)])
-def stack_stop() -> dict:
-    return _run("stack", "stop", stack_actions.stop)
 
 # ---------------------------------------------------------------------------
 # Operations - Maintenance
@@ -1142,9 +468,7 @@ def shutdown_control_center() -> dict:
     return to_dict(control_center.request_shutdown())
 
 
-# Transfer existing stable paths into plugin-owned routers, then mount the
-# resolved plugin graph. New feature plugins define their routes directly.
-adopt_builtin_feature_routes(app)
+# Mount independently defined feature contributions before the SPA fallback.
 get_plugin_registry().mount(app)
 
 # ---------------------------------------------------------------------------

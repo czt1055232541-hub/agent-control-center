@@ -90,12 +90,11 @@ def test_all_builtin_features_contribute_routers() -> None:
         "acc.logs-diagnostics",
         "acc.backup-migration",
     ):
+        assert plugins[plugin_id].state == "native"
         assert plugins[plugin_id].router_factory is not None
 
 
 def test_builtin_feature_routes_are_contributed_by_plugins() -> None:
-    from feishu_stack.api.app import app as _composed_app  # noqa: F401
-
     plugins = {plugin.id: plugin for plugin in get_plugin_registry().resolve()}
     expected_paths = {
         "acc.dashboard": "/api/dashboard/summary",

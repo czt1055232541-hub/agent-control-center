@@ -4,7 +4,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from feishu_stack import app as app_module
+from feishu_stack.api.app import app
+from feishu_stack.modules.agent_array import plugin as app_module
 from feishu_stack.modules.agent_array.skill_tree.skill_registry import (
     ScanMetadata,
     SkillEntry,
@@ -18,7 +19,7 @@ from feishu_stack.modules.agent_array.skill_tree.skill_drift import (
 from feishu_stack.modules.agent_array.skill_tree import skill_baseline
 
 
-client = TestClient(app_module.app)
+client = TestClient(app)
 
 
 def _token() -> str:

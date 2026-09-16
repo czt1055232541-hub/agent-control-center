@@ -12,7 +12,7 @@ from feishu_stack.modules.local_tools.plugin import create_plugin as local_tools
 from feishu_stack.modules.backup_migration.plugin import create_plugin as backup_plugin
 
 
-@pytest.mark.parametrize("module", ["local_tools", "backup_migration"])
+@pytest.mark.parametrize("module", ["local_tools", "backup_migration", "agent_array", "model_provider", "logs_diagnostics"])
 def test_operation_plugin_import_does_not_load_host(module) -> None:
     subprocess.run([sys.executable, "-c", (
         "import sys; "
