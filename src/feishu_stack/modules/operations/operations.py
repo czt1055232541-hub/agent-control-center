@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from feishu_stack.core.settings import StackConfig, load_config
 from feishu_stack.core.log_manager import setup_logger
 from feishu_stack.core.models import OperationResult, to_dict
-from feishu_stack.modules.logs_diagnostics import metrics
+from feishu_stack.core import metrics
 
 
 @dataclass

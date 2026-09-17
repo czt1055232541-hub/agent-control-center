@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse
 
-from feishu_stack.modules.logs_diagnostics import metrics
+from feishu_stack.core import metrics
 from feishu_stack.modules.operations import control_center
 from feishu_stack.core.settings import StackConfig, find_stack_root, load_config
 from feishu_stack.core.models import ErrorResponse, OperationResult, to_dict
