@@ -4,9 +4,18 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { createRequire } from 'node:module'
+import { readFileSync } from 'node:fs'
 
 const installed = process.argv[2]
 if (!installed) throw new Error('Usage: node verify-installed.mjs <installed-package-directory> [live-ACC-url]')
+const installedRequire = createRequire(resolve(installed, 'index.js'))
+// Profile installs deliberately obtain host peers through DSH's fallback.
+// Check actual resolution, not just pnpm's profile-local dependency report.
+for (const name of ['@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-client-ui-renderer', '@deepseek-ai/dsh-client-ui-tool', 'react']) {
+  const manifest = JSON.parse(readFileSync(installedRequire.resolve(`${name}/package.json`), 'utf8'))
+  console.log(`RESOLVED: ${name}@${manifest.version}`)
+}
 const { apply } = await import(pathToFileURL(resolve(installed, 'index.js')).href)
 let mode = 'online'
 const server = createServer((req, res) => {

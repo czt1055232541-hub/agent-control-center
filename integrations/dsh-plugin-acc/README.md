@@ -22,3 +22,5 @@ node integrations/dsh-plugin-acc/verify-installed.mjs <profile中已安装的插
 ```
 
 脚本使用已安装包和真实 DSH 工具定义库，检查在线清单、结果渲染、HTTP 错误、无效 JSON、错误清单结构、超时及模拟服务退出。它不替代浏览器显示/点击、宿主其他工具或卸载回归。
+
+DSH profile 使用宿主共享依赖 fallback，`pnpm peers check` 可能报告 profile 本身未安装 peers。不要仅为消除警告而复制安装 Cordis 或 React；先运行上述脚本检查实际解析版本，并与本包 peerDependencies 对照。解析失败或版本不兼容时才处理宿主环境。
