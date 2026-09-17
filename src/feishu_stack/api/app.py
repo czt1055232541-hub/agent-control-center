@@ -20,7 +20,7 @@ from feishu_stack.core import metrics
 from feishu_stack.modules.operations import control_center
 from feishu_stack.core.settings import StackConfig, find_stack_root, load_config
 from feishu_stack.core.models import ErrorResponse, OperationResult, to_dict
-from feishu_stack.modules.operations.operations import run_exclusive
+from feishu_stack.core.operations import run_exclusive
 from .security import get_or_create_token, require_control_token
 from feishu_stack.core.status import get_status
 from feishu_stack import __version__  # noqa: F401

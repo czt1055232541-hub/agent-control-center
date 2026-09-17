@@ -6,7 +6,7 @@ from fastapi import Request
 
 from feishu_stack.core.models import OperationResult, to_dict
 from feishu_stack.core.settings import StackConfig
-from feishu_stack.modules.operations.operations import run_exclusive
+from feishu_stack.core.operations import run_exclusive
 
 
 OperationRunner = Callable[[str, str, Callable[[StackConfig], OperationResult]], dict]
