@@ -70,5 +70,4 @@ def open_thread_migration_summary_folder(request: ThreadMigrationFolderRequest, 
 def clean_backups(runner: OperationRunner = Depends(operation_runner)) -> dict:
     return runner("backups", "clean", backups.clean)
 
-def create_plugin() -> AccPlugin:
-    return AccPlugin(id='acc.backup-migration', name='备份与迁移', version='1.0.0', description='Backup Migration', requires=('acc.framework',), capabilities=('backups.manage',), cards=(PluginCard('acc.backup-migration.overview', '备份与迁移', 'Backup Migration', 'backup', icon='archive', order=100),), router_factory=lambda: router)
+from feishu_stack.plugins.builtin_descriptors import create_backup_migration_plugin as create_plugin

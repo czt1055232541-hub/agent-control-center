@@ -115,5 +115,4 @@ def force_stop_watchdog() -> dict:
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-def create_plugin() -> AccPlugin:
-    return AccPlugin(id='acc.task-battlefield', name='Task Battlefield', version='1.0.0', description='Task directory and watchdog management', requires=('acc.framework',), capabilities=('tasks.manage',), cards=(PluginCard('acc.task-battlefield.overview', '任务战场', '任务目录与看门狗', 'tasks', icon='calendar-clock', order=30),), router_factory=lambda: router)
+from feishu_stack.plugins.builtin_descriptors import create_task_battlefield_plugin as create_plugin

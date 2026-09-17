@@ -50,5 +50,4 @@ def dashboard_summary() -> dict:
 def infrastructure() -> dict:
     return {"agents": to_dict(agent_dashboard.list_infrastructure())}
 
-def create_plugin() -> AccPlugin:
-    return AccPlugin(id='acc.dashboard', name='Dashboard 总览', version='1.0.0', description='运行状态与关键指标总览。', requires=('acc.framework',), capabilities=('dashboard.read',), cards=(PluginCard('acc.dashboard.overview', 'Dashboard 总览', '运行状态与关键指标总览。', 'dashboard', icon='layout-dashboard', order=10),), router_factory=lambda: router)
+from feishu_stack.plugins.builtin_descriptors import create_dashboard_plugin as create_plugin

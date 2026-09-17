@@ -148,5 +148,4 @@ def stack_start_deepseek(runner: OperationRunner = Depends(operation_runner)) ->
 def stack_stop(runner: OperationRunner = Depends(operation_runner)) -> dict:
     return runner("stack", "stop", stack_actions.stop)
 
-def create_plugin() -> AccPlugin:
-    return AccPlugin(id='acc.model-provider', name='模型与 Provider', version='1.0.0', description='模型与 Provider', requires=('acc.framework',), capabilities=('providers.manage',), cards=(PluginCard('acc.model-provider.overview', '模型与 Provider', '模型与 Provider', 'provider', icon='server-cog', order=50),), router_factory=lambda: router)
+from feishu_stack.plugins.builtin_descriptors import create_model_provider_plugin as create_plugin

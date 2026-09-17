@@ -79,14 +79,4 @@ def create_router() -> APIRouter:
     return router
 
 
-def create_plugin() -> AccPlugin:
-    return AccPlugin(
-        id="acc.config-center",
-        name="配置中心",
-        version="1.0.0",
-        description="配置校验、导入和导出。",
-        requires=("acc.framework",),
-        capabilities=("config.manage",),
-        cards=(PluginCard("acc.config-center.overview", "配置中心", "配置校验、导入和导出。", "config", "file-cog", 80),),
-        router_factory=create_router,
-    )
+from feishu_stack.plugins.builtin_descriptors import create_config_center_plugin as create_plugin

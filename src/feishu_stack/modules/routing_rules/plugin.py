@@ -55,14 +55,4 @@ def create_router() -> APIRouter:
     return router
 
 
-def create_plugin() -> AccPlugin:
-    return AccPlugin(
-        id="acc.routing-rules",
-        name="路由规则",
-        version="1.0.0",
-        description="消息与任务路由规则管理。",
-        requires=("acc.framework",),
-        capabilities=("routing.manage",),
-        cards=(PluginCard("acc.routing-rules.overview", "路由规则", "消息与任务路由规则管理。", "routing", "route", 60),),
-        router_factory=create_router,
-    )
+from feishu_stack.plugins.builtin_descriptors import create_routing_rules_plugin as create_plugin

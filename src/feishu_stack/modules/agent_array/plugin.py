@@ -493,5 +493,4 @@ def skill_workshop_scan() -> dict:
         "scanMetadata": inventory.scan_metadata.to_dict() if inventory.scan_metadata else None,
     }
 
-def create_plugin() -> AccPlugin:
-    return AccPlugin(id='acc.agent-array', name='Agent 阵列', version='1.0.0', description='Agent 阵列', requires=('acc.framework',), capabilities=('agents.read', 'skills.manage'), cards=(PluginCard('acc.agent-array.overview', 'Agent 阵列', 'Agent 阵列', 'agents', icon='swords', order=20),), router_factory=lambda: router)
+from feishu_stack.plugins.builtin_descriptors import create_agent_array_plugin as create_plugin

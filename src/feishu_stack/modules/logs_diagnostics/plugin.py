@@ -194,5 +194,4 @@ def diagnostics() -> dict:
 def explained_diagnostics() -> dict:
     return {"items": to_dict(agent_dashboard.explained_diagnostics())}
 
-def create_plugin() -> AccPlugin:
-    return AccPlugin(id='acc.logs-diagnostics', name='日志与诊断', version='1.0.0', description='日志与诊断', requires=('acc.framework',), capabilities=('diagnostics.read',), cards=(PluginCard('acc.logs-diagnostics.overview', '日志与诊断', '日志与诊断', 'diagnostics', icon='file-text', order=90),), router_factory=lambda: router)
+from feishu_stack.plugins.builtin_descriptors import create_logs_diagnostics_plugin as create_plugin

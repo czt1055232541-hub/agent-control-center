@@ -32,14 +32,4 @@ def create_router() -> APIRouter:
     return router
 
 
-def create_plugin() -> AccPlugin:
-    return AccPlugin(
-        id="acc.feishu-connection",
-        name="飞书连接",
-        version="1.0.0",
-        description="飞书账号、权限与授权状态。",
-        requires=("acc.framework",),
-        capabilities=("feishu.inspect",),
-        cards=(PluginCard("acc.feishu-connection.overview", "飞书连接", "飞书账号、权限与授权状态。", "feishu", "send", 40),),
-        router_factory=create_router,
-    )
+from feishu_stack.plugins.builtin_descriptors import create_feishu_connection_plugin as create_plugin

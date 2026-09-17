@@ -9,16 +9,16 @@ from fastapi import APIRouter
 
 from feishu_stack.plugin_runtime import PluginRegistry, discover_entry_point_plugins
 from feishu_stack.plugin_sdk import AccPlugin, PluginCard
-from feishu_stack.modules.config_center.plugin import create_plugin as create_config_center_plugin
-from feishu_stack.modules.feishu_connection.plugin import create_plugin as create_feishu_connection_plugin
-from feishu_stack.modules.routing_rules.plugin import create_plugin as create_routing_rules_plugin
-from feishu_stack.modules.task_battlefield.plugin import create_plugin as create_task_battlefield_plugin
-from feishu_stack.modules.dashboard.plugin import create_plugin as create_dashboard_plugin
-from feishu_stack.modules.local_tools.plugin import create_plugin as create_local_tools_plugin
-from feishu_stack.modules.backup_migration.plugin import create_plugin as create_backup_migration_plugin
-from feishu_stack.modules.agent_array.plugin import create_plugin as create_agent_array_plugin
-from feishu_stack.modules.model_provider.plugin import create_plugin as create_model_provider_plugin
-from feishu_stack.modules.logs_diagnostics.plugin import create_plugin as create_logs_diagnostics_plugin
+from .builtin_descriptors import create_config_center_plugin
+from .builtin_descriptors import create_feishu_connection_plugin
+from .builtin_descriptors import create_routing_rules_plugin
+from .builtin_descriptors import create_task_battlefield_plugin
+from .builtin_descriptors import create_dashboard_plugin
+from .builtin_descriptors import create_local_tools_plugin
+from .builtin_descriptors import create_backup_migration_plugin
+from .builtin_descriptors import create_agent_array_plugin
+from .builtin_descriptors import create_model_provider_plugin
+from .builtin_descriptors import create_logs_diagnostics_plugin
 
 
 

@@ -119,5 +119,4 @@ def restart_local_tool(tool_id: str, runner: OperationRunner = Depends(operation
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=f"local tool not found: {tool_id}") from exc
 
-def create_plugin() -> AccPlugin:
-    return AccPlugin(id='acc.local-tools', name='本地工具', version='1.0.0', description='Local Tools', requires=('acc.framework',), capabilities=('tools.manage',), cards=(PluginCard('acc.local-tools.overview', '本地工具', 'Local Tools', 'tools', icon='package-open', order=70),), router_factory=lambda: router)
+from feishu_stack.plugins.builtin_descriptors import create_local_tools_plugin as create_plugin
