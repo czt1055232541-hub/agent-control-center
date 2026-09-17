@@ -10,11 +10,7 @@ import { AgentDetailPanel } from "../modules/agent-array/skill-tree/AgentDetailP
 import { SkillWorkshopPage } from "../modules/agent-array/skill-tree/SkillWorkshopPage";
 import { RecentRunsTable } from "../modules/agent-array/skill-tree/RecentRunsTable";
 import { TaskTraceMap } from "../modules/agent-array/skill-tree/TaskTraceMap";
-import TaskDashboardPage from "../modules/task-battlefield/TaskDashboardPage";
-import { ConfigCenterPage } from "../modules/config-center";
-import { RoutingRulesPage } from "../modules/routing-rules";
-import { FeishuConnectionPage } from "../modules/feishu-connection";
-import { LocalToolsPage } from "../modules/local-tools/LocalToolsPage";
+import { clientRegistry } from "../plugins/clientPlugins";
 import { recentRunsFromOperations, taskTraceFromAgents, toAgentProfiles } from "../modules/agent-array/skill-tree/viewModels";
 import { ActionButton } from "../components/common/ActionButton";
 import { StatusPill } from "../components/common/StatusPill";
@@ -493,6 +489,7 @@ function App() {
   const activePage = availableCards.some((card) => card.page === requestedPage)
     ? requestedPage
     : availableCards[0]?.page ?? "__no_plugins__";
+  const PluginPage = clientRegistry.resolve(activePage, plugins);
   const [adventureSelectedAgent, setAdventureSelectedAgent] = React.useState<AgentProfile | null>(null);
   const [activeDetailTab, setActiveDetailTab] = React.useState<string>("概览");
 
@@ -737,13 +734,7 @@ function App() {
             </div>
           ) : null}
 
-          {activePage === "tasks" ? (
-            <TaskDashboardPage token={token} />
-          ) : null}
-
-          {activePage === "tools" ? (
-            <LocalToolsPage token={token} />
-          ) : null}
+          {PluginPage ? <PluginPage token={token} /> : null}
 
           {activePage === "provider" ? (
             <>
@@ -791,17 +782,11 @@ function App() {
             </>
           ) : null}
 
-          {activePage === "config" ? (
-            <ConfigCenterPage token={token} />
-          ) : activePage === "routing" ? (
-            <RoutingRulesPage token={token} />
-          ) : activePage === "feishu" ? (
-            <FeishuConnectionPage token={token} />
-          ) : activePage === "backup" ? (
+          {activePage === "backup" ? (
             <PlannedPage page={activePage} />
           ) : null}
 
-          {!new Set(["dashboard", "agents", "tasks", "tools", "provider", "diagnostics", "config", "routing", "feishu", "backup"]).has(activePage) ? (
+          {!PluginPage && !new Set(["dashboard", "agents", "provider", "diagnostics", "backup"]).has(activePage) ? (
             <PluginDetailPage plugin={plugins.find((plugin) => plugin.cards.some((card) => card.page === activePage)) ?? null} />
           ) : null}
 
