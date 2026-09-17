@@ -134,6 +134,7 @@ export function AgentDrawer({
   const changes = changedFields(editable, draft);
 
   async function saveConfig() {
+    if (!agent) return;
     if (!editable || !token) {
       setConfigError(token ? "当前 Agent 没有可编辑配置。" : "Control token is not ready.");
       return;
@@ -163,6 +164,7 @@ export function AgentDrawer({
   }
 
   async function backupConfig() {
+    if (!agent) return;
     if (!token) {
       setConfigError("Control token is not ready.");
       return;
@@ -185,6 +187,7 @@ export function AgentDrawer({
   }
 
   async function rollbackConfig() {
+    if (!agent) return;
     if (!token) {
       setConfigError("Control token is not ready.");
       return;

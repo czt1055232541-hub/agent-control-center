@@ -286,9 +286,9 @@ export function LocalToolsPage({ token }: { token: string | null }) {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <input ref={fileInputRef} className="hidden" type="file" accept=".json,application/json" onChange={chooseManifest} />
-            <ActionButton icon={<FilePlus2 size={16} />} label="选择注册文档" onClick={() => fileInputRef.current?.click()} />
+            <ActionButton icon={<FilePlus2 size={16} />} label="选择注册文档" disabled={Boolean(busy)} onClick={() => fileInputRef.current?.click()} />
             <ActionButton icon={<Search size={16} />} label="扫描" disabled={busy === "scan"} onClick={scan} />
-            <ActionButton icon={<RefreshCcw size={16} />} label="刷新" onClick={load} />
+            <ActionButton icon={<RefreshCcw size={16} />} label="刷新" disabled={Boolean(busy)} onClick={load} />
           </div>
         </div>
         <div className="mt-3 flex flex-col gap-2 lg:flex-row">
