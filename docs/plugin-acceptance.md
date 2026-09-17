@@ -17,6 +17,7 @@
 
 ## 本阶段验证
 
+- DSH 工具生命周期验证：verify-installed.mjs 创建真实 Cordis Context、SystemPrompt 和 ToolRuntime，连续两轮加载/释放已安装 ACC 插件；acc_overview 正确注册并在 fiber.dispose 后消失，同宿主独立哨兵工具在各阶段均正常执行。清理工具与提示服务 fiber 后脚本以 0 退出。初次脚本误用不存在的 Context.dispose，修正为服务 fiber 清理并重跑成功；不将初次失败计为通过。这证明工具注册所有权，不等同于完整 DSH 会话或浏览器回归。
 - 独立 profile 安装/卸载验证：在专用 acc-audit profile 中安装适配器 0.1.3，DSH dump-config 成功且包含 acc-integration；执行 remove 后，package.json 依赖与组合配置中的 ACC 条目均消失。原 Web profile 仍安装 0.1.3、DSH PID 5032 未变。新 profile 初次安装遭遇 pnpm 项目索引 symlink EPERM，使用该索引到测试 profile 的目录联接后成功；测试 profile 和索引联接保留供复验。此验证覆盖包管理和配置发现/移除，尚不覆盖卸载后浏览器或模型工具回归。
 - v0.13.1 汇总发布：全量 Python 328 项通过（3 条既有警告），Web 7 项、类型检查、生产构建通过；同步修正前端 lockfile 的根包版本。仅重启 ACC 后，线上健康版本为 0.13.1、指标端点正常，DSH PID 5032 保持运行。此前统计迁移及 Dashboard 禁用状态流修复已随本次重启上线。测试临时产物已清理。此为阶段发布，非整体视觉/交互验收通过。
 - 框架模式回归：隔离进程禁用全部内建功能后，健康检查 200、清单仅 acc.framework、业务 HTTP 路由 404；修复状态 WebSocket 仍开放的问题，Dashboard 禁用时以 1008 拒绝连接且不调用业务状态采集。生命周期及框架统计测试合计 6 通过。尚未重启线上服务以应用此修复；功能 Python 包仍可能因现有静态导入加载，不能将路由禁用声明为物理卸载。

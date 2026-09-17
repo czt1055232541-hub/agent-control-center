@@ -61,3 +61,33 @@ if (process.argv[3]) {
   assert.equal(live.online, true)
   console.log(`PASS: live ACC inventory has ${live.count} entries`)
 }
+
+// Exercise real Cordis ownership, rather than a fake register callback.
+const { Context } = await import(pathToFileURL(installedRequire.resolve('@deepseek-ai/cordis')).href)
+const { ToolRuntime, defineTool } = await import(pathToFileURL(installedRequire.resolve('@deepseek-ai/dsh-tools')).href)
+const { default: SystemPrompt } = await import(pathToFileURL(installedRequire.resolve('@deepseek-ai/dsh-system-prompt')).href)
+const ctx = new Context()
+const promptFiber = await ctx.plugin(SystemPrompt, {})
+const toolsFiber = await ctx.plugin(ToolRuntime, { mode: 'native' })
+const sentinel = defineTool({
+  name: 'acc_audit_sentinel', description: 'Independent test-only host tool', parameters: {},
+  output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+  async execute() { return 'untouched' },
+})
+const removeSentinel = ctx.tools.register(sentinel)
+try {
+  const plugin = await import(pathToFileURL(resolve(installed, 'index.js')).href)
+  for (let cycle = 0; cycle < 2; cycle++) {
+    const fiber = await ctx.plugin(plugin, { baseUrl, requestTimeoutMs: 250 })
+    assert.ok(ctx.tools.get('acc_overview'))
+    assert.equal(await ctx.tools.get('acc_audit_sentinel').execute({}, {}), 'untouched')
+    await fiber.dispose()
+    assert.equal(ctx.tools.get('acc_overview'), undefined)
+    assert.equal(await ctx.tools.get('acc_audit_sentinel').execute({}, {}), 'untouched')
+  }
+  console.log('PASS: real Cordis install/dispose/reinstall removes only ACC tool')
+} finally {
+  removeSentinel()
+  await toolsFiber.dispose()
+  await promptFiber.dispose()
+}
