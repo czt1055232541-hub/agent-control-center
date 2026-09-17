@@ -226,6 +226,9 @@ def prometheus_metrics():
 
 @app.websocket("/ws/status")
 async def ws_status(ws: WebSocket) -> None:
+    if not any(plugin.id == "acc.dashboard" for plugin in get_plugin_registry().resolve()):
+        await ws.close(code=1008, reason="Dashboard plugin is disabled")
+        return
     await ws_manager.connect(ws)
     try:
         while True:

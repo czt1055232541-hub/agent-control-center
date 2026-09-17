@@ -75,3 +75,28 @@ with TestClient(app) as client:
 """
     subprocess.run([sys.executable, "-c", program], check=True,
                    env={**os.environ, "ACC_DISABLED_PLUGINS": "acc.task-battlefield"})
+
+
+def test_framework_only_mode_does_not_collect_business_status():
+    program = """
+import os
+from feishu_stack.plugins import BUILTIN_PLUGINS
+os.environ['ACC_DISABLED_PLUGINS'] = ','.join(p.id for p in BUILTIN_PLUGINS if p.kind != 'framework')
+from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
+from feishu_stack.api import app as module
+def forbidden():
+    raise AssertionError('Disabled business status must not be collected')
+module.get_status = forbidden
+with TestClient(module.app) as client:
+    assert client.get('/api/health').status_code == 200
+    assert [p['id'] for p in client.get('/api/plugins').json()['plugins']] == ['acc.framework']
+    assert client.get('/api/status').status_code == 404
+    assert client.get('/api/task-battlefield/directory').status_code == 404
+    try:
+        with client.websocket_connect('/ws/status'):
+            raise AssertionError('Disabled dashboard accepted websocket')
+    except WebSocketDisconnect as exc:
+        assert exc.code == 1008
+"""
+    subprocess.run([sys.executable, '-c', program], check=True, env=os.environ.copy())
