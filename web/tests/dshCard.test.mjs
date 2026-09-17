@@ -41,3 +41,12 @@ test('DSH card never enables unsafe or credential-bearing destinations', () => {
     assert.match(render(result({ online: true, url })), /disabled=""/);
   }
 });
+
+test('DSH card uses host theme tokens and inherits button foreground', () => {
+  const html = render(result({ online: true, url: 'http://127.0.0.1:8765' }));
+  for (const token of ['--dsw-alias-bg-layer-1', '--dsw-alias-label-primary', '--dsw-alias-border-l2', '--dsw-alias-state-success-primary']) {
+    assert.ok(html.includes(token));
+  }
+  assert.match(html, /color:inherit/);
+  assert.match(html, /font-family:inherit/);
+});

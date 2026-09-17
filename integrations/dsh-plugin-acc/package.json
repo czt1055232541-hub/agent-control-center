@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-acc",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Out-of-tree DeepSeek Harness bridge for Agent Control Center",
   "type": "module",
   "main": "./index.js",
