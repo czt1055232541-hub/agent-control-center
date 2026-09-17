@@ -3,8 +3,17 @@ import React, { useMemo } from 'react'
 export const inject = ['slots']
 
 function resultText(block) {
+  if (!block || typeof block !== 'object') return ''
   if (!('kind' in block)) return null
-  return block.content.map(item => item.type === 'text' ? item.text : '').join('')
+  if (!Array.isArray(block.content)) return ''
+  return block.content.map(item => item?.type === 'text' && typeof item.text === 'string' ? item.text : '').join('')
+}
+
+function safeUrl(value) {
+  try {
+    const url = new URL(value)
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : ''
+  } catch { return '' }
 }
 
 function parseOverview(block) {
@@ -15,7 +24,7 @@ function parseOverview(block) {
     return {
       running: false,
       online: value.online === true,
-      url: typeof value.url === 'string' ? value.url : '',
+      url: typeof value.url === 'string' ? safeUrl(value.url) : '',
       count: Number.isInteger(value.count) ? value.count : 0,
       plugins: Array.isArray(value.plugins) ? value.plugins.map(String) : [],
       error: typeof value.error === 'string' ? value.error : '',
@@ -39,7 +48,7 @@ function AccOverviewCard({ block, inspect }) {
     },
   },
   React.createElement('button', {
-    type: 'button', onClick: open, disabled: !model.online,
+    type: 'button', onClick: open, disabled: !model.online || !model.url,
     style: { width: '100%', border: 0, background: 'transparent', padding: 14, textAlign: 'left', cursor: model.online ? 'pointer' : 'default' },
   },
   React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
