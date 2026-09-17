@@ -1,6 +1,9 @@
-import React, { useMemo } from 'react'
+// DSH loads classic scripts whose factories resolve shared platform modules.
+window.__ModuleLoader__.load({ id: 'dsh-plugin-acc', factory: (require) => {
+const React = require('react')
+const { useMemo } = React
 
-export const inject = ['slots']
+const inject = ['slots']
 
 function resultText(block) {
   if (!block || typeof block !== 'object') return ''
@@ -65,9 +68,11 @@ function AccOverviewCard({ block, inspect }) {
   inspect ? React.createElement('button', { type: 'button', onClick: inspect, style: { border: 0, borderTop: '1px solid var(--dsw-alias-border, #d8dee9)', width: '100%', padding: '8px 14px', background: 'transparent', textAlign: 'left', fontSize: 12, opacity: .65, cursor: 'pointer' } }, '查看调用详情') : null)
 }
 
-export function apply(ctx) {
+function apply(ctx) {
   ctx.slots.inject('tool.call.toolview', () => ctx.slots.register(
     { name: 'tool.call.toolview', key: 'acc_overview' },
     AccOverviewCard,
   ))
 }
+return { inject, apply }
+} })

@@ -1,15 +1,18 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
+import { runInNewContext } from 'node:vm';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-const require = createRequire(import.meta.url);
-const source = (await readFile(new URL('../../integrations/dsh-plugin-acc/client.js', import.meta.url), 'utf8'))
-  .replace("from 'react'", `from ${JSON.stringify(pathToFileURL(require.resolve('react')).href)}`);
-const { apply } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+const source = await readFile(new URL('../../integrations/dsh-plugin-acc/client.js', import.meta.url), 'utf8');
+let registration;
+runInNewContext(source, { URL, window: { __ModuleLoader__: { load(value) { registration = value; } } } });
+assert.equal(registration.id, 'dsh-plugin-acc');
+const { apply } = registration.factory(name => {
+  assert.equal(name, 'react');
+  return React;
+});
 let Card;
 apply({ slots: {
   inject(name, register) { assert.equal(name, 'tool.call.toolview'); register(); },
