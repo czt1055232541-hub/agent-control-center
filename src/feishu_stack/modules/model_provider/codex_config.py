@@ -124,34 +124,12 @@ def _bootstrap_agent_config(cfg: StackConfig) -> None:
             shutil.copy2(source, target)
 
 
-def _cleanup_backups(codex_home: Path, pattern: str, keep: int, keep_path: Path | None = None) -> int:
-    files = sorted(codex_home.glob(pattern), key=lambda path: path.stat().st_mtime, reverse=True)
-    removed = 0
-    kept = 0
-    for path in files:
-        if keep_path and path.resolve() == keep_path.resolve():
-            kept += 1
-            continue
-        if kept < keep:
-            kept += 1
-            continue
-        path.unlink(missing_ok=True)
-        removed += 1
-    return removed
+from feishu_stack.modules.backup_migration.retention import _cleanup_backups
 
 
 def clean_backups(config: StackConfig | None = None, keep: int = 1) -> OperationResult:
-    cfg = config or load_config()
-    started = time.monotonic()
-    removed_switch = _cleanup_backups(cfg.codex_home, "config.toml.bak-switch-*", keep)
-    removed_restore = _cleanup_backups(cfg.codex_home, "config.toml.bak-restore-native-*", keep)
-    return OperationResult(
-        ok=True,
-        component="backups",
-        action="clean",
-        message=f"Removed switch backups: {removed_switch}; removed restore backups: {removed_restore}; goal backups preserved.",
-        duration_ms=int((time.monotonic() - started) * 1000),
-    )
+    from feishu_stack.modules.backup_migration.backups import clean
+    return clean(config, keep)
 
 
 def _apply_native(lines: list[str], cfg: StackConfig) -> list[str]:
