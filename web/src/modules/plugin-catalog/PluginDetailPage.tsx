@@ -32,6 +32,12 @@ export function PluginDetailPage({ plugin }: { plugin: AccPlugin | null }) {
               <ExternalLink size={15} /> {card.title}
             </div>
             <p className="mt-2 text-sm text-slate-600">{card.description}</p>
+            {card.href?.startsWith("/") && !card.href.startsWith("//") && !/[\\\s]/.test(card.href) ? (
+              <a href={card.href} target="_blank" rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-2 rounded bg-cyan-700 px-3 py-2 text-sm text-white hover:bg-cyan-800">
+                打开功能 <ExternalLink size={14} />
+              </a>
+            ) : null}
           </article>
         ))}
       </div>

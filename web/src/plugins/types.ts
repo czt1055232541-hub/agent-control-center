@@ -5,6 +5,7 @@ export type AccPluginCard = {
   page: string;
   icon: string;
   order: number;
+  href?: string | null;
 };
 
 export type AccPlugin = {

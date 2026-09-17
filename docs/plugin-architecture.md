@@ -53,6 +53,12 @@ def create_plugin() -> AccPlugin:
 
 当前宿主保留会话、健康检查、框架清单、异常处理、静态页面、宿主关停以及共享状态通知、指标和操作执行器。模块间的业务服务调用仍存在；独立启停与前端页面注册需要继续验收。
 
+## 独立项目安装示例
+
+`examples/acc-example-plugin` 提供可安装发行包、entry point、API 和独立页面。卡片可设置同源绝对路径 `href`，ACC 通用详情页显示“打开功能”入口。未来小项目可由自己的路由提供页面，无需修改 ACC React 编译入口或 DSH 源码。参见示例 README 的安装、禁用和卸载步骤。
+
+集成测试将示例包真正安装到临时 Python 搜索路径，在新进程启动 ACC 并验证清单、API、HTML 页面与禁用后的 404；测试不改变常用 Python 环境。
+
 ## DSH 适配器
 
 `integrations/dsh-plugin-acc` 是独立 npm bundle：

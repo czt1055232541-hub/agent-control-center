@@ -29,6 +29,12 @@ class PluginRegistry:
             raise ValueError("plugin id must be a non-empty trimmed string")
         if plugin.id in self._plugins:
             raise ValueError(f"duplicate ACC plugin id: {plugin.id}")
+        for card in plugin.cards:
+            if card.href is not None and (
+                not card.href.startswith("/") or card.href.startswith("//")
+                or "\\" in card.href or any(ord(char) < 33 for char in card.href)
+            ):
+                raise ValueError(f"ACC plugin card {card.id} href must be a same-origin absolute path")
         self._plugins[plugin.id] = plugin
 
     def resolve(self) -> tuple[AccPlugin, ...]:
@@ -105,6 +111,7 @@ class PluginRegistry:
                         "page": card.page,
                         "icon": card.icon,
                         "order": card.order,
+                        "href": card.href,
                     }
                     for card in sorted(plugin.cards, key=lambda item: (item.order, item.id))
                 ],

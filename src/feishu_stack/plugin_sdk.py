@@ -24,6 +24,7 @@ class PluginCard:
     page: str
     icon: str = "package"
     order: int = 100
+    href: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

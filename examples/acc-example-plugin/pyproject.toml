@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "acc-example-plugin"
+version = "0.1.0"
+description = "Standalone ACC plugin example"
+requires-python = ">=3.11"
+dependencies = ["agent-control-center>=0.10.0"]
+
+[project.entry-points."agent_control_center.plugins"]
+example = "acc_example:create_plugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]

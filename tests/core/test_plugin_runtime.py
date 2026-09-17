@@ -24,6 +24,15 @@ def test_registry_resolves_dependencies_before_consumers() -> None:
     assert [item.id for item in registry.resolve()] == ["provider", "consumer"]
 
 
+@pytest.mark.parametrize("href", ["javascript:alert(1)", "https://example.org", "//example.org", "/\\example.org", "/\n/example.org"])
+def test_card_links_reject_non_local_targets(href) -> None:
+    with pytest.raises(ValueError, match="same-origin"):
+        PluginRegistry([AccPlugin(
+            id="bad-link", name="Bad", version="1", description="test",
+            cards=(PluginCard("bad", "Bad", "Bad", "bad", href=href),),
+        )])
+
+
 def test_registry_rejects_duplicate_missing_and_cyclic_plugins() -> None:
     registry = PluginRegistry((plugin("one"),))
     with pytest.raises(ValueError, match="duplicate"):
