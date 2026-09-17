@@ -17,6 +17,7 @@
 
 ## 本阶段验证
 
+- 独立 profile 安装/卸载验证：在专用 acc-audit profile 中安装适配器 0.1.3，DSH dump-config 成功且包含 acc-integration；执行 remove 后，package.json 依赖与组合配置中的 ACC 条目均消失。原 Web profile 仍安装 0.1.3、DSH PID 5032 未变。新 profile 初次安装遭遇 pnpm 项目索引 symlink EPERM，使用该索引到测试 profile 的目录联接后成功；测试 profile 和索引联接保留供复验。此验证覆盖包管理和配置发现/移除，尚不覆盖卸载后浏览器或模型工具回归。
 - v0.13.1 汇总发布：全量 Python 328 项通过（3 条既有警告），Web 7 项、类型检查、生产构建通过；同步修正前端 lockfile 的根包版本。仅重启 ACC 后，线上健康版本为 0.13.1、指标端点正常，DSH PID 5032 保持运行。此前统计迁移及 Dashboard 禁用状态流修复已随本次重启上线。测试临时产物已清理。此为阶段发布，非整体视觉/交互验收通过。
 - 框架模式回归：隔离进程禁用全部内建功能后，健康检查 200、清单仅 acc.framework、业务 HTTP 路由 404；修复状态 WebSocket 仍开放的问题，Dashboard 禁用时以 1008 拒绝连接且不调用业务状态采集。生命周期及框架统计测试合计 6 通过。尚未重启线上服务以应用此修复；功能 Python 包仍可能因现有静态导入加载，不能将路由禁用声明为物理卸载。
 - 2026-09-17 profile 依赖警告审计：pnpm peers check 报缺失/冲突，但从已安装 ACC 适配器的真实模块路径解析，Cordis=4.0.2、DSH tools/ui-renderer/ui-tool=0.1.5-rc.2、React=18.3.1，均满足当前声明。DSH profile 机制使用宿主 fallback 并关闭自动安装 peers；未为消除警告而安装重复宿主库。验证脚本加入依赖解析输出；原有 dsh-free-search 的警告未修改。解析成功不代表浏览器已成功激活客户端。
