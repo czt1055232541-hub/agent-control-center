@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from feishu_stack.plugin_sdk import AccPlugin, PluginCard
+from feishu_stack.api.security import require_control_token
 
 from . import router as service
 
@@ -37,17 +38,17 @@ def create_router() -> APIRouter:
             raise HTTPException(status_code=404, detail=f"Unknown routing rule: {rule_id}")
         return item
 
-    @router.post("/set")
+    @router.post("/set", dependencies=[Depends(require_control_token)])
     def set_rule(request: RoutingRuleSetRequest) -> dict:
         return service.set_rule(**request.model_dump())
 
-    @router.delete("/delete/{rule_id}")
+    @router.delete("/delete/{rule_id}", dependencies=[Depends(require_control_token)])
     def delete_rule(rule_id: str) -> dict:
         if not service.delete_rule(rule_id):
             raise HTTPException(status_code=404, detail=f"Unknown routing rule: {rule_id}")
         return {"ok": True}
 
-    @router.post("/batch")
+    @router.post("/batch", dependencies=[Depends(require_control_token)])
     def batch_rules(request: RoutingRuleBatchRequest) -> dict:
         return service.batch_import_rules(request.rules)
 

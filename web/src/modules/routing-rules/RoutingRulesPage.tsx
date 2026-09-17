@@ -151,7 +151,7 @@ export default function RoutingRulesPage({ token }: { token: string }) {
     try {
       await readJson("/api/routing-rules/set", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Control-Token": token },
         body: JSON.stringify({
           rule_id: editingId ?? form.rule_id ?? "auto",
           name: form.name.trim(),
@@ -177,6 +177,7 @@ export default function RoutingRulesPage({ token }: { token: string }) {
     try {
       await readJson(`/api/routing-rules/delete/${encodeURIComponent(ruleId)}`, {
         method: "DELETE",
+        headers: { "X-Control-Token": token },
       });
       await refresh();
     } catch (exc) {
@@ -192,7 +193,7 @@ export default function RoutingRulesPage({ token }: { token: string }) {
     try {
       await readJson("/api/routing-rules/set", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Control-Token": token },
         body: JSON.stringify({
           rule_id: rule.rule_id,
           name: rule.name,
@@ -244,7 +245,7 @@ export default function RoutingRulesPage({ token }: { token: string }) {
         const rulesArray = Array.isArray(parsed) ? parsed : parsed.rules ?? [];
         await readJson("/api/routing-rules/batch", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-Control-Token": token },
           body: JSON.stringify({ rules: rulesArray }),
         });
         await refresh();

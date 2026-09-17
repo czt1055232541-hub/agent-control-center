@@ -141,7 +141,7 @@ export default function ConfigCenterPage({ token }: { token: string }) {
     try {
       await readJson("/api/config-center/set", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Control-Token": token },
         body: JSON.stringify({
           key: form.key.trim(),
           value: form.value,
@@ -164,6 +164,7 @@ export default function ConfigCenterPage({ token }: { token: string }) {
     try {
       await readJson(`/api/config-center/delete/${encodeURIComponent(key)}`, {
         method: "DELETE",
+        headers: { "X-Control-Token": token },
       });
       await refresh();
     } catch (exc) {
@@ -179,7 +180,7 @@ export default function ConfigCenterPage({ token }: { token: string }) {
     try {
       const data = await readJson<{ configs: Record<string, { value: string; description: string }> }>(
         "/api/config-center/export",
-        { method: "POST" },
+        { method: "POST", headers: { "X-Control-Token": token } },
       );
       const blob = new Blob([JSON.stringify(data.configs, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -209,7 +210,7 @@ export default function ConfigCenterPage({ token }: { token: string }) {
         const parsed = JSON.parse(text);
         await readJson("/api/config-center/import", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-Control-Token": token },
           body: JSON.stringify({ configs: parsed }),
         });
         await refresh();

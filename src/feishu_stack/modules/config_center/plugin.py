@@ -5,12 +5,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from feishu_stack.core.config_contract import compare_shared_config, load_json_object, redact_config, validate_shared_config
 from feishu_stack.core.settings import find_stack_root, resolve_settings_path
 from feishu_stack.plugin_sdk import AccPlugin, PluginCard
+from feishu_stack.api.security import require_control_token
 
 from . import router as service
 
@@ -57,21 +58,21 @@ def create_router() -> APIRouter:
             raise HTTPException(status_code=404, detail=f"Unknown config key: {key}")
         return item
 
-    @router.post("/api/config-center/set")
+    @router.post("/api/config-center/set", dependencies=[Depends(require_control_token)])
     def set_config(request: ConfigCenterSetRequest) -> dict:
         return service.set_config(request.key, request.value, request.description)
 
-    @router.delete("/api/config-center/delete/{key}")
+    @router.delete("/api/config-center/delete/{key}", dependencies=[Depends(require_control_token)])
     def delete_config(key: str) -> dict:
         if not service.delete_config(key):
             raise HTTPException(status_code=404, detail=f"Unknown config key: {key}")
         return {"ok": True}
 
-    @router.post("/api/config-center/export")
+    @router.post("/api/config-center/export", dependencies=[Depends(require_control_token)])
     def export_configs() -> dict:
         return service.export_configs()
 
-    @router.post("/api/config-center/import")
+    @router.post("/api/config-center/import", dependencies=[Depends(require_control_token)])
     def import_configs(request: ConfigCenterImportRequest) -> dict:
         return service.import_configs(request.configs)
 
