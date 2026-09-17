@@ -14,3 +14,11 @@ dsh --profile web --dump-config
 Windows 上如果 checkout 路径包含空格，当前 DSH CLI 的 pnpm 转发可能拆分本地目录参数。此时先运行 `npm pack --pack-destination <无空格目录>`，再安装生成的 `.tgz`。
 
 默认连接 `http://127.0.0.1:8765`。部署可在 profile 的 `cordis.patch.yml` 中按 `acc-integration` id 覆盖完整配置。ACC 离线时工具返回离线状态，DSH 其他功能不受影响。
+
+维护者可从 ACC 仓库运行安装包验证（不调用模型、不停止用户服务）：
+
+```bash
+node integrations/dsh-plugin-acc/verify-installed.mjs <profile中已安装的插件目录> [在线ACC地址]
+```
+
+脚本使用已安装包和真实 DSH 工具定义库，检查在线清单、结果渲染、HTTP 错误、无效 JSON、错误清单结构、超时及模拟服务退出。它不替代浏览器显示/点击、宿主其他工具或卸载回归。
