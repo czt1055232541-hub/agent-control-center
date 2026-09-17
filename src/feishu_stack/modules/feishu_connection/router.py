@@ -7,7 +7,7 @@ from typing import Any
 
 from feishu_stack.core.settings import StackConfig, load_config
 from feishu_stack.core.process import run_capture
-from feishu_stack.diagnostics import lark_auth_status
+from .auth import lark_auth_status
 
 _log = logging.getLogger(__name__)
 

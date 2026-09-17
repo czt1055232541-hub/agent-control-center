@@ -102,7 +102,7 @@ class DiagnosticsLarkAuthTests(unittest.TestCase):
         completed.returncode = 0
         completed.stdout = "authenticated"
         completed.stderr = ""
-        with patch("feishu_stack.modules.logs_diagnostics.diagnostics.run_capture", return_value=completed):
+        with patch("feishu_stack.modules.feishu_connection.auth.run_capture", return_value=completed):
             from feishu_stack.modules.logs_diagnostics.diagnostics import lark_auth_status
 
             cfg = MagicMock()

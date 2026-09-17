@@ -50,16 +50,8 @@ def deepseek_env_status(config: StackConfig | None = None) -> dict[str, Any]:
 
 
 def lark_auth_status(config: StackConfig | None = None) -> dict[str, Any]:
-    cfg = config or load_config()
-    started = time.monotonic()
-    env = os.environ.copy()
-    env["OPENCLAW_HOME"] = ""
-    env["CLAW_HOME"] = ""
-    try:
-        completed = run_capture([str(cfg.lark_cli_bin), "auth", "status"], cwd=cfg.stack_root, env=env, timeout=45)
-        return _completed_result("lark-auth-status", started, completed.returncode, completed.stdout, completed.stderr)
-    except Exception as exc:
-        return _completed_result("lark-auth-status", started, 1, "", str(exc))
+    from feishu_stack.modules.feishu_connection.auth import lark_auth_status as probe
+    return probe(config)
 
 
 def diagnostics(config: StackConfig | None = None) -> dict[str, Any]:
