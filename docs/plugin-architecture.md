@@ -88,6 +88,7 @@ def create_plugin() -> AccPlugin:
 ## 发布与回退
 
 每个阶段按改动范围执行测试、构建和隐私扫描；DSH 集成变更另做打包与真实启动检查。阶段提交推送到 `develop`，以语义化标签形成回退点；改造前远端备份分支为 `backup/pre-plugin-0.3.0-20260916`。
-# 框架统计依赖补充
+
+## 框架统计依赖补充
 
 请求和操作统计的实现归属 `feishu_stack.core.metrics`。旧路径 `modules.logs_diagnostics.metrics` 仅保留同一模块对象的兼容别名，避免重复注册 Prometheus 指标。宿主与操作执行器不再通过日志诊断功能取得统计服务。这只消除统计层的反向依赖，其他共享业务服务仍需逐项审计。
