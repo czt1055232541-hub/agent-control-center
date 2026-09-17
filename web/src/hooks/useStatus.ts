@@ -2,13 +2,14 @@ import React from "react";
 import { readJson } from "../api";
 import type { Diagnostics, StackStatus } from "../types";
 
-export function useStatus() {
+export function useStatus(enabled = true, diagnosticsEnabled = true) {
   const [token, setToken] = React.useState("");
   const [status, setStatus] = React.useState<StackStatus | null>(null);
   const [diagnostics, setDiagnostics] = React.useState<Diagnostics | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(async () => {
+    if (!enabled) return;
     try {
       const nextStatus = await readJson<StackStatus>("/api/status");
       setStatus(nextStatus);
@@ -17,12 +18,13 @@ export function useStatus() {
       setError(exc instanceof Error ? exc.message : String(exc));
       throw exc;
     }
-  }, []);
+  }, [enabled]);
 
   const loadDiagnostics = React.useCallback(async () => {
+    if (!diagnosticsEnabled) return;
     const next = await readJson<Diagnostics>("/api/diagnostics");
     setDiagnostics(next);
-  }, []);
+  }, [diagnosticsEnabled]);
 
   // Initial load + WebSocket with HTTP fallback
   React.useEffect(() => {
@@ -70,7 +72,7 @@ export function useStatus() {
       };
     };
 
-    connectWs();
+    if (enabled) connectWs();
 
     return () => {
       if (statusTimer !== null) window.clearInterval(statusTimer);
@@ -80,7 +82,7 @@ export function useStatus() {
         ws.close();
       }
     };
-  }, [refresh, loadDiagnostics]);
+  }, [enabled, refresh, loadDiagnostics]);
 
   return { token, status, diagnostics, error, refresh, loadDiagnostics };
 }

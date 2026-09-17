@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from importlib import metadata
+from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Iterable
 
 from fastapi import FastAPI
@@ -16,8 +17,9 @@ ENTRY_POINT_GROUP = "agent_control_center.plugins"
 class PluginRegistry:
     """Validated collection of ACC plugins in dependency order."""
 
-    def __init__(self, plugins: Iterable[AccPlugin] = ()) -> None:
+    def __init__(self, plugins: Iterable[AccPlugin] = (), *, disabled: Iterable[str] = ()) -> None:
         self._plugins: dict[str, AccPlugin] = {}
+        self._disabled = frozenset(disabled)
         for plugin in plugins:
             self.register(plugin)
 
@@ -31,11 +33,20 @@ class PluginRegistry:
 
     def resolve(self) -> tuple[AccPlugin, ...]:
         """Return a deterministic dependency order or fail on an invalid graph."""
+        unknown = self._disabled.difference(self._plugins)
+        if unknown:
+            raise ValueError(f"Unknown disabled ACC plugins: {', '.join(sorted(unknown))}")
+        for plugin_id in self._disabled:
+            if self._plugins[plugin_id].kind == "framework":
+                raise ValueError(f"Cannot disable ACC framework plugin: {plugin_id}")
         resolved: list[AccPlugin] = []
         visiting: list[str] = []
         visited: set[str] = set()
 
         def visit(plugin_id: str) -> None:
+            if plugin_id in self._disabled:
+                owner = visiting[-1] if visiting else "plugin graph"
+                raise ValueError(f"ACC plugin {owner} requires disabled plugin {plugin_id}")
             if plugin_id in visited:
                 return
             if plugin_id in visiting:
@@ -53,8 +64,18 @@ class PluginRegistry:
             resolved.append(plugin)
 
         for plugin_id in sorted(self._plugins):
-            visit(plugin_id)
+            if plugin_id not in self._disabled:
+                visit(plugin_id)
         return tuple(resolved)
+
+    @asynccontextmanager
+    async def lifespan(self, app: FastAPI):
+        """Start dependencies first and unwind in reverse order, even on failure."""
+        async with AsyncExitStack() as stack:
+            for plugin in self.resolve():
+                if plugin.lifespan is not None:
+                    await stack.enter_async_context(plugin.lifespan(app))
+            yield
 
     def mount(self, app: FastAPI) -> tuple[AccPlugin, ...]:
         """Mount every native plugin router after validating the full graph."""

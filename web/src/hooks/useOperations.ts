@@ -2,16 +2,17 @@
 import { readJson } from "../api";
 import type { OperationRecord, OperationResult } from "../types";
 
-export function useOperations(token: string, refresh: () => Promise<void>) {
+export function useOperations(token: string, refresh: () => Promise<void>, enabled = true) {
   const [operations, setOperations] = React.useState<OperationRecord[]>([]);
   const [result, setResult] = React.useState<OperationResult | null>(null);
   const [error, setError] = React.useState("");
   const [busy, setBusy] = React.useState(false);
 
   const loadOperations = React.useCallback(async () => {
+    if (!enabled) return;
     const next = await readJson<{ operations: OperationRecord[] }>("/api/operations");
     setOperations(next.operations);
-  }, []);
+  }, [enabled]);
 
   // Load operations on mount
   React.useEffect(() => {

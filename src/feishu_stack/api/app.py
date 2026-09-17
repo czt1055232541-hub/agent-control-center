@@ -50,7 +50,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    yield
+    async with get_plugin_registry().lifespan(_app):
+        yield
 
 
 app = FastAPI(
@@ -542,6 +543,8 @@ if web_dist.exists():
 
     @app.get("/{path:path}", include_in_schema=False)
     def frontend(path: str) -> FileResponse:
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="API endpoint not found")
         target = web_dist / path
         if path and target.exists() and target.is_file():
             return FileResponse(target)

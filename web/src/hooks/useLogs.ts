@@ -2,7 +2,7 @@
 import { readJson } from "../api";
 import type { LogTail } from "../types";
 
-export function useLogs() {
+export function useLogs(enabled = true) {
   const [logs, setLogs] = React.useState<{ component: string; logs: LogTail[] } | null>(null);
   const [selectedLog, setSelectedLog] = React.useState("operations");
   const [logLines, setLogLines] = React.useState(120);
@@ -14,6 +14,7 @@ export function useLogs() {
   logLinesRef.current = logLines;
 
   const loadLogs = React.useCallback(async (component?: string, lines?: number): Promise<void> => {
+    if (!enabled) return;
     const comp = component ?? selectedLogRef.current;
     const lineCount = lines ?? logLinesRef.current;
     const result = await readJson<{ component: string; logs: LogTail[] }>(
@@ -22,15 +23,16 @@ export function useLogs() {
     setSelectedLog(comp);
     setLogs(result);
     setError(null);
-  }, []);
+  }, [enabled]);
 
   // Periodic log polling
   React.useEffect(() => {
+    if (!enabled) return;
     const logTimer = window.setInterval(() => {
       loadLogs().catch((exc) => setError(exc instanceof Error ? exc.message : String(exc)));
     }, 3000);
     return () => window.clearInterval(logTimer);
-  }, [loadLogs]);
+  }, [enabled, loadLogs]);
 
   return { logs, selectedLog, logLines, error, loadLogs, setSelectedLog, setLogLines };
 }

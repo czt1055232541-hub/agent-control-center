@@ -472,30 +472,41 @@ function PlannedPage({ page }: { page: CommandPage }) {
 }
 
 function App() {
-  const { token, status, diagnostics, error: statusError, refresh, loadDiagnostics } = useStatus();
-  const { operations, result, error, busy, run, setError, setResult } = useOperations(token, refresh);
-  const { logs, selectedLog, logLines, error: logsError, loadLogs, setSelectedLog, setLogLines } = useLogs();
+  const { plugins, pluginsError } = usePluginInventory();
+  const enabled = (id: string) => plugins.some((plugin) => plugin.id === id);
+  const dashboardEnabled = enabled("acc.dashboard");
+  const diagnosticsEnabled = enabled("acc.logs-diagnostics");
+  const backupEnabled = enabled("acc.backup-migration");
+  const providerEnabled = enabled("acc.model-provider");
+  const configEnabled = enabled("acc.config-center");
+  const { token, status, diagnostics, error: statusError, refresh, loadDiagnostics } = useStatus(dashboardEnabled, diagnosticsEnabled);
+  const { operations, result, error, busy, run, setError, setResult } = useOperations(token, refresh, dashboardEnabled);
+  const { logs, selectedLog, logLines, error: logsError, loadLogs, setSelectedLog, setLogLines } = useLogs(diagnosticsEnabled);
   const mig = useMigration(token, refresh);
-  const { summary, agents, infrastructure, explainedDiagnostics, refreshDashboard } = useCommandDashboard();
-  const { watchdog, error: watchdogError, refreshWatchdog } = useWatchdog();
-  const codexStream = useCodexStream();
+  const { summary, agents, infrastructure, explainedDiagnostics, refreshDashboard } = useCommandDashboard(dashboardEnabled, enabled("acc.agent-array"), diagnosticsEnabled);
+  const { watchdog, error: watchdogError, refreshWatchdog } = useWatchdog(enabled("acc.task-battlefield"));
+  const codexStream = useCodexStream(diagnosticsEnabled);
   const [configStatus, setConfigStatus] = React.useState<ConfigContractStatus | null>(null);
   const [selectedAgent, setSelectedAgent] = React.useState<AgentConfig | null>(null);
-  const [activePage, setActivePage] = React.useState<CommandPage>("dashboard");
-  const { plugins, pluginsError } = usePluginInventory();
+  const [requestedPage, setActivePage] = React.useState<CommandPage>("dashboard");
+  const availableCards = plugins.flatMap((plugin) => plugin.cards).sort((a, b) => a.order - b.order);
+  const activePage = availableCards.some((card) => card.page === requestedPage)
+    ? requestedPage
+    : availableCards[0]?.page ?? "__no_plugins__";
   const [adventureSelectedAgent, setAdventureSelectedAgent] = React.useState<AgentProfile | null>(null);
   const [activeDetailTab, setActiveDetailTab] = React.useState<string>("概览");
 
   React.useEffect(() => {
-    mig.loadThreads().catch(() => {});
-    mig.loadDeepSeekModels().catch(() => {});
-  }, []);
+    if (backupEnabled) mig.loadThreads().catch(() => {});
+    if (providerEnabled) mig.loadDeepSeekModels().catch(() => {});
+  }, [backupEnabled, providerEnabled, mig.loadThreads, mig.loadDeepSeekModels]);
 
   React.useEffect(() => {
+    if (!configEnabled) return;
     readJson<ConfigContractStatus>("/api/config/status")
       .then(setConfigStatus)
       .catch((exc) => console.error("Configuration status check failed", exc));
-  }, []);
+  }, [configEnabled]);
 
   const appProviderMode = status?.codex_app?.mode ?? status?.codex.mode ?? "unknown";
   const agentProviderMode = status?.codex_agent_provider?.mode ?? status?.codex.mode ?? "unknown";

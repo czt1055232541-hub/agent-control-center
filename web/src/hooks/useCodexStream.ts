@@ -6,7 +6,7 @@ type StreamWsMessage =
   | { type: "event"; run_id: string; event: CodexStreamEvent }
   | { type: "heartbeat"; run_id: string; events: [] };
 
-export function useCodexStream() {
+export function useCodexStream(enabled = true) {
   const [runs, setRuns] = React.useState<CodexStreamRun[]>([]);
   const [runId, setRunId] = React.useState("latest");
   const [events, setEvents] = React.useState<CodexStreamEvent[]>([]);
@@ -14,12 +14,14 @@ export function useCodexStream() {
   const [error, setError] = React.useState<string | null>(null);
 
   const loadRuns = React.useCallback(async () => {
+    if (!enabled) return [];
     const result = await readJson<{ streams: CodexStreamRun[] }>("/api/codex-agent/streams?limit=20");
     setRuns(result.streams);
     return result.streams;
-  }, []);
+  }, [enabled]);
 
   const loadStream = React.useCallback(async (target = runId) => {
+    if (!enabled) return null;
     try {
       const result = await readJson<CodexStreamPayload>(`/api/codex-agent/streams/${encodeURIComponent(target)}`);
       setEvents(result.events);
@@ -30,7 +32,7 @@ export function useCodexStream() {
       setError(exc instanceof Error ? exc.message : String(exc));
       return null;
     }
-  }, [runId]);
+  }, [enabled, runId]);
 
   React.useEffect(() => {
     loadRuns().catch(() => {});
@@ -39,6 +41,7 @@ export function useCodexStream() {
 
   React.useEffect(() => {
     let ws: WebSocket | null = null;
+    if (!enabled) return;
     let reconnectTimeout: number | null = null;
     let closed = false;
     const connect = () => {
@@ -84,7 +87,7 @@ export function useCodexStream() {
         ws.close();
       }
     };
-  }, [runId]);
+  }, [enabled, runId]);
 
   return { runs, runId, events, connected, error, setRunId, loadRuns, loadStream };
 }

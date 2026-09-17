@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+import os
 
 from fastapi import APIRouter
 
@@ -47,7 +48,8 @@ BUILTIN_PLUGINS = (
 @lru_cache(maxsize=1)
 def get_plugin_registry() -> PluginRegistry:
     """Build the stable registry once per ACC process."""
-    return PluginRegistry((*BUILTIN_PLUGINS, *discover_entry_point_plugins()))
+    disabled = tuple(value.strip() for value in os.environ.get("ACC_DISABLED_PLUGINS", "").split(",") if value.strip())
+    return PluginRegistry((*BUILTIN_PLUGINS, *discover_entry_point_plugins()), disabled=disabled)
 
 
 def create_plugin_router() -> APIRouter:
