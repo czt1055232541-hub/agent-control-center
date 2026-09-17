@@ -3,15 +3,7 @@ import ReactDOM from "react-dom/client";
 import { AlertTriangle, FileText, PauseCircle, Play, Power, RefreshCcw, ShieldCheck, Wrench } from "lucide-react";
 import "./styles.css";
 import { logOptions } from "../types";
-import type { AgentProfile } from "../types";
-import { TopStatusBar } from "../modules/agent-array/skill-tree/TopStatusBar";
-import { AgentCard as AdventureAgentCard } from "../modules/agent-array/skill-tree/AgentCard";
-import { AgentDetailPanel } from "../modules/agent-array/skill-tree/AgentDetailPanel";
-import { SkillWorkshopPage } from "../modules/agent-array/skill-tree/SkillWorkshopPage";
-import { RecentRunsTable } from "../modules/agent-array/skill-tree/RecentRunsTable";
-import { TaskTraceMap } from "../modules/agent-array/skill-tree/TaskTraceMap";
 import { clientRegistry } from "../plugins/clientPlugins";
-import { recentRunsFromOperations, taskTraceFromAgents, toAgentProfiles } from "../modules/agent-array/skill-tree/viewModels";
 import { ActionButton } from "../components/common/ActionButton";
 import { StatusPill } from "../components/common/StatusPill";
 import { DiagnosticCard } from "../components/common/DiagnosticCard";
@@ -384,89 +376,6 @@ function OperationLog({ operations }: { operations: ReturnType<typeof useOperati
   );
 }
 
-function PlannedPage({ page }: { page: CommandPage }) {
-  const plans: Record<CommandPage, { title: string; stage: string; dependencies: string[]; next: string[] }> = {
-    dashboard: { title: "Dashboard 总览", stage: "已实现", dependencies: [], next: [] },
-    agents: { title: "Agent 管理", stage: "已实现", dependencies: [], next: [] },
-    provider: { title: "模型与 Provider", stage: "已实现", dependencies: [], next: [] },
-    diagnostics: { title: "日志与诊断", stage: "已实现", dependencies: [], next: [] },
-    tasks: {
-      title: "任务监控",
-      stage: "后续阶段",
-      dependencies: ["OpenClaw 会话事件流", "Codex Agent 生成状态事件", "任务 ID 与消息 ID 关联"],
-      next: ["定义任务事件 schema", "接入 sessions.json 增量读取", "补充生成中/排队/完成状态"],
-    },
-    feishu: {
-      title: "飞书连接",
-      stage: "后续阶段",
-      dependencies: ["Lark auth status", "OpenClaw channel accounts", "Codex Agent bot env"],
-      next: ["展示账号启用状态", "增加权限缺失诊断", "只读展示 chat/app/openId 脱敏摘要"],
-    },
-    routing: {
-      title: "路由规则",
-      stage: "后续阶段",
-      dependencies: ["OpenClaw bindings", "A2A_BOTS", "群聊触发规则"],
-      next: ["解析调度规则", "展示 @ 名称到 Agent 的映射", "设计只读冲突检查"],
-    },
-    config: {
-      title: "配置中心",
-      stage: "开发中",
-      dependencies: ["当前 Agent 管理页的白名单写入 API", "配置备份目录", "脱敏 diff"],
-      next: ["将更多低风险字段纳入白名单", "提供全局配置预览", "增加 schema 说明"],
-    },
-    backup: {
-      title: "备份与迁移",
-      stage: "后续阶段",
-      dependencies: ["runtime/config-versions", "线程迁移 API", "备份清理 API"],
-      next: ["列出配置版本", "支持选择版本回滚", "整合 Codex thread migration 结果"],
-    },
-  };
-  const plan = plans[page];
-  const plannedItems = React.useMemo<SortableGridItem[]>(() => [
-    {
-      id: "dependencies",
-      node: (
-        <div className="h-full rounded-md border border-slate-200 bg-slate-50 p-3">
-          <h3 className="text-sm font-medium text-slate-900">依赖数据源</h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
-            {plan.dependencies.map((item) => <li key={item}>{item}</li>)}
-          </ul>
-        </div>
-      ),
-    },
-    {
-      id: "next",
-      node: (
-        <div className="h-full rounded-md border border-slate-200 bg-slate-50 p-3">
-          <h3 className="text-sm font-medium text-slate-900">阶段任务</h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
-            {plan.next.map((item) => <li key={item}>{item}</li>)}
-          </ul>
-        </div>
-      ),
-    },
-  ], [plan]);
-
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-950">{plan.title}</h2>
-          <p className="mt-1 text-sm text-slate-600">当前阶段：{plan.stage}。这里保留导航入口，但不放占位控件或不可用按钮。</p>
-        </div>
-        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">{plan.stage}</span>
-      </div>
-      <SortableGrid
-        ariaLabel="Planned page cards"
-        className="mt-4 grid gap-4 lg:grid-cols-2"
-        items={plannedItems}
-        maxColSpan={2}
-        storageKey={`acc.${page}.plannedLayout`}
-      />
-    </section>
-  );
-}
-
 function App() {
   const { plugins, pluginsError } = usePluginInventory();
   const enabled = (id: string) => plugins.some((plugin) => plugin.id === id);
@@ -490,8 +399,7 @@ function App() {
     ? requestedPage
     : availableCards[0]?.page ?? "__no_plugins__";
   const PluginPage = clientRegistry.resolve(activePage, plugins);
-  const [adventureSelectedAgent, setAdventureSelectedAgent] = React.useState<AgentProfile | null>(null);
-  const [activeDetailTab, setActiveDetailTab] = React.useState<string>("概览");
+
 
   React.useEffect(() => {
     if (backupEnabled) mig.loadThreads().catch(() => {});
@@ -515,13 +423,10 @@ function App() {
       }),
     [run, refreshDashboard, refreshWatchdog],
   );
-  const adventureAgents = React.useMemo(() => toAgentProfiles(agents), [agents]);
   const providerInfrastructure = React.useMemo(
     () => infrastructure.filter((agent) => agent.id !== "codex-runtime"),
     [infrastructure],
   );
-  const recentRuns = React.useMemo(() => recentRunsFromOperations(operations), [operations]);
-  const currentTrace = React.useMemo(() => taskTraceFromAgents(agents), [agents]);
   const dashboardPanelItems = React.useMemo<SortableGridItem[]>(() => [
     {
       id: "config-health",
@@ -571,16 +476,6 @@ function App() {
     runAndRefresh,
     watchdog,
   ]);
-  const adventureAgentItems = React.useMemo<SortableGridItem[]>(() => adventureAgents.map((agent) => ({
-    id: agent.id,
-    node: (
-      <AdventureAgentCard
-        agent={agent}
-        selected={adventureSelectedAgent?.id === agent.id}
-        onSelect={(nextAgent) => setAdventureSelectedAgent(nextAgent)}
-      />
-    ),
-  })), [adventureAgents, adventureSelectedAgent?.id]);
   const providerInfrastructureItems = React.useMemo<SortableGridItem[]>(() => providerInfrastructure.map((agent) => ({
     id: agent.id,
     node: (
@@ -635,16 +530,7 @@ function App() {
     },
   ], [busy, codexStream, loadLogs, logLines, logs, operations, selectedLog]);
 
-  React.useEffect(() => {
-    if (!adventureAgents.length) {
-      setAdventureSelectedAgent(null);
-      return;
-    }
-    setAdventureSelectedAgent((current) => {
-      const next = adventureAgents.find((agent) => agent.id === current?.id) ?? adventureAgents[0];
-      return next;
-    });
-  }, [adventureAgents]);
+
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
@@ -689,50 +575,7 @@ function App() {
             </>
           ) : null}
 
-          {activePage === "agents" ? (
-            <div className="flex flex-col gap-4">
-              <TopStatusBar
-                totalAgents={adventureAgents.length}
-                onlineAgents={adventureAgents.filter(a => a.status === "online" || a.status === "running").length}
-                runningAgents={adventureAgents.filter(a => a.status === "running").length}
-                taskQueue={adventureAgents.filter(a => a.status === "running").length}
-                dailyTokens={0}
-                tokenBudget={0}
-                tokensPercent={0}
-              />
-              <div>
-                <div className="mb-2 flex items-center gap-2">
-                  <h2 className="text-base font-semibold" style={{color:'var(--text-main)'}}>Agent 阵容</h2>
-                  <span className="rounded px-2 py-0.5 text-xs" style={{background:'var(--bg-panel-soft)',color:'var(--text-muted)',border:'1px solid var(--border-light)'}}>
-                    {adventureAgents.length} 个真实角色
-                  </span>
-                </div>
-                <SortableGrid
-                  ariaLabel="Agent cards"
-                  className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-                  items={adventureAgentItems}
-                  maxColSpan={3}
-                  storageKey="acc.agents.cardLayout"
-                />
-              </div>
-              <AgentDetailPanel
-                agent={adventureSelectedAgent}
-                activeTab={activeDetailTab as any}
-                onTabChange={(tab) => setActiveDetailTab(tab)}
-              />
-              <div>
-                <SkillWorkshopPage
-                  agents={agents}
-                  adventureSelectedAgent={adventureSelectedAgent}
-                  token={token}
-                />
-              </div>
-              <div className="grid gap-4 lg:grid-cols-2">
-                <RecentRunsTable runs={recentRuns} onSelectRun={() => {}} />
-                <TaskTraceMap trace={currentTrace} />
-              </div>
-            </div>
-          ) : null}
+
 
           {PluginPage ? <PluginPage token={token} /> : null}
 
@@ -782,11 +625,9 @@ function App() {
             </>
           ) : null}
 
-          {activePage === "backup" ? (
-            <PlannedPage page={activePage} />
-          ) : null}
 
-          {!PluginPage && !new Set(["dashboard", "agents", "provider", "diagnostics", "backup"]).has(activePage) ? (
+
+          {!PluginPage && !new Set(["dashboard", "provider", "diagnostics"]).has(activePage) ? (
             <PluginDetailPage plugin={plugins.find((plugin) => plugin.cards.some((card) => card.page === activePage)) ?? null} />
           ) : null}
 
