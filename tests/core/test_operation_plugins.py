@@ -22,6 +22,16 @@ def test_operation_plugin_import_does_not_load_host(module) -> None:
     )], check=True)
 
 
+def test_logs_mount_does_not_load_optional_log_providers() -> None:
+    subprocess.run([sys.executable, "-c", (
+        "import sys; "
+        "from feishu_stack.modules.logs_diagnostics.plugin import create_plugin; "
+        "assert create_plugin().router_factory().routes; "
+        "assert 'feishu_stack.modules.model_provider.codex_desktop' not in sys.modules; "
+        "assert 'feishu_stack.modules.local_tools.registry' not in sys.modules"
+    )], check=True)
+
+
 @pytest.mark.parametrize("factory,path,body,component,action", [
     (local_tools_plugin, "/api/local-tools/demo/start", None, "local-tool:demo", "start"),
     (backup_plugin, "/api/backups/clean", None, "backups", "clean"),

@@ -8,9 +8,7 @@ from pathlib import Path
 from fastapi import Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from . import explanations
-from feishu_stack.modules.model_provider import codex_desktop
 from feishu_stack.modules.logs_diagnostics import diagnostics as diagnostics_module
-from feishu_stack.modules.local_tools import registry as local_tools
 from feishu_stack.core.settings import load_config
 from feishu_stack.core.logs import tail
 from feishu_stack.core import codex_streams
@@ -100,6 +98,8 @@ def set_log_level(request: LogLevelSetRequest) -> dict:
 def logs(component: str, lines: int = 120) -> dict:
     cfg = load_config()
     if component == "codex-desktop":
+        from feishu_stack.modules.model_provider import codex_desktop
+
         codex_desktop.log(cfg)
     table = {
         "openclaw": [cfg.openclaw_stdout_log, cfg.openclaw_stderr_log],
@@ -109,6 +109,8 @@ def logs(component: str, lines: int = 120) -> dict:
         "operations": [cfg.log_dir / "operations.jsonl"],
     }
     if component.startswith("local-tool:"):
+        from feishu_stack.modules.local_tools import registry as local_tools
+
         tool_id = component.split(":", 1)[1]
         try:
             local_tools.get_tool_status(tool_id, cfg)
