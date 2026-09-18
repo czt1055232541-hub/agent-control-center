@@ -1,6 +1,6 @@
 [project]
 name = "agent-control-center"
-version = "0.13.1"
+version = "0.14.0"
 description = "Local desktop control center for the machine agent stack."
 requires-python = ">=3.11"
 dependencies = [
