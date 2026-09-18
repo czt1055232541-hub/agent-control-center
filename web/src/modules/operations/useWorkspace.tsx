@@ -22,6 +22,7 @@ import { useCodexStream } from "../../hooks/useCodexStream";
 import { usePluginInventory } from "../../hooks/usePluginInventory";
 import type { AgentConfig, CodexStreamEvent, CodexStreamRun, CurrentWatchdogStatus } from "../../types";
 import { readJson } from "../../api";
+import { visibleDashboardPanels } from "../../plugins/workspaceContributions";
 
 import { WatchdogCard, ConfigHealthCard, InfrastructureHealth, OperationLog, LogsPanel, CodexLiveStreamPanel, type ConfigContractStatus } from "./WorkspacePanels";
 export function useWorkspace(token: string, page: string) {
@@ -89,11 +90,15 @@ export function useWorkspace(token: string, page: string) {
       ),
     },
     {
+      id: "agent-topology",
+      className: "xl:col-span-2",
+      node: <AgentTopology agents={agents} onSelect={setSelectedAgent} />,
+    },
+    {
       id: "agent-diagnostics",
       className: "xl:col-span-2",
       node: (
         <section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
-          <AgentTopology agents={agents} onSelect={setSelectedAgent} />
           <DiagnosticCenter items={explainedDiagnostics} busy={busy} onRun={runAndRefresh} onLogs={(component) => loadLogs(component)} />
         </section>
       ),
@@ -172,7 +177,7 @@ export function useWorkspace(token: string, page: string) {
 
 
 
-  return { token, status, diagnostics, statusError, result, error, busy, run, logsError, loadLogs, mig, summary, explainedDiagnostics, refreshDashboard, watchdogError, selectedAgent, setSelectedAgent, runAndRefresh, dashboardPanelItems, providerInfrastructureItems, diagnosticsItems, loadDiagnostics };
+  return { token, status, diagnostics, statusError, result, error, busy, run, logsError, loadLogs, mig, summary, explainedDiagnostics, refreshDashboard, watchdogError, selectedAgent, setSelectedAgent, runAndRefresh, dashboardPanelItems: visibleDashboardPanels(dashboardPanelItems, plugins.map(plugin => plugin.id)), providerInfrastructureItems, diagnosticsItems, loadDiagnostics };
 }
 
 export function WorkspaceFrame({ workspace, children }: { workspace: ReturnType<typeof useWorkspace>; children: React.ReactNode }) {
