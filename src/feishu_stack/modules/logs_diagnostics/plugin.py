@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from fastapi import Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
-from feishu_stack.modules.agent_array.skill_tree import agent_dashboard
+from . import explanations
 from feishu_stack.modules.model_provider import codex_desktop
 from feishu_stack.modules.logs_diagnostics import diagnostics as diagnostics_module
 from feishu_stack.modules.local_tools import registry as local_tools
@@ -192,6 +192,6 @@ def diagnostics() -> dict:
     tags=[DIAGNOSTICS_TAG],
 )
 def explained_diagnostics() -> dict:
-    return {"items": to_dict(agent_dashboard.explained_diagnostics())}
+    return {"items": to_dict(explanations.explained_diagnostics())}
 
 from feishu_stack.plugins.builtin_descriptors import create_logs_diagnostics_plugin as create_plugin

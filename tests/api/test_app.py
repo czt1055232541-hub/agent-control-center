@@ -364,7 +364,7 @@ def test_agent_editable_config_update_uses_mock(monkeypatch) -> None:
 
 def test_explained_diagnostics_route_is_read_only_without_token(monkeypatch) -> None:
     monkeypatch.setattr(
-        agent_plugin.agent_dashboard,
+        logs_plugin.explanations,
         "explained_diagnostics",
         lambda: [
             ExplainedDiagnosticItem(
