@@ -2,6 +2,9 @@
 .env
 *.env
 config/stack.settings.local.json
+config/plugin-settings.local.json
+config/plugin-settings.local.json.bak
+config/.plugin-settings-*.tmp
 config/stack.settings.local.json.bak-*
 *.key
 *.pem

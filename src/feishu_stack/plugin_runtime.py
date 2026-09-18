@@ -37,6 +37,11 @@ class PluginRegistry:
                 raise ValueError(f"ACC plugin card {card.id} href must be a same-origin absolute path")
         self._plugins[plugin.id] = plugin
 
+    @property
+    def installed(self) -> tuple[AccPlugin, ...]:
+        """All descriptors, including disabled plugins, without mounting them."""
+        return tuple(self._plugins[key] for key in sorted(self._plugins))
+
     def resolve(self) -> tuple[AccPlugin, ...]:
         """Return a deterministic dependency order or fail on an invalid graph."""
         unknown = self._disabled.difference(self._plugins)

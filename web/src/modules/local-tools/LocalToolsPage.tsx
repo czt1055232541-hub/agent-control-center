@@ -281,8 +281,8 @@ export function LocalToolsPage({ token }: { token: string | null }) {
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-slate-950">本地工具中心</h2>
-            <p className="mt-1 text-sm text-slate-600">通过注册文档接入、启动和嵌入本机小工具。</p>
+            <h2 className="text-base font-semibold text-slate-950">外部应用</h2>
+            <p className="mt-1 text-sm text-slate-600">管理独立程序的注册、进程启动与页面嵌入（原“本地工具”）。ACC 功能插件的启用与停用请前往侧边栏“设置”，这里不重复注册功能插件。</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <input ref={fileInputRef} className="hidden" type="file" accept=".json,application/json" onChange={chooseManifest} />

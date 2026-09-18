@@ -1,4 +1,4 @@
-import { Archive, CalendarClock, FileCog, FileText, LayoutDashboard, PackageOpen, Route, Send, ServerCog, ScrollText, Swords } from "lucide-react";
+import { Archive, CalendarClock, FileCog, FileText, LayoutDashboard, PackageOpen, Route, Send, ServerCog, ScrollText, Swords, Settings } from "lucide-react";
 import type { AccPlugin } from "../plugins/types";
 
 export type CommandPage = string;
@@ -31,6 +31,7 @@ export function Sidebar({
         <p className="mt-1 text-xs" style={{color: "var(--text-muted)"}}>Agent Control Center</p>
       </div>
       <nav className="grid gap-1">
+        <p className="px-3 text-xs text-slate-500">已启用的功能插件</p>
         {navItems.map(({ plugin, card }) => {
           const Icon = icons[card.icon as keyof typeof icons] ?? PackageOpen;
           const active = activePage === card.page;
@@ -61,8 +62,13 @@ export function Sidebar({
           );
         })}
       </nav>
+      <button type="button" onClick={() => onNavigate("__settings__")}
+        aria-current={activePage === "__settings__" ? "page" : undefined}
+        className={`mt-4 flex min-h-10 w-full items-center gap-2 rounded-md border px-3 py-2 text-sm ${activePage === "__settings__" ? "bg-teal-700 text-white" : "bg-white/60 text-slate-700"}`}>
+        <Settings size={16} />设置 · 功能插件
+      </button>
       <div className="mt-4 rounded-md border p-3 text-xs" style={{borderColor: "var(--border-stone)", background: "rgba(255,247,232,0.7)", color: "var(--text-secondary)"}}>
-        Agent 阵列 — 管理你的探明队伍。每个 Agent 都有明确的职业、装备、技能树和任务表现。
+        功能插件由框架统一启停配置。“外部应用”仅管理独立程序的进程与页面，不是第二套插件目录。
       </div>
     </aside>
   );

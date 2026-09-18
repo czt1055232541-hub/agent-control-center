@@ -42,7 +42,7 @@ def _mount_local_tools():
     return module.router
 
 def create_local_tools_plugin() -> AccPlugin:
-    return AccPlugin(id='acc.local-tools', name='本地工具', version='1.0.0', description='Local Tools', requires=('acc.framework',), capabilities=('tools.manage',), cards=(PluginCard('acc.local-tools.overview', '本地工具', 'Local Tools', 'tools', icon='package-open', order=70),), router_factory=_mount_local_tools)
+    return AccPlugin(id='acc.local-tools', name='外部应用', version='1.0.0', description='管理独立程序的进程和页面，不重复管理 ACC 功能插件。', requires=('acc.framework',), capabilities=('tools.manage',), cards=(PluginCard('acc.local-tools.overview', '外部应用', '独立程序的注册、启动与页面嵌入', 'tools', icon='package-open', order=70),), router_factory=_mount_local_tools)
 
 def _mount_logs_diagnostics():
     module = import_module("feishu_stack.modules.logs_diagnostics.plugin")
